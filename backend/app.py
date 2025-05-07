@@ -77,6 +77,11 @@ def init_db():
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
     conn.commit()
     conn.close()
 
@@ -121,17 +126,44 @@ def dashboard():
     return render_template('dashboard.html')
 
 def get_active_apps(max_retries=7):
-    # Use Selenium to fetch real apps from AppsFlyer
-    import datetime
+    """
+    Fetch the list of active apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
+    """
     import pytz
     gmt2 = pytz.timezone('Europe/Berlin')
-    now = datetime.datetime.now(gmt2).strftime('%Y-%m-%d %H:%M:%S')
+    now = datetime.datetime.now(gmt2)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.commit()
+    c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+    row = c.fetchone()
+    if row:
+        data, updated_at = row
+        updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+        updated_at_dt = gmt2.localize(updated_at_dt)
+        if (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
+            result = json.loads(data)
+            result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+            conn.close()
+            return result
+    # If no cache or cache is old, fetch new data
     apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
-    return {
+    fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+    result = {
         "count": len(apps),
         "apps": apps,
-        "fetch_time": now
+        "fetch_time": fetch_time
     }
+    c.execute('DELETE FROM apps_cache')  # Only keep one row
+    c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
+    conn.commit()
+    conn.close()
+    return result
 
 @app.route('/active-apps')
 @login_required
@@ -650,16 +682,8 @@ def save_event_selections():
 @login_required
 def get_apps():
     try:
-        force = request.args.get('force', '0') == '1'
-        if not force and 'cached_apps' in session and 'cached_apps_time' in session:
-            return jsonify({
-                'count': len(session['cached_apps']),
-                'apps': session['cached_apps'],
-                'fetch_time': session['cached_apps_time']
-            })
+        # Always use the test data function for all pages
         result = get_active_apps()
-        session['cached_apps'] = result['apps']
-        session['cached_apps_time'] = result['fetch_time']
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)})

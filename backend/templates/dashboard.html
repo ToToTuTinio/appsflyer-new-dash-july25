@@ -504,69 +504,9 @@
     <script>
         // At the top of the <script> section, add:
         window._chartInstances = window._chartInstances || {};
+
+        // Fallback for fetchedApps
         window.fetchedApps = window.fetchedApps || [];
-
-        function loadAppsFromCache() {
-            const cached = localStorage.getItem('appsCache');
-            if (cached) {
-                try {
-                    const data = JSON.parse(cached);
-                    if (data && Array.isArray(data.apps)) {
-                        window.fetchedApps = data.apps;
-                        renderAppsList(window.fetchedApps);
-                        document.getElementById('app-count').textContent = data.count;
-                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                        return true;
-                    }
-                } catch (e) {}
-            }
-            return false;
-        }
-
-        fetchApps = function(force = true) {
-            const button = document.getElementById('get-apps-btn');
-            button.disabled = true;
-            button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
-            fetch(`/get_apps?force=${force ? '1' : '0'}`)
-                .then(response => response.json())
-                .then(data => {
-                    button.disabled = false;
-                    button.innerHTML = 'Get Apps';
-                    if (data.error) {
-                        document.getElementById('app-count').textContent = `Error: ${data.error}`;
-                        return;
-                    }
-                    window.fetchedApps = data.apps;
-                    renderAppsList(window.fetchedApps);
-                    document.getElementById('app-count').textContent = data.count;
-                    document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                    // Save to localStorage
-                    localStorage.setItem('appsCache', JSON.stringify(data));
-                })
-                .catch(error => {
-                    button.disabled = false;
-                    button.innerHTML = 'Get Apps';
-                    document.getElementById('app-count').textContent = `Error: ${error.message}`;
-                });
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Try to load from cache first
-            if (!loadAppsFromCache()) {
-                fetchApps(false); // Only fetch if no cache
-            }
-        });
-
-        // When switching to the Apps tab, load from cache if available
-        const origSwitchTab = switchTab;
-        switchTab = function(tabName) {
-            origSwitchTab(tabName);
-            if (tabName === 'apps') {
-                if (!loadAppsFromCache()) {
-                    fetchApps(false);
-                }
-            }
-        };
 
         function switchTab(tabName) {
             // Hide all tab contents
@@ -584,6 +524,33 @@
             
             // Activate selected tab button
             event.target.classList.add('active');
+        }
+
+        // Remove static apps and update fetchApps
+        fetchApps = function() {
+            const button = document.getElementById('get-apps-btn');
+            button.disabled = true;
+            button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
+
+            fetch('/get_apps')
+                .then(response => response.json())
+                .then(data => {
+                    button.disabled = false;
+                    button.innerHTML = 'Get Apps';
+                    if (data.error) {
+                        document.getElementById('app-count').textContent = `Error: ${data.error}`;
+                        return;
+                    }
+                    fetchedApps = data.apps;
+            renderAppsList(fetchedApps);
+                    document.getElementById('app-count').textContent = data.count;
+                    document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                })
+                .catch(error => {
+                    button.disabled = false;
+                    button.innerHTML = 'Get Apps';
+                    document.getElementById('app-count').textContent = `Error: ${error.message}`;
+                });
         }
 
         function logout() {

@@ -29,12 +29,12 @@ cd appsflyer-dash-2025
 
 2. Install Python dependencies:
 ```bash
-pip install -r backend/requirements.txt
-```
+   pip install -r backend/requirements.txt
+   ```
 
 3. Set up environment variables:
 Create a `.env.local` file with the following variables:
-```
+   ```
 EMAIL=your_appsflyer_email
 PASSWORD=your_appsflyer_password
 APPSFLYER_API_KEY=your_api_key
@@ -46,7 +46,7 @@ APPSFLYER_API_KEY=your_api_key
 ```bash
 cd backend
 python app.py
-```
+   ```
 
 2. Access the dashboard at `http://localhost:5000`
 
