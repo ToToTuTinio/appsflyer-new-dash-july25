@@ -1,0 +1,1088 @@
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from flask_cors import CORS
+import os
+from pathlib import Path
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+import time
+from functools import wraps
+import requests
+import csv
+from io import StringIO
+import datetime
+import sqlite3
+import sys
+import json
+import pytz
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from appsflyer_login import get_apps_with_installs
+
+# Get the project root directory and load environment variables
+project_root = Path(__file__).parent.parent
+env_path = project_root / '.env.local'
+
+print(f"Looking for .env file at: {env_path}")
+print(f"File exists: {env_path.exists()}")
+
+# Read the .env.local file directly
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            if line.strip() and not line.startswith('#'):
+                key, value = line.strip().split('=', 1)
+                os.environ[key] = value.strip('"').strip("'")
+
+app = Flask(__name__)
+CORS(app)
+app.secret_key = os.urandom(24)  # Required for session management
+
+# Dashboard Configuration
+DASHBOARD_USERNAME = "nexamob"
+DASHBOARD_PASSWORD = "NexamobTech$"
+
+# AppsFlyer Configuration
+EMAIL = os.getenv('EMAIL')
+PASSWORD = os.getenv('PASSWORD')
+APPSFLYER_API_KEY = os.getenv('APPSFLYER_API_KEY')
+
+if not all([EMAIL, PASSWORD]):
+    raise ValueError("EMAIL and PASSWORD not found in environment variables")
+
+DB_PATH = 'event_selections.db'
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS app_event_selections (
+        app_id TEXT PRIMARY KEY,
+        event1 TEXT,
+        event2 TEXT
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS stats_cache (
+        range TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
+        range TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
+        app_id TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/')
+def login():
+    if 'logged_in' in session:
+        return redirect(url_for('dashboard'))
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def handle_login():
+    data = request.get_json()
+    if data['email'] == DASHBOARD_USERNAME and data['password'] == DASHBOARD_PASSWORD:
+        session['logged_in'] = True
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 401
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
+@app.route('/check-auth')
+def check_auth():
+    if 'logged_in' in session:
+        return jsonify({'authenticated': True})
+    return jsonify({'authenticated': False}), 401
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    return render_template('dashboard.html')
+
+def get_active_apps(max_retries=7):
+    # Use Selenium to fetch real apps from AppsFlyer
+    import datetime
+    import pytz
+    gmt2 = pytz.timezone('Europe/Berlin')
+    now = datetime.datetime.now(gmt2).strftime('%Y-%m-%d %H:%M:%S')
+    apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
+    return {
+        "count": len(apps),
+        "apps": apps,
+        "fetch_time": now
+    }
+
+@app.route('/active-apps')
+@login_required
+def active_apps():
+    try:
+        result = get_active_apps()
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"Error in active_apps endpoint: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'count': 0,
+            'apps': [],
+            'fetch_time': '0.00 seconds'
+        }), 500
+
+@app.route('/app-stats/<app_id>')
+@login_required
+def app_stats(app_id):
+    headers = {
+        "Authorization": f"Bearer {APPSFLYER_API_KEY}"
+    }
+    # Example: Installs report (adjust endpoint as needed)
+    installs_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/installs_report/v5"
+    try:
+        resp = requests.get(installs_url, headers=headers)
+        if resp.status_code == 200:
+            # For now, just return the raw response (CSV or JSON)
+            return resp.text, 200, {'Content-Type': resp.headers.get('Content-Type', 'text/plain')}
+        else:
+            return jsonify({"error": f"API error: {resp.status_code}", "details": resp.text}), resp.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def get_period_dates(period):
+    today = datetime.date.today()
+    if period in ('today',):
+        start_date = end_date = today
+    elif period in ('yesterday',):
+        start_date = end_date = today - datetime.timedelta(days=1)
+    elif period in ('last30', '30d'):
+        start_date = today - datetime.timedelta(days=29)
+        end_date = today
+    elif period in ('last10', '10d'):
+        start_date = today - datetime.timedelta(days=9)
+        end_date = today
+    elif period == 'mtd':
+        start_date = today.replace(day=1)
+        end_date = today
+    elif period == 'lastmonth':
+        first_of_this_month = today.replace(day=1)
+        last_month_end = first_of_this_month - datetime.timedelta(days=1)
+        start_date = last_month_end.replace(day=1)
+        end_date = last_month_end
+    else:
+        # Default to last 10 days
+        start_date = today - datetime.timedelta(days=9)
+        end_date = today
+    return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+
+@app.route('/app-events/<app_id>')
+@login_required
+def app_events(app_id):
+    import time
+    import requests
+    today = datetime.date.today()
+    start_date = (today - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+    end_date = today.strftime("%Y-%m-%d")
+    url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
+    params = {"from": start_date, "to": end_date}
+    headers = {"accept": "text/csv", "authorization": f"Bearer {APPSFLYER_API_KEY}"}
+    
+    # Check event_cache first
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
+        app_id TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.commit()
+    c.execute('SELECT data, updated_at FROM event_cache WHERE app_id = ?', (app_id,))
+    row = c.fetchone()
+    if row:
+        data, updated_at = row
+        result = json.loads(data)
+        result['updated_at'] = updated_at
+        conn.close()
+        return jsonify(result)
+    
+    # Get app name from static apps
+    app_name = app_id
+    static_apps = [
+        {"app_id": "id905953485", "app_name": "NordVPN: VPN Fast & Secure"},
+        {"app_id": "id1211206916", "app_name": "888poker IT"}
+    ]
+    for app in static_apps:
+        if app["app_id"] == app_id:
+            app_name = app["app_name"]
+            break
+            
+    print(f"[GET EVENTS] Fetching In-App Events for: {app_name} (App ID: {app_id}) from {start_date} to {end_date}...")
+    max_retries = 2
+    retry_delay = 5
+    retries = 0
+    start_time = time.time()
+    
+    while retries < max_retries:
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=90)
+            response.raise_for_status()
+            rows = response.text.strip().split("\n")
+            if not rows:
+                return jsonify({
+                    "events": [], 
+                    "fetch_time": f"{time.time()-start_time:.2f} seconds",
+                    "error": "No data returned from API"
+                })
+                
+            header = rows[0].split(",")
+            data = [row.split(",") for row in rows[1:]]
+            
+            if "Event Name" not in header:
+                print(f"[GET EVENTS] No 'Event Name' column found for app: {app_id}")
+                return jsonify({
+                    "events": [], 
+                    "fetch_time": f"{time.time()-start_time:.2f} seconds",
+                    "error": "No 'Event Name' column in API response"
+                })
+                
+            event_name_index = header.index("Event Name")
+            event_names = set()
+            for row in data:
+                if len(row) > event_name_index:
+                    event_names.add(row[event_name_index])
+                    
+            elapsed = time.time() - start_time
+            print(f"[GET EVENTS] Done fetching events for app: {app_name} (App ID: {app_id}) in {elapsed:.2f} seconds. Found {len(event_names)} events.")
+            result = {
+                "events": sorted(list(event_names)), 
+                "fetch_time": f"{elapsed:.2f} seconds"
+            }
+            # Save to cache
+            c.execute('REPLACE INTO event_cache (app_id, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)', (app_id, json.dumps(result)))
+            conn.commit()
+            conn.close()
+            return jsonify(result)
+            
+        except requests.exceptions.HTTPError as http_err:
+            response_content = response.text.strip() if hasattr(response, 'text') else ''
+            print(f"[GET EVENTS] HTTP error occurred: {http_err}")
+            print("Response Content:", response_content)
+            
+            if "Limit reached for daily-report" in response_content:
+                retries += 1
+                if retries < max_retries:
+                    print(f"Limit reached for daily-report. Retrying in {retry_delay} seconds... (Attempt {retries}/{max_retries})")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    print("Max retries reached for daily-report. Skipping In-App Events for this app.")
+                    return jsonify({
+                        "events": [], 
+                        "fetch_time": f"{time.time()-start_time:.2f} seconds", 
+                        "error": "API rate limit reached after multiple retries"
+                    })
+            else:
+                print("Unhandled HTTP error. Skipping In-App Events for this app.")
+                return jsonify({
+                    "events": [], 
+                    "fetch_time": f"{time.time()-start_time:.2f} seconds", 
+                    "error": f"HTTP Error: {str(http_err)}",
+                    "response_content": response_content
+                })
+                
+        except Exception as e:
+            retries += 1
+            print(f"An error occurred while fetching In-App Events for {app_name} (App ID: {app_id}): {e}")
+            if retries < max_retries:
+                print(f"Retrying in {retry_delay} seconds... (Attempt {retries}/{max_retries})")
+                time.sleep(retry_delay)
+                continue
+            else:
+                print("Max retries reached or unrecoverable error occurred. Skipping In-App Events for this app.")
+                return jsonify({
+                    "events": [], 
+                    "fetch_time": f"{time.time()-start_time:.2f} seconds", 
+                    "error": str(e)
+                })
+                
+    print("Max retries reached or unrecoverable error occurred. Skipping In-App Events for this app.")
+    return jsonify({
+        "events": [], 
+        "fetch_time": f"{time.time()-start_time:.2f} seconds", 
+        "error": "Max retries reached"
+    })
+
+def make_api_request(url, params, max_retries=7, retry_delay=30):
+    headers = {
+        "Authorization": f"Bearer {APPSFLYER_API_KEY}",
+        "accept": "text/csv"
+    }
+    for attempt in range(max_retries):
+        try:
+            print(f"[API] Making request to {url} (attempt {attempt + 1}/{max_retries})")
+            resp = requests.get(url, headers=headers, params=params, timeout=90)
+            if resp.status_code == 200:
+                return resp
+            print(f"[API] Request failed with status {resp.status_code}")
+            print(f"[API] Response headers: {dict(resp.headers)}")
+            print(f"[API] Response body: {resp.text}")
+            
+            # Check for specific error messages that should skip retries
+            error_text = resp.text.lower()
+            skip_retry_messages = [
+                "limit reached for daily-report",
+                "you've reached your maximum number of in-app event reports that can be downloaded today for this app",
+                "you've reached your maximum number of install reports that can be downloaded today for this app",
+                "your current subscription package doesn't include raw data reports",
+                "subscription package doesn't include raw data"
+            ]
+            
+            if any(msg in error_text for msg in skip_retry_messages):
+                print("[API] Detected API limitation. Skipping retries for this request.")
+                return None
+                
+            if resp.status_code == 429:  # Rate limit
+                retry_after = int(resp.headers.get('Retry-After', retry_delay))
+                print(f"[API] Rate limited. Waiting {retry_after} seconds...")
+                time.sleep(retry_after)
+                continue
+            if attempt < max_retries - 1:
+                print(f"[API] Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+        except requests.exceptions.RequestException as e:
+            print(f"[API] Request error: {str(e)}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"[API] Exception response headers: {dict(e.response.headers)}")
+                print(f"[API] Exception response body: {e.response.text}")
+            if attempt < max_retries - 1:
+                print(f"[API] Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+    return None
+
+@app.route('/all-apps-stats', methods=['POST'])
+@login_required
+def all_apps_stats():
+    data = request.get_json()
+    active_apps = data.get('apps', [])
+    period = data.get('period', 'last10')
+    selected_events = data.get('selected_events', {})
+    start_date, end_date = get_period_dates(period)
+    print(f"[STATS] /all-apps-stats called for period: {period} ({start_date} to {end_date})")
+    print(f"[STATS] Apps: {[app['app_id'] for app in active_apps]}")
+    stats_list = []
+    
+    # Build a unique cache key for stats: period:event1:event2:app_ids
+    app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
+    event1 = ''
+    event2 = ''
+    if active_apps and selected_events:
+        first_app_id = active_apps[0]['app_id']
+        events = selected_events.get(first_app_id, [])
+        if len(events) > 0:
+            event1 = events[0] or ''
+        if len(events) > 1:
+            event2 = events[1] or ''
+    cache_key = f"{period}:{event1}:{event2}:{app_ids}"
+    # Check cache
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT data, updated_at FROM stats_cache WHERE range = ?', (cache_key,))
+    row = c.fetchone()
+    if row:
+        data, updated_at = row
+        result = json.loads(data)
+        # Only use cache if it contains at least one app
+        if result.get('apps') and len(result['apps']) > 0:
+            result['updated_at'] = updated_at
+            conn.close()
+            return jsonify(result)
+    
+    for app in active_apps:
+        app_id = app['app_id']
+        app_name = app['app_name']
+        print(f"[STATS] Fetching stats for app: {app_name} (App ID: {app_id})...")
+        
+        # Use the aggregate daily report endpoint for main stats
+        url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
+        params = {"from": start_date, "to": end_date}
+        
+        try:
+            print(f"[STATS] Calling daily_report API for {app_id}...")
+            resp = make_api_request(url, params)
+            daily_stats = {}
+            
+            if resp and resp.status_code == 200:
+                print(f"[STATS] Got daily_report for {app_id}.")
+                rows = resp.text.strip().split("\n")
+                if len(rows) < 2:  # Only header or empty
+                    print(f"[STATS] No data returned for {app_id}")
+                    stats_list.append({
+                        'app_id': app_id,
+                        'app_name': app_name,
+                        'table': [],
+                        'selected_events': [],
+                        'traffic': 0,
+                        'error': 'No data returned from API'
+                    })
+                    continue
+                header = rows[0].split(",")
+                print(f"[STATS] daily_report header for {app_id}: {header}")
+                data_rows = [row.split(",") for row in rows[1:]]
+                # Case-insensitive column mapping
+                col_map = {col.lower().strip(): i for i, col in enumerate(header)}
+                def find_col(*names):
+                    for name in names:
+                        for col in header:
+                            if col.lower().replace('_','').replace(' ','') == name.lower().replace('_','').replace(' ',''):
+                                return header.index(col)
+                    return None
+                impressions_idx = find_col('impressions', 'Impressions')
+                clicks_idx = find_col('clicks', 'Clicks')
+                installs_idx = find_col('installs', 'Installs')
+                date_idx = find_col('date', 'Date')
+                media_source_idx = find_col('media_source', 'media source', 'Media Source', 'Media Source (pid)', 'media_source (pid)', 'pid', 'Media Source (PID)', 'media_source (PID)')
+                if None in [impressions_idx, clicks_idx, installs_idx, date_idx]:
+                    print(f"[STATS] WARNING: Could not find all required columns for {app_id}")
+                    continue
+                if media_source_idx is None:
+                    print(f"[STATS] WARNING: Could not find media source column for {app_id}. Skipping all installs for safety.")
+                    continue
+                for row in data_rows:
+                    if len(row) <= max(impressions_idx, clicks_idx, installs_idx, date_idx, media_source_idx):
+                        continue
+                    media_source = row[media_source_idx].strip().lower()
+                    date = row[date_idx] if date_idx is not None and len(row) > date_idx else ''
+                    if not date:
+                        continue
+                    impressions = int(row[impressions_idx]) if impressions_idx is not None and len(row) > impressions_idx and row[impressions_idx].isdigit() else 0
+                    clicks = int(row[clicks_idx]) if clicks_idx is not None and len(row) > clicks_idx and row[clicks_idx].isdigit() else 0
+                    installs = int(row[installs_idx]) if installs_idx is not None and len(row) > installs_idx and row[installs_idx].isdigit() else 0
+                    
+                    # Initialize daily stats if not exists
+                    daily_stats.setdefault(date, {"impressions": 0, "clicks": 0, "total_installs": 0, "organic_installs": 0})
+                    
+                    # Add to totals
+                    daily_stats[date]["impressions"] += impressions
+                    daily_stats[date]["clicks"] += clicks
+                    daily_stats[date]["total_installs"] += installs
+                    
+                    # Track organic installs separately
+                    if media_source == 'organic':
+                        daily_stats[date]["organic_installs"] += installs
+                
+                # After processing all rows, calculate non-organic installs
+                for date in daily_stats:
+                    daily_stats[date]["installs"] = daily_stats[date]["total_installs"] - daily_stats[date]["organic_installs"]
+                    if daily_stats[date]["installs"] < 0:
+                        daily_stats[date]["installs"] = 0  # Prevent negative installs
+            else:
+                print(f"[STATS] daily_report API error for {app_id}: {resp.status_code if resp else 'No response'}")
+                continue
+            # Blocked Installs (RT)
+            print(f"[STATS] Calling blocked_installs_report API for {app_id}...")
+            blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
+            blocked_rt_params = {"from": start_date, "to": end_date}
+            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
+            if blocked_rt_resp and blocked_rt_resp.status_code == 200:
+                blocked_rows = blocked_rt_resp.text.strip().split("\n")
+                if len(blocked_rows) > 1:
+                    header_rt = blocked_rows[0].split(",")
+                    date_index = header_rt.index("Install Time") if "Install Time" in header_rt else None
+                    for row in blocked_rows[1:]:
+                        cols = row.split(",")
+                        if date_index is not None and len(cols) > date_index:
+                            install_date = cols[date_index].split(" ")[0]
+                            daily_stats.setdefault(install_date, {}).setdefault("blocked_installs_rt", 0)
+                            daily_stats[install_date]["blocked_installs_rt"] += 1
+            # Blocked Installs (PA)
+            print(f"[STATS] Calling detection API for {app_id}...")
+            blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
+            blocked_pa_params = {"from": start_date, "to": end_date}
+            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
+            if blocked_pa_resp and blocked_pa_resp.status_code == 200:
+                blocked_pa_rows = blocked_pa_resp.text.strip().split("\n")
+                if len(blocked_pa_rows) > 1:
+                    header_pa = blocked_pa_rows[0].split(",")
+                    date_index = header_pa.index("Install Time") if "Install Time" in header_pa else None
+                    for row in blocked_pa_rows[1:]:
+                        cols = row.split(",")
+                        if date_index is not None and len(cols) > date_index:
+                            install_date = cols[date_index].split(" ")[0]
+                            daily_stats.setdefault(install_date, {}).setdefault("blocked_installs_pa", 0)
+                            daily_stats[install_date]["blocked_installs_pa"] += 1
+            # In-App Events (for selected events)
+            event_data = {}
+            selected = selected_events.get(app_id, [])
+            # Helper to detect error events
+            def is_error_event(ev):
+                if not ev: return True
+                evl = ev.lower()
+                return (
+                    'maximum nu' in evl or
+                    'subscription' in evl or
+                    'error' in evl or
+                    'failed' in evl or
+                    "doesn't include" in evl or
+                    'not include' in evl or
+                    'your current subscription pack' in evl
+                )
+            # Only fetch in-app events if there are real events
+            real_events = [ev for ev in selected if ev and not is_error_event(ev)]
+            if real_events:
+                print(f"[STATS] Calling in_app_events_report API for {app_id} (events: {real_events})...")
+                events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
+                events_params = {"from": start_date, "to": end_date}
+                events_resp = make_api_request(events_url, events_params)
+                if events_resp and events_resp.status_code == 200:
+                    event_rows = events_resp.text.strip().split("\n")
+                    event_header = event_rows[0].split(",")
+                    event_name_index = event_header.index("Event Name") if "Event Name" in event_header else None
+                    event_time_index = event_header.index("Event Time") if "Event Time" in event_header else None
+                    for row in event_rows[1:]:
+                        cols = row.split(",")
+                        if event_name_index is not None and event_time_index is not None and len(cols) > max(event_name_index, event_time_index):
+                            event_name = cols[event_name_index]
+                            event_date = cols[event_time_index].split(" ")[0]
+                            if event_name in real_events:
+                                event_data.setdefault(event_name, {})
+                                event_data[event_name].setdefault(event_date, 0)
+                                event_data[event_name][event_date] += 1
+                else:
+                    print(f"[STATS] in_app_events_report API error for {app_id}: {events_resp.status_code if events_resp else 'No response'}")
+            else:
+                print(f"[STATS] Skipping in_app_events_report API for {app_id} (no real events)")
+            # Prepare daily stats for frontend
+            all_dates = sorted(daily_stats.keys())
+            table = []
+            for date in all_dates:
+                # Skip dates that have no stats data
+                if not any(daily_stats[date].get(key, 0) > 0 for key in ["impressions", "clicks", "installs", "blocked_installs_rt", "blocked_installs_pa"]):
+                    continue
+                    
+                row = {
+                    "date": date,
+                    "impressions": daily_stats[date].get("impressions", 0),
+                    "clicks": daily_stats[date].get("clicks", 0),
+                    "installs": daily_stats[date].get("installs", 0),
+                    "blocked_installs_rt": daily_stats[date].get("blocked_installs_rt", 0),
+                    "blocked_installs_pa": daily_stats[date].get("blocked_installs_pa", 0),
+                }
+                # Calculated rates
+                row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
+                row["click_to_install"] = (row["installs"] / row["clicks"]) if row["clicks"] > 0 else 0
+                row["blocked_rt_rate"] = round(row["blocked_installs_rt"] / row["installs"], 2) if row["installs"] > 0 else 0
+                row["blocked_pa_rate"] = round(row["blocked_installs_pa"] / row["installs"], 2) if row["installs"] > 0 else 0
+                # Add event counts
+                if selected:
+                    for event in selected:
+                        row[event] = event_data.get(event, {}).get(date, 0)
+                table.append(row)
+            stats_list.append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'table': table,
+                'selected_events': selected,
+                'traffic': sum(r['impressions'] + r['clicks'] for r in table)
+            })
+        except Exception as e:
+            print(f"[STATS] Error for app {app_id}: {e}")
+            stats_list.append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'table': [],
+                'selected_events': [],
+                'traffic': 0,
+                'error': str(e)
+            })
+    print(f"[STATS] Done. Returning stats for {len(stats_list)} apps.")
+    stats_list.sort(key=lambda x: x['traffic'], reverse=True)
+    # Save to cache ONLY if there is at least one app
+    if len(stats_list) > 0:
+        c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)', (cache_key, json.dumps({'apps': stats_list})))
+        conn.commit()
+    conn.close()
+    return jsonify({'apps': stats_list})
+
+@app.route('/event-selections', methods=['GET'])
+@login_required
+def get_event_selections():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT app_id, event1, event2 FROM app_event_selections')
+    rows = c.fetchall()
+    conn.close()
+    selections = {app_id: [event1, event2] for app_id, event1, event2 in rows}
+    return jsonify(selections)
+
+@app.route('/event-selections', methods=['POST'])
+@login_required
+def save_event_selections():
+    data = request.get_json()
+    # data = {app_id: [event1, event2], ...}
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    for app_id, events in data.items():
+        event1, event2 = events if len(events) == 2 else (None, None)
+        c.execute('REPLACE INTO app_event_selections (app_id, event1, event2) VALUES (?, ?, ?)', (app_id, event1, event2))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/get_apps')
+@login_required
+def get_apps():
+    try:
+        # Always use the test data function for all pages
+        result = get_active_apps()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/get_events')
+@login_required
+def get_events():
+    try:
+        app_id = request.args.get('app_id')
+        if not app_id:
+            return jsonify({"error": "app_id is required"}), 400
+
+        # Simulate a check for raw data report availability
+        # In production, this would be a real API call to AppsFlyer
+        if app_id == "id6633423879":  # SportsMillions Pick'em
+            return jsonify({
+                "events": ["Not Include Events"],
+                "error": "not_included"
+            })
+
+        # For now, return static test events for other apps
+        return jsonify({
+            "events": [
+                "af_purchase",
+                "af_complete_registration",
+                "af_level_achieved",
+                "af_tutorial_completion"
+            ]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_stats')
+@login_required
+def get_stats():
+    try:
+        range_key = request.args.get('range', '10d')
+        force = request.args.get('force', '0') == '1'
+        # If force, trigger a new fetch (client should call /all-apps-stats)
+        if force:
+            return jsonify({'error': 'Force fetch not implemented in /get_stats. Please use /all-apps-stats.'}), 400
+        # Return the most recent stats if available
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        if range_key == 'last10':
+            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
+        else:
+            c.execute('SELECT data, updated_at FROM stats_cache WHERE range = ?', (range_key,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            result['updated_at'] = updated_at
+            return jsonify(result)
+        else:
+            return jsonify({'apps': [], 'updated_at': None})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/update-credential', methods=['POST'])
+@login_required
+def update_credential():
+    allowed_keys = {'APPSFLYER_API_KEY', 'EMAIL', 'PASSWORD'}
+    data = request.get_json()
+    key = data.get('key')
+    value = data.get('value')
+    if key not in allowed_keys:
+        return jsonify({'success': False, 'error': 'Invalid key'}), 400
+    env_path = Path(__file__).parent.parent / '.env.local'
+    try:
+        # Read all lines
+        lines = []
+        found = False
+        if env_path.exists():
+            with open(env_path, 'r') as f:
+                for line in f:
+                    if line.strip().startswith(f'{key}='):
+                        lines.append(f'{key}="{value}"\n')
+                        found = True
+                    else:
+                        lines.append(line)
+        if not found:
+            lines.append(f'{key}="{value}"\n')
+        with open(env_path, 'w') as f:
+            f.writelines(lines)
+        # Update in-memory env var
+        os.environ[key] = value
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/profile-info')
+@login_required
+def profile_info():
+    return jsonify({
+        'agency': 'N/A',
+        'api_key': os.getenv('APPSFLYER_API_KEY', ''),
+        'email': os.getenv('EMAIL', ''),
+        'password': os.getenv('PASSWORD', '')
+    })
+
+def find_media_source_idx(header):
+    # More flexible matching for Media Source column
+    def norm(col):
+        return col.lower().replace(' ', '').replace('_', '').replace('(', '').replace(')', '')
+    # Try exact match first
+    for i, col in enumerate(header):
+        if norm(col) == 'mediasource':
+            return i
+    # Try partial match if exact match fails
+    for i, col in enumerate(header):
+        if 'media' in norm(col) and 'source' in norm(col):
+            return i
+    print(f"[FRAUD] WARNING: Could not find Media Source column in header: {header}")
+    return None
+
+@app.route('/get_fraud', methods=['POST'])
+@login_required
+def get_fraud():
+    try:
+        data = request.get_json()
+        active_apps = data.get('apps', [])
+        period = data.get('period', 'last10')
+        force = data.get('force', False)
+        start_date, end_date = get_period_dates(period)
+        # Create a unique cache key based on period and sorted app IDs
+        app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
+        cache_key = f"{period}:{app_ids}"
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
+            range TEXT PRIMARY KEY,
+            data TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        conn.commit()
+        if not force:
+            c.execute('SELECT data, updated_at FROM fraud_cache WHERE range = ?', (cache_key,))
+            row = c.fetchone()
+            if row:
+                data, updated_at = row
+                result = json.loads(data)
+                # Only use cache if it contains at least one app
+                if result.get('apps') and len(result['apps']) > 0:
+                    result['updated_at'] = updated_at
+                    conn.close()
+                    return jsonify(result)
+        fraud_list = []
+        for app in active_apps:
+            app_id = app['app_id']
+            app_name = app['app_name']
+            print(f"[FRAUD] Fetching fraud data for app: {app_name} (App ID: {app_id})...")
+            table = []
+            app_errors = []
+            # Helper: aggregate by (date, media_source)
+            agg = {}
+            def add_metric(date, media_source, key):
+                k = (date, media_source)
+                if k not in agg:
+                    agg[k] = {
+                        "date": date,
+                        "media_source": media_source,
+                        "blocked_installs_rt": 0,
+                        "blocked_installs_pa": 0,
+                        "blocked_in_app_events": 0,
+                        "fraud_post_inapps": 0,
+                        "blocked_clicks": 0,
+                        "blocked_install_postbacks": 0
+                    }
+                agg[k][key] += 1
+            # Blocked Installs (RT)
+            blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
+            blocked_rt_params = {"from": start_date, "to": end_date}
+            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
+            if blocked_rt_resp and blocked_rt_resp.status_code == 200:
+                rows = blocked_rt_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Install Time") if "Install Time" in header else None
+                    ms_idx = find_media_source_idx(header)
+                    if ms_idx is None:
+                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (RT) for app {app_id}. Header: {header}")
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            install_date = cols[date_idx].split(" ")[0]
+                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
+                            add_metric(install_date, media_source, "blocked_installs_rt")
+            elif blocked_rt_resp is not None:
+                app_errors.append(f"Blocked Installs (RT) API error: {blocked_rt_resp.status_code} {blocked_rt_resp.text[:200]}")
+            # Blocked Installs (PA)
+            blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
+            blocked_pa_params = {"from": start_date, "to": end_date}
+            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
+            if blocked_pa_resp and blocked_pa_resp.status_code == 200:
+                rows = blocked_pa_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Install Time") if "Install Time" in header else None
+                    ms_idx = find_media_source_idx(header)
+                    if ms_idx is None:
+                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (PA) for app {app_id}. Header: {header}")
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            install_date = cols[date_idx].split(" ")[0]
+                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
+                            add_metric(install_date, media_source, "blocked_installs_pa")
+            elif blocked_pa_resp is not None:
+                app_errors.append(f"Blocked Installs (PA) API error: {blocked_pa_resp.status_code} {blocked_pa_resp.text[:200]}")
+            # Blocked In-App Events
+            blocked_events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_in_app_events_report/v5"
+            blocked_events_params = {"from": start_date, "to": end_date}
+            blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params)
+            if blocked_events_resp and blocked_events_resp.status_code == 200:
+                rows = blocked_events_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Event Time") if "Event Time" in header else None
+                    ms_idx = find_media_source_idx(header)
+                    if ms_idx is None:
+                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked In-App Events for app {app_id}. Header: {header}")
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            event_date = cols[date_idx].split(" ")[0]
+                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
+                            add_metric(event_date, media_source, "blocked_in_app_events")
+            elif blocked_events_resp is not None:
+                app_errors.append(f"Blocked In-App Events API error: {blocked_events_resp.status_code} {blocked_events_resp.text[:200]}")
+            # Fraud Post Inapps
+            fraud_post_inapps_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/fraud-post-inapps/v5"
+            fraud_post_inapps_params = {"from": start_date, "to": end_date}
+            fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params)
+            if fraud_post_inapps_resp and fraud_post_inapps_resp.status_code == 200:
+                rows = fraud_post_inapps_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Event Time") if "Event Time" in header else None
+                    ms_idx = find_media_source_idx(header)
+                    if ms_idx is None:
+                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Fraud Post InApps for app {app_id}. Header: {header}")
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            event_date = cols[date_idx].split(" ")[0]
+                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
+                            add_metric(event_date, media_source, "fraud_post_inapps")
+            elif fraud_post_inapps_resp is not None:
+                app_errors.append(f"Fraud Post-InApps API error: {fraud_post_inapps_resp.status_code} {fraud_post_inapps_resp.text[:200]}")
+            # Blocked Clicks
+            blocked_clicks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_clicks_report/v5"
+            blocked_clicks_params = {"from": start_date, "to": end_date}
+            blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params)
+            if blocked_clicks_resp and blocked_clicks_resp.status_code == 200:
+                rows = blocked_clicks_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Click Time") if "Click Time" in header else None
+                    ms_idx = find_media_source_idx(header)
+                    if ms_idx is None:
+                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Clicks for app {app_id}. Header: {header}")
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            click_date = cols[date_idx].split(" ")[0]
+                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
+                            add_metric(click_date, media_source, "blocked_clicks")
+            elif blocked_clicks_resp is not None:
+                app_errors.append(f"Blocked Clicks API error: {blocked_clicks_resp.status_code} {blocked_clicks_resp.text[:200]}")
+            # Blocked Install Postbacks
+            blocked_postbacks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_install_postbacks/v5"
+            blocked_postbacks_params = {"from": start_date, "to": end_date}
+            blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params)
+            if blocked_postbacks_resp and blocked_postbacks_resp.status_code == 200:
+                rows = blocked_postbacks_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Install Time") if "Install Time" in header else None
+                    ms_idx = find_media_source_idx(header)
+                    if ms_idx is None:
+                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Install Postbacks for app {app_id}. Header: {header}")
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            install_date = cols[date_idx].split(" ")[0]
+                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
+                            add_metric(install_date, media_source, "blocked_install_postbacks")
+            elif blocked_postbacks_resp is not None:
+                app_errors.append(f"Blocked Install Postbacks API error: {blocked_postbacks_resp.status_code} {blocked_postbacks_resp.text[:200]}")
+            # Aggregate all (date, media_source) rows
+            for (date, media_source), row in sorted(agg.items()):
+                # Include all rows, even if all metrics are zero
+                print(f"[FRAUD] Adding row for media source: {media_source} on date: {date}")
+                print(f"[FRAUD] Row metrics: {row}")
+                table.append(row)
+            print(f"[FRAUD] Final table for {app_name} has {len(table)} rows")
+            print(f"[FRAUD] Unique media sources: {sorted(set(row['media_source'] for row in table))}")
+            fraud_list.append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'table': table,
+                'errors': app_errors
+            })
+        # Save to cache ONLY if there is at least one app
+        if len(fraud_list) > 0:
+            c.execute('REPLACE INTO fraud_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                      (cache_key, json.dumps({'apps': fraud_list})))
+            conn.commit()
+        conn.close()
+        return jsonify({'apps': fraud_list})
+    except Exception as e:
+        print(f"[FRAUD] Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/overview')
+@login_required
+def overview():
+    try:
+        # Read the most recent 'last10' stats_cache entry (regardless of event selections or app IDs)
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
+        row = c.fetchone()
+        total_impressions = 0
+        total_clicks = 0
+        total_installs = 0
+        last_updated = None
+        date_map = {}
+        if row:
+            data, updated_at = row
+            stats = json.loads(data)
+            # Convert last_updated to GMT+2
+            if updated_at:
+                import datetime
+                utc_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+                utc_dt = utc_dt.replace(tzinfo=pytz.utc)
+                gmt2 = pytz.timezone('Europe/Berlin')
+                last_updated = utc_dt.astimezone(gmt2).strftime('%Y-%m-%d %H:%M:%S')
+            for app in stats.get('apps', []):
+                for entry in app.get('table', []):
+                    date = entry.get('date')
+                    if date:
+                        if date not in date_map:
+                            date_map[date] = {'impressions': 0, 'clicks': 0, 'installs': 0}
+                        date_map[date]['impressions'] += int(entry.get('impressions', 0))
+                        date_map[date]['clicks'] += int(entry.get('clicks', 0))
+                        date_map[date]['installs'] += int(entry.get('installs', 0))
+                    total_impressions += int(entry.get('impressions', 0))
+                    total_clicks += int(entry.get('clicks', 0))
+                    total_installs += int(entry.get('installs', 0))
+        trend_dates = sorted(date_map.keys())
+        trend_impressions = [date_map[d]['impressions'] for d in trend_dates]
+        trend_clicks = [date_map[d]['clicks'] for d in trend_dates]
+        trend_installs = [date_map[d]['installs'] for d in trend_dates]
+
+        # Use only the most recent 'last10:' fraud_cache entry for Top Fraudulent Sources
+        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last10:%' ORDER BY updated_at DESC LIMIT 1")
+        fraud_cache_row = c.fetchone()
+        top_bad_sources_by_app = []
+        if fraud_cache_row:
+            fraud_cache_key = fraud_cache_row[0]
+            c.execute('SELECT data FROM fraud_cache WHERE range = ?', (fraud_cache_key,))
+            fraud_row = c.fetchone()
+            if fraud_row:
+                fraud_data = json.loads(fraud_row[0])
+                # For each app, group by media_source and sum fraud
+                for app in fraud_data.get('apps', []):
+                    app_name = app.get('app_name', '')
+                    app_id = app.get('app_id', '')
+                    source_map = {}
+                    for row in app.get('table', []):
+                        media_source = row.get('media_source', '')
+                        pa_fraud = int(row.get('blocked_installs_pa', 0))
+                        rt_fraud = int(row.get('blocked_installs_rt', 0))
+                        if pa_fraud > 0 or rt_fraud > 0:
+                            if media_source not in source_map:
+                                source_map[media_source] = {'media_source': media_source, 'pa_fraud': 0, 'rt_fraud': 0}
+                            source_map[media_source]['pa_fraud'] += pa_fraud
+                            source_map[media_source]['rt_fraud'] += rt_fraud
+                    # Top 5 sources for this app
+                    sources = list(source_map.values())
+                    sources.sort(key=lambda x: x['pa_fraud'] + x['rt_fraud'], reverse=True)
+                    top_sources = sources[:5]
+                    total_fraud = sum(s['pa_fraud'] + s['rt_fraud'] for s in top_sources)
+                    top_bad_sources_by_app.append({
+                        'app_id': app_id,
+                        'app_name': app_name,
+                        'sources': top_sources,
+                        'total_fraud': total_fraud
+                    })
+                # Sort apps by total fraud, take top 5
+                top_bad_sources_by_app.sort(key=lambda x: x['total_fraud'], reverse=True)
+                top_bad_sources_by_app = top_bad_sources_by_app[:5]
+        conn.close()
+
+        return jsonify({
+            'totals': {
+                'impressions': total_impressions,
+                'clicks': total_clicks,
+                'installs': total_installs
+            },
+            'trend': {
+                'dates': trend_dates,
+                'impressions': trend_impressions,
+                'clicks': trend_clicks,
+                'installs': trend_installs
+            },
+            'topBadSourcesByApp': top_bad_sources_by_app,
+            'last_updated': last_updated
+        })
+    except Exception as e:
+        print(f"Error in overview endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/clear-backend-cache', methods=['POST'])
+def clear_backend_cache():
+    import sqlite3
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('DELETE FROM stats_cache')
+        c.execute('DELETE FROM fraud_cache')
+        c.execute('DELETE FROM event_cache')
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[CACHE CLEAR ERROR] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)

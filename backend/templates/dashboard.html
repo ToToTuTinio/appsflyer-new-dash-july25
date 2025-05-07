@@ -1,0 +1,2133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppsFlyer Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-button.active {
+            background-color: #4F46E5;
+            color: white;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4F46E5;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: #f3f3f3;
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #4F46E5;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        /* Stats Table Improvements */
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+            margin-bottom: 1.2rem;
+            background: #fff;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .stats-table th, .stats-table td {
+            padding: 0.28rem 0.13rem;
+            border: 1px solid #e5e7eb;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .stats-table th {
+            background: #f3f4f6;
+            font-weight: bold;
+            color: #22223b;
+            text-align: center;
+        }
+        .stats-table th.app-header {
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 1.1rem;
+            text-align: left;
+            padding-left: 1rem;
+        }
+        .stats-table td:first-child, .stats-table th:first-child {
+            text-align: left !important;
+            padding-left: 0.7rem;
+            position: sticky;
+            left: 0;
+            background: #fff;
+            z-index: 2;
+            box-shadow: 2px 0 6px -2px rgba(60,60,100,0.10);
+        }
+        .stats-table th:first-child {
+            background: #e0e7ff;
+            z-index: 3;
+            box-shadow: 2px 0 8px -2px rgba(60,60,100,0.13);
+        }
+        .stats-table {
+            min-width: 900px;
+        }
+        .stats-table-container {
+            overflow-x: auto;
+            width: 100%;
+        }
+        .app-card {
+            border: 1.5px solid #e5e7eb;
+            border-radius: 1rem;
+            margin-bottom: 2.5rem;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 2rem 1.5rem 2.5rem 1.5rem;
+            transition: box-shadow 0.2s;
+        }
+        .app-card:hover {
+            box-shadow: 0 6px 24px rgba(80,80,180,0.10);
+        }
+        .trend-graph {
+            height: 260px;
+            margin-top: 2.2rem;
+        }
+        @media (max-width: 900px) {
+          .fraud-graph-container { min-width: 180px !important; }
+        }
+        @media (max-width: 600px) {
+          .fraud-graph-container { min-width: 120px !important; }
+        }
+        /* Sticky metric column for stats table */
+        .sticky-metric-col {
+          position: sticky;
+          left: 0;
+          background: #eef2ff !important; /* indigo-50 */
+          z-index: 3;
+          border-right: 2px solid #e0e7ff;
+          min-width: 120px;
+          max-width: 220px;
+          box-shadow: 2px 0 8px -2px rgba(60,60,100,0.10);
+        }
+        .fraud-app-card { background: #f8fafc; border-radius: 1rem; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(80,80,180,0.06); border: 1.5px solid #e0e7ff; }
+        .fraud-app-header { background: #e0e7ff; color: #3730a3; font-size: 1.1rem; font-weight: bold; border-radius: 1rem 1rem 0 0; padding: 1rem 1.5rem; border-bottom: 1.5px solid #c7d2fe; }
+        .fraud-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 0 0 1rem 1rem; overflow: hidden; }
+        .fraud-table th { background: #f1f5f9; color: #334155; font-weight: 700; font-size: 0.95rem; padding: 0.7rem 1rem; text-align: left; }
+        .fraud-table th.fraud-center, .fraud-table td.fraud-center { text-align: center !important; }
+        .fraud-table td { padding: 0.7rem 1rem; font-size: 1rem; border-bottom: 1px solid #f1f5f9; }
+        .fraud-table tr:last-child td { border-bottom: none; }
+        .fraud-media-source { font-family: 'Menlo', 'Consolas', monospace; font-weight: 500; color: #475569; }
+        .fraud-badge-pa { background: #fee2e2; color: #dc2626; font-weight: bold; border-radius: 9999px; padding: 0.25em 0.9em; font-size: 1rem; display: inline-block; }
+        .fraud-badge-rt { background: #fef9c3; color: #ca8a04; font-weight: bold; border-radius: 9999px; padding: 0.25em 0.9em; font-size: 1rem; display: inline-block; }
+        .fraud-table tr:nth-child(even) { background: #f9fafb; }
+        .fraud-table tr:hover { background: #e0e7ff22; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">AppsFlyer Dashboard</h1>
+            <div class="flex items-center space-x-2">
+                <button onclick="switchTab('profile')" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Profile</button>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mb-8">
+            <div class="flex space-x-4 border-b border-gray-200">
+                <button class="tab-button active px-4 py-2 rounded-t-lg" onclick="switchTab('overview')">
+                    Overview
+                </button>
+                <button class="tab-button px-4 py-2 rounded-t-lg" onclick="switchTab('apps')">
+                    Apps
+                </button>
+                <button class="tab-button px-4 py-2 rounded-t-lg" onclick="switchTab('stats')">
+                    Stats
+                </button>
+                <button class="tab-button px-4 py-2 rounded-t-lg" onclick="switchTab('fraud')">
+                    Fraud
+                </button>
+                <button class="tab-button px-4 py-2 rounded-t-lg" onclick="switchTab('profile')">
+                    Profile
+                </button>
+            </div>
+        </div>
+
+        <!-- Overview Tab Content -->
+        <div id="overview-tab" class="tab-content active">
+            <div class="flex justify-end mb-4">
+                <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 transition">Clear Backend Data</button>
+                <button id="refresh-overview-btn" class="ml-2 border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh Overview</button>
+            </div>
+            <div class="space-y-12"> <!-- Add vertical spacing between cards -->
+                <!-- Total Performance Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-3xl font-extrabold text-gray-900 flex items-center">Total Performance <span class="text-xs text-gray-400 font-normal ml-4" id="overview-last-updated"></span></h2>
+                    </div>
+                    <div class="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 shadow mb-6">
+                        <div class="flex flex-col md:flex-row gap-6 justify-center items-stretch">
+                            <div class="bg-white border border-gray-200 rounded-xl p-4 flex-1 min-w-0 flex flex-col items-center shadow-sm">
+                                <div class="text-sm font-semibold text-indigo-700 mb-2 text-center">Impressions</div>
+                                <canvas id="impressionsChart" height="220" style="max-height:220px;"></canvas>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-xl p-4 flex-1 min-w-0 flex flex-col items-center shadow-sm">
+                                <div class="text-sm font-semibold text-green-700 mb-2 text-center">Clicks</div>
+                                <canvas id="clicksChart" height="220" style="max-height:220px;"></canvas>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-xl p-4 flex-1 min-w-0 flex flex-col items-center shadow-sm">
+                                <div class="text-sm font-semibold text-orange-700 mb-2 text-center">Installs</div>
+                                <canvas id="installsChart" height="220" style="max-height:220px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2 text-center">Data reflects the last run of the <b>Last 10 Days</b> report on the Stats page.</div>
+                </div>
+                <!-- Top Fraudulent Sources Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-8">
+                    <h3 class="text-2xl font-extrabold text-gray-900 mb-4 flex items-center">Top Fraudulent Sources <span class="text-xs text-gray-400 font-normal ml-4" id="fraud-last-updated"></span></h3>
+                    <div class="overflow-x-auto">
+                        <style>
+                        .fraud-app-card { background: #f8fafc; border-radius: 1rem; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(80,80,180,0.06); border: 1.5px solid #e0e7ff; }
+                        .fraud-app-header { background: #e0e7ff; color: #3730a3; font-size: 1.1rem; font-weight: bold; border-radius: 1rem 1rem 0 0; padding: 1rem 1.5rem; border-bottom: 1.5px solid #c7d2fe; }
+                        .fraud-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 0 0 1rem 1rem; overflow: hidden; }
+                        .fraud-table th { background: #f1f5f9; color: #334155; font-weight: 700; font-size: 0.95rem; padding: 0.7rem 1rem; text-align: left; }
+                        .fraud-table th.fraud-center, .fraud-table td.fraud-center { text-align: center !important; }
+                        .fraud-table td { padding: 0.7rem 1rem; font-size: 1rem; border-bottom: 1px solid #f1f5f9; }
+                        .fraud-table tr:last-child td { border-bottom: none; }
+                        .fraud-media-source { font-family: 'Menlo', 'Consolas', monospace; font-weight: 500; color: #475569; }
+                        .fraud-badge-pa { background: #fee2e2; color: #dc2626; font-weight: bold; border-radius: 9999px; padding: 0.25em 0.9em; font-size: 1rem; display: inline-block; }
+                        .fraud-badge-rt { background: #fef9c3; color: #ca8a04; font-weight: bold; border-radius: 9999px; padding: 0.25em 0.9em; font-size: 1rem; display: inline-block; }
+                        .fraud-table tr:nth-child(even) { background: #f9fafb; }
+                        .fraud-table tr:hover { background: #e0e7ff22; }
+                        </style>
+                        <div id="bad-sources-list"></div>
+                        <div id="bad-sources-empty" class="text-center text-gray-400 text-sm mt-4" style="display:none;">No fraud data available. Please run the 'Fraud Per Source' report for the last 10 days.</div>
+                    </div>
+                </div>
+                <!-- Top Performing Apps Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-8">
+                    <h3 class="text-2xl font-extrabold text-gray-900 mb-4 flex items-center">Top Performing Apps <span class="text-xs text-gray-400 font-normal ml-4" id="top-apps-last-updated"></span></h3>
+                    <div class="overflow-x-auto">
+                        <div class="fraud-app-card">
+                            <table class="fraud-table">
+                                <thead>
+                                    <tr>
+                                        <th>App Name</th>
+                                        <th class="fraud-center" id="event1-header">Event 1</th>
+                                        <th class="fraud-center" id="event2-header">Event 2</th>
+                                        <th class="fraud-center">Total Events</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="top-apps-list">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Apps Tab Content -->
+        <div id="apps-tab" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-xl p-10">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-3xl font-extrabold text-gray-900 flex items-center">Active Apps</h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-xs text-gray-400 font-normal" id="apps-last-updated"></div>
+                        <button id="get-apps-btn" onclick="fetchApps()" 
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg flex items-center shadow-md transition">
+                            <span>Get Apps</span>
+                            <div class="loading-spinner ml-2"></div>
+                        </button>
+                        <button id="get-events-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center relative shadow-md transition">
+                            <span>Get Events</span>
+                            <div id="get-events-spinner" class="loading-spinner ml-2" style="display:none;"></div>
+                            <span id="get-events-timer" class="ml-2 text-xs text-gray-400"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="progress-bar mb-4">
+                    <div class="progress-bar-fill"></div>
+                </div>
+                <div class="mb-6">
+                    <p class="text-gray-600 text-lg">Total Active Apps: <span id="app-count" class="font-bold text-indigo-700">0</span></p>
+                </div>
+                <div class="overflow-x-auto rounded-xl shadow">
+                    <table class="min-w-full bg-white rounded-xl overflow-hidden shadow-lg">
+                        <thead class="bg-indigo-50">
+                            <tr>
+                                <th class="py-4 px-6 text-left text-gray-700 font-bold text-sm uppercase tracking-wider">App ID</th>
+                                <th class="py-4 px-6 text-left text-gray-700 font-bold text-sm uppercase tracking-wider">App Name</th>
+                                <th class="py-4 px-6 text-left text-gray-700 font-bold text-sm uppercase tracking-wider">Event 1</th>
+                                <th class="py-4 px-6 text-left text-gray-700 font-bold text-sm uppercase tracking-wider">Event 2</th>
+                                <th class="py-4 px-6 text-left text-gray-700 font-bold text-sm uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apps-list" class="divide-y divide-gray-100">
+                            <!-- Apps will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end mt-8">
+                    <button id="save-all-events-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg transition">SAVE ALL</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Tab Content -->
+        <div id="stats-tab" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-xl p-10">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
+                <!-- Date Range Tabs -->
+                <div class="flex border-b border-gray-200 mb-8 gap-2">
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+                </div>
+                <!-- Sub-tab content containers -->
+                <div id="stats-content-10d" class="stats-range-content" style="display:none;">
+                    <button id="run-report-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-10d" class="space-y-10"></div>
+                </div>
+                <div id="stats-content-mtd" class="stats-range-content" style="display:none;">
+                    <button id="run-report-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-mtd" class="space-y-10"></div>
+                </div>
+                <div id="stats-content-lastmonth" class="stats-range-content" style="display:none;">
+                    <button id="run-report-lastmonth-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-lastmonth" class="space-y-10"></div>
+                </div>
+                <div id="stats-content-30d" class="stats-range-content" style="display:none;">
+                    <button id="run-report-30d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-30d"></div>
+                </div>
+                <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
+                    Loading stats...
+                </div>
+                <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
+                    Error loading stats.
+                </div>
+            </div>
+        </div>
+
+        <!-- Fraud Tab Content -->
+        <div id="fraud-tab" class="tab-content">
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-5xl mx-auto">
+                <!-- Sub-tabs for Fraud Analytics and Fraud Per Source -->
+                <div class="flex space-x-4 mb-6">
+                    <button id="fraud-analytics-tab-btn" class="subtab-button border-b-2 border-blue-500 text-blue-600 font-semibold px-4 py-2" onclick="switchFraudSubTab('analytics')">Fraud Analytics</button>
+                    <button id="fraud-source-tab-btn" class="subtab-button border-b-2 border-transparent text-gray-500 font-semibold px-4 py-2" onclick="switchFraudSubTab('source')">Fraud Per Source</button>
+                </div>
+                <!-- Fraud Analytics Sub-page -->
+                <div id="fraud-analytics-subtab">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Analytics</h2>
+                    <!-- Date Range Tabs -->
+                    <div class="flex border-b border-gray-200 mb-8 gap-2">
+                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
+                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
+                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
+                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+                    </div>
+                    <!-- Sub-tab content containers -->
+                    <div id="fraud-content-10d" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-data-10d"></div>
+                    </div>
+                    <div id="fraud-content-mtd" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-data-mtd"></div>
+                    </div>
+                    <div id="fraud-content-lastmonth" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-lastmonth-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-data-lastmonth"></div>
+                    </div>
+                    <div id="fraud-content-30d" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-30d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-data-30d"></div>
+                    </div>
+                    <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
+                        Loading fraud data...
+                    </div>
+                    <div id="fraud-error" class="text-center text-red-500 mt-8" style="display:none;">
+                        Error loading fraud data.
+                    </div>
+                </div>
+                <!-- Fraud Per Source Sub-page -->
+                <div id="fraud-source-subtab" style="display:none;">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Per Source</h2>
+                    <!-- Date Range Tabs -->
+                    <div class="flex border-b border-gray-200 mb-8 gap-2">
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+                    </div>
+                    <!-- Sub-tab content containers -->
+                    <div id="fraud-source-content-10d" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-10d" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-10d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
+                        <div id="fraud-source-data-10d"></div>
+                    </div>
+                    <div id="fraud-source-content-mtd" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-mtd" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-mtd" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
+                        <div id="fraud-source-data-mtd"></div>
+                    </div>
+                    <div id="fraud-source-content-lastmonth" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-lastmonth-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-lastmonth" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-lastmonth" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
+                        <div id="fraud-source-data-lastmonth"></div>
+                    </div>
+                    <div id="fraud-source-content-30d" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-30d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-30d" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-30d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
+                        <div id="fraud-source-data-30d"></div>
+                    </div>
+                    <div id="fraud-source-loading" class="text-center text-gray-500 mt-8" style="display:none;">
+                        Loading fraud per source data...
+                    </div>
+                    <div id="fraud-source-error" class="text-center text-red-500 mt-8" style="display:none;">
+                        Error loading fraud per source data.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Tab Content -->
+        <div id="profile-tab" class="tab-content">
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-lg mx-auto">
+                <h2 class="text-3xl font-bold text-gray-800 mb-8">Profile</h2>
+                <div class="space-y-6">
+                    <div>
+                        <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Agency Account</div>
+                        <div class="flex items-center space-x-2">
+                            <span id="agency-name" class="text-lg font-semibold text-gray-900">N/A</span>
+                            <button id="edit-agency-btn" class="text-blue-600 hover:underline text-sm">Edit</button>
+                        </div>
+                        <div id="agency-edit" class="flex items-center space-x-2 mt-2" style="display:none;">
+                            <input id="agency-input" type="text" class="border rounded px-2 py-1 text-sm flex-1" style="min-width:120px;">
+                            <button id="save-agency-btn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">Save</button>
+                            <button id="cancel-agency-btn" class="text-gray-500 px-3 py-1 rounded text-xs">Cancel</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">API Key</div>
+                        <div class="flex items-center space-x-2">
+                            <span id="api-key" class="font-mono text-base text-gray-900 truncate" style="max-width: 180px; display: inline-block;">N/A</span>
+                            <button id="edit-api-key-btn" class="text-blue-600 hover:underline text-sm">Edit</button>
+                        </div>
+                        <div id="api-key-edit" class="flex items-center space-x-2 mt-2" style="display:none;">
+                            <input id="api-key-input" type="text" class="border rounded px-2 py-1 text-sm font-mono flex-1" style="min-width:120px;">
+                            <button id="save-api-key-btn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">Save</button>
+                            <button id="cancel-api-key-btn" class="text-gray-500 px-3 py-1 rounded text-xs">Cancel</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">User/Email</div>
+                        <div class="flex items-center space-x-2">
+                            <span id="user-email" class="font-mono text-base text-gray-900">N/A</span>
+                            <button id="edit-user-email-btn" class="text-blue-600 hover:underline text-sm">Edit</button>
+                        </div>
+                        <div id="user-email-edit" class="flex items-center space-x-2 mt-2" style="display:none;">
+                            <input id="user-email-input" type="text" class="border rounded px-2 py-1 text-sm font-mono flex-1" style="min-width:120px;">
+                            <button id="save-user-email-btn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">Save</button>
+                            <button id="cancel-user-email-btn" class="text-gray-500 px-3 py-1 rounded text-xs">Cancel</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Password</div>
+                        <div class="flex items-center space-x-2">
+                            <span id="user-password" class="font-mono text-base text-gray-900">••••••••</span>
+                            <button id="edit-user-password-btn" class="text-blue-600 hover:underline text-sm">Edit</button>
+                        </div>
+                        <div id="user-password-edit" class="flex items-center space-x-2 mt-2" style="display:none;">
+                            <input id="user-password-input" type="password" class="border rounded px-2 py-1 text-sm font-mono flex-1" style="min-width:120px;">
+                            <button id="save-user-password-btn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">Save</button>
+                            <button id="cancel-user-password-btn" class="text-gray-500 px-3 py-1 rounded text-xs">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // At the top of the <script> section, add:
+        window._chartInstances = window._chartInstances || {};
+
+        // Fallback for fetchedApps
+        window.fetchedApps = window.fetchedApps || [];
+
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            // Activate selected tab button
+            event.target.classList.add('active');
+        }
+
+        // Remove static apps and update fetchApps
+        fetchApps = function() {
+            const button = document.getElementById('get-apps-btn');
+            button.disabled = true;
+            button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
+
+            fetch('/get_apps')
+                .then(response => response.json())
+                .then(data => {
+                    button.disabled = false;
+                    button.innerHTML = 'Get Apps';
+                    if (data.error) {
+                        document.getElementById('app-count').textContent = `Error: ${data.error}`;
+                        return;
+                    }
+                    fetchedApps = data.apps;
+            renderAppsList(fetchedApps);
+                    document.getElementById('app-count').textContent = data.count;
+                    document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                })
+                .catch(error => {
+                    button.disabled = false;
+                    button.innerHTML = 'Get Apps';
+                    document.getElementById('app-count').textContent = `Error: ${error.message}`;
+                });
+        }
+
+        function logout() {
+            fetch('/logout')
+                .then(() => {
+                    window.location.href = '/';
+                });
+        }
+
+        // Check authentication status
+        function checkAuth() {
+            fetch('/check-auth')
+                .then(response => {
+                    if (!response.ok) {
+                        window.location.href = '/';
+                    }
+                });
+        }
+
+        // Check auth status periodically
+        setInterval(checkAuth, 30000);
+        checkAuth();
+
+        // --- Stats Tab Logic ---
+        // Persistent stats data for each range
+        const statsData = {
+            '10d': null,
+            'mtd': null,
+            'lastmonth': null,
+            '30d': null
+        };
+
+        // Date range tab logic
+        const dateRanges = ['10d','mtd','lastmonth','30d'];
+        function switchStatsRangeTab(range) {
+            document.querySelectorAll('.date-range-tab').forEach(btn => {
+                btn.classList.remove('border-green-600','text-green-700','bg-white');
+                btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
+            });
+            document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.remove('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
+            document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
+            document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
+            document.getElementById(`stats-content-${range}`).style.display = '';
+        }
+        document.querySelectorAll('.date-range-tab').forEach(btn => {
+            btn.onclick = function() {
+                switchStatsRangeTab(this.getAttribute('data-range'));
+            };
+        });
+        // Show the first tab by default
+        switchStatsRangeTab('10d');
+
+        // Patch RUN REPORT button logic to add logging and defensive checks
+        const periodMap = {
+            '10d': 'last10',
+            'mtd': 'mtd',
+            'lastmonth': 'lastmonth',
+            '30d': 'last30'
+        };
+        dateRanges.forEach(range => {
+            const btn = document.getElementById(`run-report-${range}-btn`);
+            if (btn) {
+                btn.onclick = function() {
+                    console.log('RUN REPORT clicked for', range);
+                    console.log('fetchedApps:', window.fetchedApps);
+                    if (!window.fetchedApps || !window.fetchedApps.length) {
+                        alert('No apps loaded. Please click Get Apps first.');
+                        return;
+                    }
+                    runStatsReport(range);
+                };
+            } else {
+                console.warn('RUN REPORT button not found for range:', range);
+            }
+        });
+        function runStatsReport(range) {
+            const loadingElem = document.getElementById('stats-loading');
+            if (loadingElem) loadingElem.style.display = '';
+            let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+            fetch('/all-apps-stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apps: window.fetchedApps,
+                    period: periodMap[range],
+                    selected_events: eventSelections
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                console.log('Stats data for', range, data); // Debug log
+                statsData[range] = data;
+                renderStatsAppsForRange(range, data.apps || []);
+                if (loadingElem) loadingElem.style.display = 'none';
+            })
+            .catch(error => {
+                const errorElem = document.getElementById('stats-error');
+                if (errorElem) {
+                    errorElem.textContent = error.message;
+                    errorElem.style.display = '';
+                }
+                if (loadingElem) loadingElem.style.display = 'none';
+            });
+        }
+
+        // Update renderStatsAppsForRange to target the correct data div
+        function renderStatsAppsForRange(range, apps) {
+            const container = document.getElementById(`stats-data-${range}`);
+            if (!container) {
+                console.warn('Stats container not found for range:', range);
+                return;
+            }
+            if (!apps || !apps.length) {
+                container.innerHTML = '<div class="text-gray-500">No data available for this range.</div>';
+                return;
+            }
+            container.innerHTML = '';
+            apps.forEach(app => {
+                const section = document.createElement('div');
+                section.className = 'app-card';
+                section.innerHTML = `<div class="text-center mb-6">
+                    <h2 class="text-2xl font-extrabold text-indigo-900 mb-2">${app.app_name}</h2>
+                    <p class="text-sm font-mono text-indigo-600 tracking-wide">App ID: ${app.app_id}</p>
+                </div>`;
+                if (app.table && app.table.length) {
+                    const dates = app.table.map(row => row.date);
+                    let event1 = app.selected_events && app.selected_events[0] ? app.selected_events[0] : null;
+                    let event2 = app.selected_events && app.selected_events[1] ? app.selected_events[1] : null;
+                    // Detect error events (e.g., truncated error message or containing 'maximum nu')
+                    const isErrorEvent = ev => !ev || ev.toLowerCase().includes('maximum nu') || ev.toLowerCase().includes('subscription') || ev.toLowerCase().includes('error') || ev.toLowerCase().includes('failed') || ev.toLowerCase().includes('doesn\'t include');
+                    if (isErrorEvent(event1)) event1 = null;
+                    if (isErrorEvent(event2)) event2 = null;
+                    let metrics = [
+                        { key: 'impressions', label: 'Impressions', isNumber: true },
+                        { key: 'clicks', label: 'Clicks', isNumber: true },
+                        { key: 'installs', label: 'Installs', isNumber: true },
+                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', isNumber: true },
+                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', isNumber: true },
+                    ];
+                    if (event1) metrics.push({ key: event1, label: event1, isNumber: true });
+                    if (event2) metrics.push({ key: event2, label: event2, isNumber: true });
+                    metrics.push(
+                        { key: 'imp_to_click', label: '% imp to click', percent: true },
+                        { key: 'click_to_install', label: 'Conversion Rate', percent: true, decimals: 2 }
+                    );
+                    if (event1) metrics.push({ key: 'install_to_' + event1, label: `% install to ${event1}`, percent: true });
+                    if (event1 && event2) metrics.push({ key: event1 + '_to_' + event2, label: `% ${event1} to ${event2}`, percent: true });
+                    metrics.push(
+                        { key: 'blocked_rt_rate', label: '% blocked installs (RT)', percent: true },
+                        { key: 'blocked_pa_rate', label: '% blocked installs (PA)', percent: true }
+                    );
+                    // Compute extra % columns if needed
+                    app.table.forEach(row => {
+                        if (event1 && row.installs > 0 && row[event1] !== undefined) {
+                            row['install_to_' + event1] = row[event1] / row.installs;
+                        }
+                        if (event1 && event2 && row[event1] > 0 && row[event2] !== undefined) {
+                            row[event1 + '_to_' + event2] = row[event2] / row[event1];
+                        }
+                    });
+                    // Table
+                    let table = '<div class="stats-table-container"><table class="stats-table"><thead><tr><th class="app-header sticky-metric-col">Metric</th>';
+                    dates.forEach(date => {
+                        table += `<th style="text-align:center;">${date}</th>`;
+                    });
+                    table += '</tr></thead><tbody>';
+                    metrics.forEach(m => {
+                        table += `<tr><td class="sticky-metric-col" style="text-align:left;font-weight:600;">${m.label}</td>`;
+                        app.table.forEach(row => {
+                            let val = row[m.key];
+                            let display = '';
+                            if (m.percent) display = (typeof val === 'number' ? (val * 100).toFixed(m.decimals || 2) + '%' : '-');
+                            else if (m.isNumber) display = (val !== undefined ? Number(val).toLocaleString() : '-');
+                            else display = (val !== undefined ? val : '-');
+                            table += `<td style='text-align:center;'>${display}</td>`;
+                        });
+                        table += '</tr>';
+                    });
+                    table += '</tbody></table></div>';
+                    // Modern multi-metric trend graph below table
+                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Impressions & Clicks</div><canvas id='trend-main-${app.app_name.replace(/\W/g,"")}'></canvas></div>`;
+                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Installs & Events</div><canvas id='trend-events-${app.app_name.replace(/\W/g,"")}'></canvas></div>`;
+                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#a21caf;margin-bottom:0.5rem;'>Fraud: Blocked Installs</div><canvas id='trend-fraud-${app.app_name.replace(/\W/g,"")}'></canvas></div>`;
+                    section.innerHTML += table;
+                    setTimeout(() => {
+                        // 1. Impressions & Clicks
+                        const ctxMain = document.getElementById(`trend-main-${app.app_name.replace(/\W/g,"")}`);
+                        if (ctxMain && window.Chart) {
+                            if (window._chartInstances[`trend-main-${app.app_name.replace(/\W/g,"")}`]) {
+                                window._chartInstances[`trend-main-${app.app_name.replace(/\W/g,"")}`].destroy();
+                            }
+                            window._chartInstances[`trend-main-${app.app_name.replace(/\W/g,"")}`] = new Chart(ctxMain, {
+                                type: 'line',
+                                data: {
+                                    labels: app.table.map(r=>r.date),
+                                    datasets: [
+                                        {
+                                            label: 'Impressions',
+                                            data: app.table.map(r=>r.impressions),
+                                            borderColor: '#6366f1',
+                                            backgroundColor: 'rgba(99,102,241,0.08)',
+                                            fill: false,
+                                            tension: 0.18
+                                        },
+                                        {
+                                            label: 'Clicks',
+                                            data: app.table.map(r=>r.clicks),
+                                            borderColor: '#10b981',
+                                            backgroundColor: 'rgba(16,185,129,0.08)',
+                                            fill: false,
+                                            tension: 0.18
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    plugins: { legend: { display: true, position: 'bottom' } },
+                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    elements: { point: { radius: 2 } },
+                                    responsive: true,
+                                    maintainAspectRatio: false
+                                }
+                            });
+                        }
+                        // 2. Installs & Events
+                        const ctxEvents = document.getElementById(`trend-events-${app.app_name.replace(/\W/g,"")}`);
+                        if (ctxEvents && window.Chart) {
+                            const datasets = [
+                                {
+                                    label: 'Installs',
+                                    data: app.table.map(r=>r.installs),
+                                    borderColor: '#f59e42',
+                                    backgroundColor: 'rgba(245,158,66,0.08)',
+                                    fill: false,
+                                    tension: 0.18
+                                }
+                            ];
+                            if (app.selected_events) {
+                                app.selected_events.forEach((event, i) => {
+                                    datasets.push({
+                                        label: event,
+                                        data: app.table.map(r=>r[event]||0),
+                                        borderColor: i === 0 ? '#3b82f6' : '#a21caf',
+                                        backgroundColor: i === 0 ? 'rgba(59,130,246,0.08)' : 'rgba(162,28,175,0.08)',
+                                        fill: false,
+                                        tension: 0.18
+                                    });
+                                });
+                            }
+                            if (window._chartInstances[`trend-events-${app.app_name.replace(/\W/g,"")}`]) {
+                                window._chartInstances[`trend-events-${app.app_name.replace(/\W/g,"")}`].destroy();
+                            }
+                            window._chartInstances[`trend-events-${app.app_name.replace(/\W/g,"")}`] = new Chart(ctxEvents, {
+                                type: 'line',
+                                data: {
+                                    labels: app.table.map(r=>r.date),
+                                    datasets: datasets
+                                },
+                                options: {
+                                    plugins: { legend: { display: true, position: 'bottom' } },
+                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    elements: { point: { radius: 2 } },
+                                    responsive: true,
+                                    maintainAspectRatio: false
+                                }
+                            });
+                        }
+                        // 3. Blocked Installs (Fraud)
+                        const ctxFraud = document.getElementById(`trend-fraud-${app.app_name.replace(/\W/g,"")}`);
+                        if (ctxFraud && window.Chart) {
+                            if (window._chartInstances[`trend-fraud-${app.app_name.replace(/\W/g,"")}`]) {
+                                window._chartInstances[`trend-fraud-${app.app_name.replace(/\W/g,"")}`].destroy();
+                            }
+                            window._chartInstances[`trend-fraud-${app.app_name.replace(/\W/g,"")}`] = new Chart(ctxFraud, {
+                                type: 'line',
+                                data: {
+                                    labels: app.table.map(r=>r.date),
+                                    datasets: [
+                                        {
+                                            label: 'Blocked Installs (RT)',
+                                            data: app.table.map(r=>r.blocked_installs_rt),
+                                            borderColor: '#ef4444',
+                                            backgroundColor: 'rgba(239,68,68,0.08)',
+                                            fill: false,
+                                            tension: 0.18
+                                        },
+                                        {
+                                            label: 'Blocked Installs (PA)',
+                                            data: app.table.map(r=>r.blocked_installs_pa),
+                                            borderColor: '#6366f1',
+                                            backgroundColor: 'rgba(99,102,241,0.08)',
+                                            fill: false,
+                                            tension: 0.18
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    plugins: { legend: { display: true, position: 'bottom' } },
+                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    elements: { point: { radius: 2 } },
+                                    responsive: true,
+                                    maintainAspectRatio: false
+                                }
+                            });
+                        }
+                    }, 100);
+                } else {
+                    section.innerHTML += '<div class="text-gray-400">No data available.</div>';
+                }
+                container.appendChild(section);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('get-stats-btn').addEventListener('click', function() { fetchAllAppsStats('last10'); });
+            document.getElementById('get-stats-mtd-btn').addEventListener('click', function() { fetchAllAppsStats('mtd'); });
+        });
+
+        // Patch fetchAllAppsStats to use static app and accept period
+        function fetchAllAppsStats(period = 'last10') {
+            const loading = document.getElementById('stats-loading');
+            const error = document.getElementById('stats-error');
+            const statsList = document.getElementById('stats-apps-list');
+            const noApps = document.getElementById('stats-no-apps');
+            
+            if (!fetchedApps || fetchedApps.length === 0) {
+                loading.style.display = 'none';
+                error.style.display = 'none';
+                statsList.style.display = 'none';
+                noApps.style.display = 'block';
+                return;
+            }
+            
+            noApps.style.display = 'none';
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            statsList.style.display = 'none';
+            
+            let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+            let timer = 0;
+            const timerElem = document.createElement('div');
+            timerElem.className = 'text-center text-gray-400 mt-2';
+            timerElem.textContent = 'Thinking... 0s';
+            loading.appendChild(timerElem);
+            
+            const timerInterval = setInterval(() => {
+                timer++;
+                timerElem.textContent = `Thinking... ${timer}s`;
+            }, 1000);
+            
+            fetch('/all-apps-stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    apps: fetchedApps, 
+                    period: period, 
+                    selected_events: eventSelections 
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    clearInterval(timerInterval);
+                    loading.style.display = 'none';
+                    if (data && data.apps && data.apps.length > 0) {
+                        statsList.style.display = 'block';
+                        renderStatsApps(data.apps);
+                    } else {
+                        error.textContent = 'No stats found.';
+                        error.style.display = 'block';
+                    }
+                })
+                .catch(e => {
+                    clearInterval(timerInterval);
+                    loading.style.display = 'none';
+                    error.textContent = 'Error loading stats.';
+                    error.style.display = 'block';
+                });
+        }
+
+        // Store event selections in localStorage
+        function saveEventSelection(appId, event1, event2, button) {
+            button.disabled = true;
+            // Save to backend
+            fetch('/event-selections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [appId]: [event1, event2] })
+            })
+            .then(res => res.json())
+            .then(() => {
+                // Save to localStorage as well
+                let selections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                selections[appId] = [event1, event2];
+                localStorage.setItem('eventSelections', JSON.stringify(selections));
+                button.innerHTML = '✔️ Saved!';
+                setTimeout(() => { button.textContent = 'SAVE'; button.disabled = false; }, 1200);
+            })
+            .catch(() => {
+                button.textContent = 'Error';
+                setTimeout(() => { button.textContent = 'SAVE'; button.disabled = false; }, 1200);
+            });
+        }
+        function getEventSelection(appId) {
+            let selections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+            return selections[appId] || [null, null];
+        }
+        function saveAllEventSelections() {
+            const rows = document.querySelectorAll('.event-save-btn');
+            const data = {};
+            let selections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+            rows.forEach(btn => {
+                const tr = btn.closest('tr');
+                const appId = btn.getAttribute('data-app-id');
+                const event1 = tr.querySelector('.event1-dropdown').value;
+                const event2 = tr.querySelector('.event2-dropdown').value;
+                data[appId] = [event1, event2];
+                selections[appId] = [event1, event2];
+            });
+            localStorage.setItem('eventSelections', JSON.stringify(selections));
+            const button = document.getElementById('save-all-events-btn');
+            button.disabled = true;
+            fetch('/event-selections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(() => {
+                rows.forEach(btn => {
+                    btn.innerHTML = '✔️ Saved!';
+                    btn.disabled = true;
+                    setTimeout(() => { btn.textContent = 'SAVE'; btn.disabled = false; }, 1200);
+                });
+                button.textContent = 'All Saved!';
+                setTimeout(() => { button.textContent = 'SAVE ALL'; button.disabled = false; }, 1200);
+            })
+            .catch(() => {
+                button.textContent = 'Error';
+                setTimeout(() => { button.textContent = 'SAVE ALL'; button.disabled = false; }, 1200);
+            });
+        }
+        // Fetch events for an app
+        function fetchEventsForApp(appId, callback) {
+            fetch(`/app-events/${appId}`)
+                .then(r => r.json())
+                .then(data => {
+                    let errorMsg = '';
+                    if (data.response_content) {
+                        errorMsg = String(data.response_content).replace(/\n/g, ' ').replace(/\r/g, '').trim();
+                    } else if (data.error) {
+                        errorMsg = String(data.error).replace(/\n/g, ' ').replace(/\r/g, '').trim();
+                    }
+                    if (errorMsg) {
+                        callback([errorMsg], data.fetch_time || null, true, errorMsg); // true = isError, pass full errorMsg
+                    } else {
+                        callback(data.events || [], data.fetch_time || null, false, null);
+                    }
+                })
+                .catch(() => {
+                    callback(['Failed to load events'], null, true, 'Failed to load events');
+                });
+        }
+        // Only fetch and populate event dropdowns when GET EVENTS is pressed
+        function fetchAndRenderEventsForAllApps() {
+            const appsList = document.getElementById('apps-list');
+            const spinner = document.getElementById('get-events-spinner');
+            // Remove timer/status from button
+            spinner.style.display = 'inline-block';
+            document.getElementById('get-events-timer').textContent = '';
+            let completed = 0;
+            let total = fetchedApps.length;
+            fetchedApps.forEach(app => {
+                // Find the table row for this app by matching the app_id cell
+                let tr = null;
+                Array.from(appsList.querySelectorAll('tr')).forEach(row => {
+                    const firstCell = row.querySelector('td');
+                    if (firstCell && firstCell.textContent.trim() === app.app_id) {
+                        tr = row;
+                    }
+                });
+                if (!tr) {
+                    completed++;
+                    if (completed === total) done();
+                    return;
+                }
+                fetchEventsForApp(app.app_id, function(events, fetchTime, isError, fullErrorMsg) {
+                    const event1Sel = tr.querySelector('.event1-dropdown');
+                    const event2Sel = tr.querySelector('.event2-dropdown');
+                    if (isError && fullErrorMsg) {
+                        const truncated = fullErrorMsg.length > 30 ? fullErrorMsg.slice(0, 30) + '…' : fullErrorMsg;
+                        event1Sel.innerHTML = `<option>${truncated}</option>`;
+                        event2Sel.innerHTML = `<option>${truncated}</option>`;
+                        event1Sel.disabled = true;
+                        event2Sel.disabled = true;
+                        event1Sel.title = fullErrorMsg;
+                        event2Sel.title = fullErrorMsg;
+                    } else if (events.length === 0) {
+                        event1Sel.innerHTML = '<option>No Events Found.</option>';
+                        event2Sel.innerHTML = '<option>No Events Found.</option>';
+                        event1Sel.disabled = true;
+                        event2Sel.disabled = true;
+                        event1Sel.title = '';
+                        event2Sel.title = '';
+                    } else {
+                        event1Sel.innerHTML = events.map(ev => `<option value=\"${ev}\">${ev}</option>`).join('');
+                        event2Sel.innerHTML = events.map(ev => `<option value=\"${ev}\">${ev}</option>`).join('');
+                        event1Sel.disabled = false;
+                        event2Sel.disabled = false;
+                        event1Sel.title = '';
+                        event2Sel.title = '';
+                        // Set saved selection if exists
+                        const [sel1, sel2] = getEventSelection(app.app_id);
+                        if (sel1) event1Sel.value = sel1;
+                        if (sel2) event2Sel.value = sel2;
+                    }
+                    completed++;
+                    if (completed === total) done();
+                });
+            });
+            function done() {
+                spinner.style.display = 'none';
+                document.getElementById('get-events-timer').textContent = '';
+            }
+        }
+        // Patch renderAppsList to not auto-fetch events
+        function renderAppsList(apps) {
+            const appsList = document.getElementById('apps-list');
+            appsList.innerHTML = '';
+            apps.forEach(app => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-gray-800">${app.app_id}</td>
+                    <td class="py-3 px-4 text-gray-800">${app.app_name}</td>
+                    <td class="py-3 px-4">
+                        <div class="relative">
+                            <select class="event1-dropdown block w-48 px-4 py-2 pr-8 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 appearance-none bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}"></select>
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="relative">
+                            <select class="event2-dropdown block w-48 px-4 py-2 pr-8 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 appearance-none bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}"></select>
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <button class="event-save-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded" data-app-id="${app.app_id}">SAVE</button>
+                    </td>
+                `;
+                appsList.appendChild(tr);
+                // Save button handler
+                tr.querySelector('.event-save-btn').onclick = function() {
+                    const event1 = tr.querySelector('.event1-dropdown').value;
+                    const event2 = tr.querySelector('.event2-dropdown').value;
+                    saveEventSelection(app.app_id, event1, event2, this);
+                };
+            });
+        }
+        // GET EVENTS button handler
+        document.getElementById('get-events-btn').onclick = fetchAndRenderEventsForAllApps;
+        // Save all button handler
+        document.getElementById('save-all-events-btn').onclick = saveAllEventSelections;
+
+        // Masking logic per requirements
+        function maskApiKey(val) {
+            if (!val) return 'N/A';
+            if (val.length <= 4) return val[0] + '******';
+            return val.slice(0, 4) + '******';
+        }
+        function maskPassword(val) {
+            return '••••••••';
+        }
+        function showEdit(field) {
+            document.getElementById(field).style.display = 'none';
+            document.getElementById(field+'-edit').style.display = '';
+            document.getElementById(field+'-input').value = '';
+        }
+        function hideEdit(field, value) {
+            document.getElementById(field+'-edit').style.display = 'none';
+            document.getElementById(field).style.display = '';
+            if (value !== undefined) {
+                if (field === 'api-key') document.getElementById(field).textContent = maskApiKey(value);
+                else if (field === 'user-password') document.getElementById(field).textContent = maskPassword(value);
+                else if (field === 'user-email') document.getElementById(field).textContent = value;
+            }
+        }
+        function loadProfile() {
+            // Always set Agency Name from localStorage
+            document.getElementById('agency-name').textContent = localStorage.getItem('agencyName') || 'N/A';
+            fetch('/profile-info')
+                .then(r => r.json())
+                .then(data => {
+                    // Do NOT overwrite agency-name from backend
+                    document.getElementById('api-key').textContent = maskApiKey(data.api_key);
+                    document.getElementById('user-email').textContent = data.email || 'N/A';
+                    document.getElementById('user-password').textContent = maskPassword(data.password);
+                    // Store last values for persistence
+                    window._profileLast = {
+                        api_key: data.api_key,
+                        email: data.email,
+                        password: data.password
+                    };
+                })
+                .catch(() => {
+                    document.getElementById('api-key').textContent = 'N/A';
+                    document.getElementById('user-email').textContent = 'N/A';
+                    document.getElementById('user-password').textContent = maskPassword('');
+                });
+        }
+        // Load profile info when Profile tab is shown
+        const origSwitchTab = switchTab;
+        switchTab = function(tabName) {
+            origSwitchTab(tabName);
+            if (tabName === 'profile') loadProfile();
+        };
+        document.getElementById('edit-api-key-btn').onclick = function() { showEdit('api-key'); };
+        document.getElementById('cancel-api-key-btn').onclick = function() { hideEdit('api-key', window._profileLast ? window._profileLast.api_key : undefined); };
+        document.getElementById('save-api-key-btn').onclick = function() {
+            const val = document.getElementById('api-key-input').value;
+            fetch('/update-credential', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'APPSFLYER_API_KEY', value: val })
+            })
+            .then(r => r.json())
+            .then(data => { if (data.success) { window._profileLast.api_key = val; hideEdit('api-key', val); } });
+        };
+        document.getElementById('edit-user-email-btn').onclick = function() { showEdit('user-email'); };
+        document.getElementById('cancel-user-email-btn').onclick = function() { hideEdit('user-email', window._profileLast ? window._profileLast.email : undefined); };
+        document.getElementById('save-user-email-btn').onclick = function() {
+            const val = document.getElementById('user-email-input').value;
+            fetch('/update-credential', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'EMAIL', value: val })
+            })
+            .then(r => r.json())
+            .then(data => { if (data.success) { window._profileLast.email = val; hideEdit('user-email', val); } });
+        };
+        document.getElementById('edit-user-password-btn').onclick = function() { showEdit('user-password'); };
+        document.getElementById('cancel-user-password-btn').onclick = function() { hideEdit('user-password', window._profileLast ? window._profileLast.password : undefined); };
+        document.getElementById('save-user-password-btn').onclick = function() {
+            const val = document.getElementById('user-password-input').value;
+            fetch('/update-credential', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'PASSWORD', value: val })
+            })
+            .then(r => r.json())
+            .then(data => { if (data.success) { window._profileLast.password = val; hideEdit('user-password', val); } });
+        };
+        // Agency Account edit logic (localStorage persistence)
+        function showEditAgency() {
+            document.getElementById('agency-name').style.display = 'none';
+            document.getElementById('edit-agency-btn').style.display = 'none';
+            document.getElementById('agency-edit').style.display = '';
+            document.getElementById('agency-input').value = localStorage.getItem('agencyName') || '';
+        }
+        function hideEditAgency(value) {
+            document.getElementById('agency-edit').style.display = 'none';
+            document.getElementById('agency-name').style.display = '';
+            document.getElementById('edit-agency-btn').style.display = '';
+            if (value !== undefined) {
+                document.getElementById('agency-name').textContent = value;
+                localStorage.setItem('agencyName', value);
+            }
+        }
+        document.getElementById('edit-agency-btn').onclick = showEditAgency;
+        document.getElementById('cancel-agency-btn').onclick = function() { hideEditAgency(localStorage.getItem('agencyName') || 'N/A'); };
+        document.getElementById('save-agency-btn').onclick = function() {
+            const val = document.getElementById('agency-input').value;
+            hideEditAgency(val);
+        };
+
+        // --- Fraud Tab Logic (Tabs & RUN Button) ---
+        const fraudRanges = ['10d','mtd','lastmonth','30d'];
+        const fraudDataCache = { '10d': null, 'mtd': null, 'lastmonth': null, '30d': null };
+        // Use the same period mapping as Stats
+        const fraudPeriodMap = {
+            '10d': 'last10',
+            'mtd': 'mtd',
+            'lastmonth': 'lastmonth',
+            '30d': 'last30'
+        };
+        function switchFraudRangeTab(range) {
+            document.querySelectorAll('.fraud-range-tab').forEach(btn => {
+                btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
+                btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            });
+            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.remove('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.add('border-green-600', 'text-green-700', 'bg-white');
+            document.querySelectorAll('.fraud-range-content').forEach(div => div.style.display = 'none');
+            document.getElementById(`fraud-content-${range}`).style.display = '';
+            // If we have cached data, render it
+            if (fraudDataCache[range]) renderFraudAll(fraudDataCache[range], range);
+        }
+        document.querySelectorAll('.fraud-range-tab').forEach(btn => {
+            btn.onclick = function() {
+                switchFraudRangeTab(this.getAttribute('data-range'));
+            };
+        });
+        // Show the first tab by default
+        switchFraudRangeTab('10d');
+        // RUN button logic
+        fraudRanges.forEach(range => {
+            document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
+                document.getElementById('fraud-loading').style.display = '';
+                document.getElementById('fraud-error').style.display = 'none';
+                // Use the same app list as Stats (fetchedApps)
+                fetch('/get_fraud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apps: fetchedApps,
+                        period: fraudPeriodMap[range]
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    fraudDataCache[range] = data;
+                    document.getElementById('fraud-loading').style.display = 'none';
+                    renderFraudAll(data, range);
+                })
+                .catch(() => {
+                    document.getElementById('fraud-loading').style.display = 'none';
+                    document.getElementById('fraud-error').style.display = '';
+                });
+            };
+        });
+        function renderFraudAll(data, range) {
+            const container = document.getElementById(`fraud-data-${range}`);
+            container.innerHTML = '';
+            if (data.error) {
+                container.innerHTML = `<div class='text-center text-red-500 mt-8'>${data.error}</div>`;
+                return;
+            }
+            if (!data.apps || data.apps.length === 0) {
+                container.innerHTML = `<div class='text-center text-gray-500 mt-8'>No fraud data for this period.</div>`;
+                return;
+            }
+            // --- Fraud Trends (All Apps) ---
+            const allAppsSection = document.createElement('div');
+            allAppsSection.className = 'app-card mb-10 p-8 bg-white shadow-lg rounded-lg';
+            allAppsSection.innerHTML = `<div style="font-weight:700;font-size:1.4rem;color:#3730a3;margin-bottom:1.2rem;">Fraud Trends (All Apps)</div>`;
+            // Create a grid for 6 small charts
+            const metrics = [
+                { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+                { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
+                { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e42', bg: 'rgba(245,158,66,0.08)' },
+                { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6', bg: 'rgba(20,184,166,0.08)' },
+                { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf', bg: 'rgba(162,28,175,0.08)' },
+                { key: 'blocked_install_postbacks', label: 'Blocked Install Postbacks', color: '#f97316', bg: 'rgba(249,115,22,0.08)' }
+            ];
+            const dateMap = {};
+            data.apps.forEach(app => {
+                (app.table || []).forEach(row => {
+                    if (!dateMap[row.date]) {
+                        dateMap[row.date] = {
+                            blocked_installs_rt: 0,
+                            blocked_installs_pa: 0,
+                            blocked_in_app_events: 0,
+                            fraud_post_inapps: 0,
+                            blocked_clicks: 0,
+                            blocked_install_postbacks: 0
+                        };
+                    }
+                    dateMap[row.date].blocked_installs_rt += row.blocked_installs_rt || 0;
+                    dateMap[row.date].blocked_installs_pa += row.blocked_installs_pa || 0;
+                    dateMap[row.date].blocked_in_app_events += row.blocked_in_app_events || 0;
+                    dateMap[row.date].fraud_post_inapps += row.fraud_post_inapps || 0;
+                    dateMap[row.date].blocked_clicks += row.blocked_clicks || 0;
+                    dateMap[row.date].blocked_install_postbacks += row.blocked_install_postbacks || 0;
+                });
+            });
+            const dates = Object.keys(dateMap).sort();
+            // Grid container
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6';
+            metrics.forEach((metric, i) => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 rounded-xl p-4 flex flex-col items-center shadow border border-gray-100';
+                card.innerHTML = `<div class='text-sm font-bold mb-2' style='color:${metric.color}'>${metric.label}</div>` +
+                    `<canvas id='fraudTrendsAllApps-${metric.key}-${range}' height='140' width='260'></canvas>`;
+                grid.appendChild(card);
+            });
+            allAppsSection.appendChild(grid);
+            container.appendChild(allAppsSection);
+            // Render each chart
+            setTimeout(() => {
+                metrics.forEach((metric, i) => {
+                    const ctx = document.getElementById(`fraudTrendsAllApps-${metric.key}-${range}`);
+                    if (ctx && window.Chart) {
+                        if (window._chartInstances[`fraudTrendsAllApps-${metric.key}-${range}`]) {
+                            window._chartInstances[`fraudTrendsAllApps-${metric.key}-${range}`].destroy();
+                        }
+                        window._chartInstances[`fraudTrendsAllApps-${metric.key}-${range}`] = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: dates,
+                                datasets: [{
+                                    label: metric.label,
+                                    data: dates.map(d => dateMap[d][metric.key]),
+                                    borderColor: metric.color,
+                                    backgroundColor: metric.bg,
+                                    fill: true,
+                                    tension: 0.18
+                                }]
+                            },
+                            options: {
+                                plugins: { legend: { display: false } },
+                                scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: false }, ticks: { precision: 0 } } },
+                                elements: { point: { radius: 2 } },
+                                responsive: false,
+                                maintainAspectRatio: false
+                            }
+                        });
+                    }
+                });
+            }, 100);
+            // --- Per-App Sections ---
+            data.apps.forEach((app, idx) => {
+                const appSection = document.createElement('div');
+                appSection.className = 'app-card mb-12 p-8 bg-gray-50 shadow rounded-lg border border-gray-200';
+                // App header (improved design)
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'flex flex-col items-center justify-center mb-6';
+                titleDiv.innerHTML = `
+                    <div class="text-2xl font-extrabold text-gray-900 mb-1 text-center">${app.app_name}</div>
+                    <div class="text-base font-semibold text-indigo-600 tracking-wide text-center">App ID: <span class="font-mono text-lg text-gray-700">${app.app_id}</span></div>
+                `;
+                appSection.appendChild(titleDiv);
+                // Error display
+                if (app.errors && app.errors.length > 0) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'text-red-500 mt-2 mb-4';
+                    errorDiv.innerHTML = app.errors.map(error => `<div>${error}</div>`).join('');
+                    appSection.appendChild(errorDiv);
+                }
+                // --- 6 Metric Cards ---
+                if (app.table && app.table.length > 0) {
+                    // Calculate totals for this app
+                    const totals = {
+                        blocked_installs_rt: 0,
+                        blocked_installs_pa: 0,
+                        blocked_in_app_events: 0,
+                        fraud_post_inapps: 0,
+                        blocked_clicks: 0,
+                        blocked_install_postbacks: 0
+                    };
+                    app.table.forEach(row => {
+                        totals.blocked_installs_rt += row.blocked_installs_rt || 0;
+                        totals.blocked_installs_pa += row.blocked_installs_pa || 0;
+                        totals.blocked_in_app_events += row.blocked_in_app_events || 0;
+                        totals.fraud_post_inapps += row.fraud_post_inapps || 0;
+                        totals.blocked_clicks += row.blocked_clicks || 0;
+                        totals.blocked_install_postbacks += row.blocked_install_postbacks || 0;
+                    });
+                    // Cards
+                    const cards = [
+                        { label: 'Blocked Installs (RT)', value: totals.blocked_installs_rt, color: 'text-red-500' },
+                        { label: 'Blocked Installs (PA)', value: totals.blocked_installs_pa, color: 'text-indigo-500' },
+                        { label: 'Blocked In-App Events', value: totals.blocked_in_app_events, color: 'text-yellow-500' },
+                        { label: 'Fraud Post-InApps', value: totals.fraud_post_inapps, color: 'text-black' },
+                        { label: 'Blocked Clicks', value: totals.blocked_clicks, color: 'text-purple-500' },
+                        { label: 'Blocked Install Postbacks', value: totals.blocked_install_postbacks, color: 'text-black' }
+                    ];
+                    const cardsRow = document.createElement('div');
+                    cardsRow.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-8';
+                    cards.forEach(card => {
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = 'bg-white rounded-lg shadow p-4 flex flex-col items-center border border-gray-100';
+                        cardDiv.innerHTML = `<div class="text-xs text-gray-500 mb-1">${card.label}</div><div class="text-2xl font-bold ${card.color}">${card.value.toLocaleString()}</div>`;
+                        cardsRow.appendChild(cardDiv);
+                    });
+                    appSection.appendChild(cardsRow);
+                }
+                // --- App Trend Chart & Table ---
+                if (app.table && app.table.length > 0) {
+                    // Chart
+                    const chartSection = document.createElement('div');
+                    chartSection.style.marginTop = '2.5rem';
+                    chartSection.innerHTML = `<div style="font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;">Fraud Trends</div>`;
+                    
+                    // Create a grid container for the 6 metrics
+                    const metricsGrid = document.createElement('div');
+                    metricsGrid.className = 'grid grid-cols-2 md:grid-cols-3 gap-3 mb-6';
+                    
+                    const metrics = [
+                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444' },
+                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1' },
+                        { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e42' },
+                        { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6' },
+                        { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf' },
+                        { key: 'blocked_install_postbacks', label: 'Blocked Install Postbacks', color: '#f97316' }
+                    ];
+
+                    metrics.forEach((metric, midx) => {
+                        const graphContainer = document.createElement('div');
+                        graphContainer.className = 'bg-white p-2 rounded-lg shadow border border-gray-200 flex flex-col items-center justify-center';
+                        graphContainer.style.minWidth = '182px'; // 140 * 1.3
+                        graphContainer.style.maxWidth = '286px'; // 220 * 1.3
+                        graphContainer.style.margin = '0 auto';
+                        
+                        const graphTitle = document.createElement('div');
+                        graphTitle.className = 'text-sm font-semibold text-gray-700 mb-1 text-center'; // was text-xs
+                        graphTitle.textContent = metric.label;
+                        graphContainer.appendChild(graphTitle);
+                        
+                        const canvas = document.createElement('canvas');
+                        canvas.id = `fraudTrendChart${range}-${idx}-${midx}`;
+                        canvas.height = 156; // 120 * 1.3
+                        canvas.width = 260;  // 200 * 1.3
+                        graphContainer.appendChild(canvas);
+                        
+                        metricsGrid.appendChild(graphContainer);
+                        
+                        // Render individual chart
+                        setTimeout(() => {
+                            const ctx = document.getElementById(`fraudTrendChart${range}-${idx}-${midx}`);
+                            if (ctx && window.Chart) {
+                                if (window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`]) {
+                                    window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`].destroy();
+                                }
+                                window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`] = new Chart(ctx, {
+                                    type: 'line',
+                                    data: {
+                                        labels: app.table.map(r => r.date),
+                                        datasets: [{
+                                            label: metric.label,
+                                            data: app.table.map(r => r[metric.key] || 0),
+                                            borderColor: metric.color,
+                                            backgroundColor: `${metric.color}20`,
+                                            fill: false,
+                                            tension: 0.18
+                                        }]
+                                    },
+                                    options: {
+                                        plugins: {
+                                            legend: { display: false },
+                                            tooltip: {
+                                                mode: 'index',
+                                                intersect: false,
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        return `${context.dataset.label}: ${context.parsed.y}`;
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        scales: {
+                                            x: {
+                                                display: true,
+                                                ticks: { maxRotation: 45, minRotation: 45, font: { size: 12 } },
+                                                grid: { display: false }
+                                            },
+                                            y: {
+                                                beginAtZero: true,
+                                                display: true,
+                                                grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
+                                                ticks: { font: { size: 12 }, precision: 0 }
+                                            }
+                                        },
+                                        elements: { point: { radius: 2.2 } },
+                                        responsive: false,
+                                        maintainAspectRatio: false
+                                    }
+                                });
+                            }
+                        }, 100);
+                    });
+                    
+                    chartSection.appendChild(metricsGrid);
+                    appSection.appendChild(chartSection);
+                } else {
+                    const noDataDiv = document.createElement('div');
+                    noDataDiv.className = 'text-gray-500 mt-2';
+                    noDataDiv.textContent = 'No fraud data available for this period';
+                    appSection.appendChild(noDataDiv);
+                }
+                container.appendChild(appSection);
+            });
+        }
+
+        // Add JS logic for switching sub-tabs and running fetch/render for both sub-pages
+        let currentFraudSubTab = 'analytics';
+        function switchFraudSubTab(subtab) {
+            document.getElementById('fraud-analytics-tab-btn').classList.remove('border-blue-500', 'text-blue-600');
+            document.getElementById('fraud-analytics-tab-btn').classList.add('border-transparent', 'text-gray-500');
+            document.getElementById('fraud-source-tab-btn').classList.remove('border-blue-500', 'text-blue-600');
+            document.getElementById('fraud-source-tab-btn').classList.add('border-transparent', 'text-gray-500');
+            document.getElementById('fraud-analytics-subtab').style.display = 'none';
+            document.getElementById('fraud-source-subtab').style.display = 'none';
+            if (subtab === 'analytics') {
+                document.getElementById('fraud-analytics-tab-btn').classList.add('border-blue-500', 'text-blue-600');
+                document.getElementById('fraud-analytics-tab-btn').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('fraud-analytics-subtab').style.display = '';
+            } else {
+                document.getElementById('fraud-source-tab-btn').classList.add('border-blue-500', 'text-blue-600');
+                document.getElementById('fraud-source-tab-btn').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('fraud-source-subtab').style.display = '';
+            }
+            currentFraudSubTab = subtab;
+        }
+
+        // Add a helper to group fraud data by media source
+        function processFraudDataBySource(app) {
+            const grouped = {};
+            console.log(`[DEBUG] Processing fraud data for app: ${app.app_name} (${app.app_id})`);
+            console.log(`[DEBUG] Total rows: ${(app.table || []).length}`);
+            (app.table || []).forEach(row => {
+                // Use the normalized media_source field from backend
+                let source = row.media_source;
+                if (!source) source = 'Unknown';
+                console.log(`[DEBUG] Processing media source: ${source}`);
+                if (!grouped[source]) {
+                    grouped[source] = {
+                        blocked_installs_rt: 0,
+                        blocked_installs_pa: 0,
+                        blocked_in_app_events: 0,
+                        fraud_post_inapps: 0,
+                        blocked_clicks: 0,
+                        blocked_install_postbacks: 0,
+                        dates: [],
+                        rows: []
+                    };
+                }
+                grouped[source].blocked_installs_rt += parseInt(row.blocked_installs_rt || 0);
+                grouped[source].blocked_installs_pa += parseInt(row.blocked_installs_pa || 0);
+                grouped[source].blocked_in_app_events += parseInt(row.blocked_in_app_events || 0);
+                grouped[source].fraud_post_inapps += parseInt(row.fraud_post_inapps || 0);
+                grouped[source].blocked_clicks += parseInt(row.blocked_clicks || 0);
+                grouped[source].blocked_install_postbacks += parseInt(row.blocked_install_postbacks || 0);
+                grouped[source].dates.push(row.date);
+                grouped[source].rows.push(row);
+            });
+            console.log(`[DEBUG] Grouped media sources: ${Object.keys(grouped).join(', ')}`);
+            return grouped;
+        }
+
+        // Update renderFraudSource to use the grouped data
+        function renderFraudSource(data, range) {
+            const container = document.getElementById(`fraud-source-data-${range}`);
+            container.innerHTML = '';
+            if (!data.apps || data.apps.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-gray-400 mb-4">
+                            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="text-gray-500 text-lg mb-2">No Fraud Data Available</div>
+                        <div class="text-gray-400 text-sm">Please run the report for this period to see fraud data.</div>
+                    </div>
+                `;
+                return;
+            }
+            // Sort apps by total fraud (sum of all 6 metrics, descending)
+            const fraudMetricKeys = [
+                'blocked_installs_rt',
+                'blocked_installs_pa',
+                'blocked_in_app_events',
+                'fraud_post_inapps',
+                'blocked_clicks',
+                'blocked_install_postbacks'
+            ];
+            const sortedApps = [...data.apps].sort((a, b) => {
+                const sumA = (a.table || []).reduce((acc, row) => acc + fraudMetricKeys.reduce((s, k) => s + (parseInt(row[k]) || 0), 0), 0);
+                const sumB = (b.table || []).reduce((acc, row) => acc + fraudMetricKeys.reduce((s, k) => s + (parseInt(row[k]) || 0), 0), 0);
+                return sumB - sumA;
+            });
+
+            sortedApps.forEach((app, idx) => {
+                // Group by media source
+                const grouped = processFraudDataBySource(app);
+                // Sort sources by total fraud (sum of all 6 metrics)
+                const sortedSources = Object.keys(grouped).sort((a, b) => {
+                    const sumA = fraudMetricKeys.reduce((acc, key) => acc + (parseInt(grouped[a][key]) || 0), 0);
+                    const sumB = fraudMetricKeys.reduce((acc, key) => acc + (parseInt(grouped[b][key]) || 0), 0);
+                    return sumB - sumA;
+                });
+                console.log(`[DEBUG] Sorted media sources for ${app.app_name}: ${sortedSources.join(', ')}`);
+                const appSection = document.createElement('div');
+                appSection.className = 'mb-12 p-6 bg-white rounded-2xl shadow-xl border border-gray-100';
+                // App title section
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'text-center mb-6';
+                titleDiv.innerHTML = `
+                    <h2 class="text-2xl font-extrabold text-indigo-900 mb-1">${app.app_name}</h2>
+                    <p class="text-base font-mono text-indigo-600">App ID: ${app.app_id}</p>
+                    <div class="mt-2 text-xs text-gray-500">Data Period: ${app.table[0]?.date || ''} to ${app.table[app.table.length - 1]?.date || ''}</div>
+                `;
+                appSection.appendChild(titleDiv);
+
+                 // Group by media source
+                 const sourcesGrid = document.createElement('div');
+                 sourcesGrid.className = 'flex flex-col gap-6';
+
+                 sortedSources.forEach((source, sidx) => {
+                     // Source card: bordered, rounded, padded, with shadow, horizontal layout
+                     const sourceCard = document.createElement('div');
+                     sourceCard.className = 'flex flex-col md:flex-row items-stretch bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 w-full mb-4';
+
+                     // --- Info column (left) ---
+                     const infoCol = document.createElement('div');
+                     infoCol.className = 'flex flex-col justify-center items-start text-left min-w-[200px] md:pr-8 md:border-r border-gray-200 mb-4 md:mb-0';
+                     // Media Source header
+                     const sourceHeader = document.createElement('div');
+                     sourceHeader.className = 'mb-2 w-full';
+                     sourceHeader.innerHTML = `
+                         <h3 class="text-lg font-bold text-gray-800 mb-1 truncate" title="${source}">${source}</h3>
+                     `;
+                     infoCol.appendChild(sourceHeader);
+                     // Summary metrics
+                     const metricsRow = document.createElement('div');
+                     metricsRow.className = 'flex flex-col gap-1 w-full';
+                     metricsRow.innerHTML = `
+                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Installs (RT): <span class="font-bold text-red-600 ml-2">${grouped[source].blocked_installs_rt}</span></div>
+                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Installs (PA): <span class="font-bold text-indigo-600 ml-2">${grouped[source].blocked_installs_pa}</span></div>
+                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked In-App Events: <span class="font-bold text-yellow-600 ml-2">${grouped[source].blocked_in_app_events}</span></div>
+                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Fraud Post-InApps: <span class="font-bold text-teal-600 ml-2">${grouped[source].fraud_post_inapps}</span></div>
+                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Clicks: <span class="font-bold text-purple-600 ml-2">${grouped[source].blocked_clicks}</span></div>
+                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Install Postbacks: <span class="font-bold text-orange-600 ml-2">${grouped[source].blocked_install_postbacks}</span></div>
+                     `;
+                     infoCol.appendChild(metricsRow);
+
+                     // --- Graphs row (right) ---
+                     const graphsRow = document.createElement('div');
+                     graphsRow.className = 'flex flex-row flex-wrap gap-4 flex-1 pl-0 md:pl-8 items-center justify-start overflow-x-auto py-2';
+
+                     // Create graphs for each metric (side by side, compact)
+                     const metrics = [
+                         { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444' },
+                         { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1' },
+                         { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e42' },
+                         { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6' },
+                         { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf' },
+                         { key: 'blocked_install_postbacks', label: 'Blocked Install Postbacks', color: '#f97316' }
+                     ];
+                     metrics.forEach((metric, midx) => {
+                         const graphContainer = document.createElement('div');
+                         graphContainer.className = 'bg-white p-3 rounded-lg shadow border border-gray-200 flex flex-col items-center';
+                         graphContainer.style.minWidth = '160px';
+                         graphContainer.style.maxWidth = '220px';
+                         graphContainer.style.margin = '0 auto';
+
+                         const graphTitle = document.createElement('div');
+                         graphTitle.className = 'text-xs font-medium text-gray-700 mb-1 text-center';
+                         graphTitle.textContent = metric.label;
+                         graphContainer.appendChild(graphTitle);
+
+                         const canvas = document.createElement('canvas');
+                         canvas.id = `fraudSourceChart_${idx}_${sidx}_${midx}_${range}`;
+                         canvas.width = 200;
+                         canvas.height = 120;
+                         graphContainer.appendChild(canvas);
+                         graphsRow.appendChild(graphContainer);
+                         // Render chart
+                         setTimeout(() => {
+                             const ctx = document.getElementById(`fraudSourceChart_${idx}_${sidx}_${midx}_${range}`);
+                             if (ctx && window.Chart) {
+                                 const dates = [...new Set(grouped[source].rows.map(r => r.date))].sort();
+                                 new Chart(ctx, {
+                                     type: 'line',
+                                     data: {
+                                         labels: dates,
+                                         datasets: [{
+                                             label: metric.label,
+                                             data: dates.map(date => {
+                                                 const row = grouped[source].rows.find(r => r.date === date);
+                                                 return row ? row[metric.key] || 0 : 0;
+                                             }),
+                                             borderColor: metric.color,
+                                             backgroundColor: `${metric.color}20`,
+                                             fill: false,
+                                             tension: 0.18,
+                                             pointRadius: 1.5,
+                                             pointBackgroundColor: metric.color,
+                                             pointBorderColor: metric.color
+                                         }]
+                                     },
+                                     options: {
+                                         plugins: {
+                                             legend: { display: false },
+                                             tooltip: { mode: 'index', intersect: false, callbacks: { label: function(context) { return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} (${context.label})`; } } }
+                                         },
+                                         scales: {
+                                             x: {
+                                                 display: true,
+                                                 ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
+                                                 grid: { display: false },
+                                                 title: { display: false }
+                                             },
+                                             y: {
+                                                 beginAtZero: true,
+                                                 display: true,
+                                                 grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
+                                                 ticks: { font: { size: 9 }, precision: 0 }
+                                             }
+                                         },
+                                         elements: { point: { radius: 1.5 } },
+                                         responsive: false,
+                                         maintainAspectRatio: false
+                                 }
+                             });
+                             }
+                         }, 0);
+                     });
+
+                     // Compose card
+                     sourceCard.appendChild(infoCol);
+                     sourceCard.appendChild(graphsRow);
+                     sourcesGrid.appendChild(sourceCard);
+                 });
+
+                 appSection.appendChild(sourcesGrid);
+                 container.appendChild(appSection);
+            });
+        }
+
+        // Add RUN button logic for each period range in Fraud Per Source
+        const fraudSourceRanges = ['10d','mtd','lastmonth','30d'];
+        const fraudSourceDataCache = { '10d': null, 'mtd': null, 'lastmonth': null, '30d': null };
+        const fraudSourcePeriodMap = {
+            '10d': 'last10',
+            'mtd': 'mtd',
+            'lastmonth': 'lastmonth',
+            '30d': 'last30'
+        };
+        function switchFraudSourceRangeTab(range) {
+            document.querySelectorAll('.fraud-source-range-tab').forEach(btn => {
+                btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
+                btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            });
+            document.querySelector(`.fraud-source-range-tab[data-range="${range}"]`).classList.remove('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            document.querySelector(`.fraud-source-range-tab[data-range="${range}"]`).classList.add('border-green-600', 'text-green-700', 'bg-white');
+            document.querySelectorAll('.fraud-source-range-content').forEach(div => div.style.display = 'none');
+            document.getElementById(`fraud-source-content-${range}`).style.display = '';
+            if (fraudSourceDataCache[range]) renderFraudSource(fraudSourceDataCache[range], range);
+        }
+        document.querySelectorAll('.fraud-source-range-tab').forEach(btn => {
+            btn.onclick = function() {
+                switchFraudSourceRangeTab(this.getAttribute('data-range'));
+            };
+        });
+        // Show the first tab by default
+        switchFraudSourceRangeTab('10d');
+        fraudSourceRanges.forEach(range => {
+            document.getElementById(`run-fraud-source-${range}-btn`).onclick = function() {
+                // Hide all loading/error for all ranges first
+                fraudSourceRanges.forEach(r => {
+                    document.getElementById(`fraud-source-loading-${r}`).style.display = 'none';
+                    document.getElementById(`fraud-source-error-${r}`).style.display = 'none';
+                });
+                document.getElementById(`fraud-source-loading-${range}`).style.display = '';
+                // Use the same app list as Stats (fetchedApps)
+                fetch('/get_fraud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apps: fetchedApps,
+                        period: fraudSourcePeriodMap[range]
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    fraudSourceDataCache[range] = data;
+                    document.getElementById(`fraud-source-loading-${range}`).style.display = 'none';
+                    renderFraudSource(data, range);
+                })
+                .catch(() => {
+                    document.getElementById(`fraud-source-loading-${range}`).style.display = 'none';
+                    document.getElementById(`fraud-source-error-${range}`).style.display = '';
+                });
+            };
+        });
+
+        // Add DEV: Re-render from cache button logic
+        (function() {
+            const devBtn = document.getElementById('dev-rerender-cache-btn');
+            if (devBtn) {
+                devBtn.onclick = function() {
+                    // Find the currently active range
+                    const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
+                    let range = '10d';
+                    if (activeBtn) range = activeBtn.getAttribute('data-range');
+                    if (fraudSourceDataCache[range]) {
+                        renderFraudSource(fraudSourceDataCache[range], range);
+                    } else {
+                        alert('No cached data for this range. Please run the report at least once.');
+                    }
+                };
+            }
+        })();
+
+        localStorage.removeItem('fraudSourceDataCache_10d'); // or mtd, lastmonth, 30d
+
+        // Overview Tab Functionality
+        function initializeOverviewTab() {
+            // Initialize charts
+            initializeCharts();
+            
+            // Fetch and update overview data
+            fetchOverviewData();
+            
+            // Fetch and update Top Performing Apps
+            fetchTopPerformingApps();
+            
+            // Set up periodic refresh
+            setInterval(fetchOverviewData, 30000); // Refresh every 30 seconds
+            setInterval(fetchTopPerformingApps, 30000); // Refresh every 30 seconds
+        }
+
+        function initializeCharts() {
+            // Impressions Chart
+            const impressionsCanvas = document.getElementById('impressionsChart');
+            if (impressionsCanvas) {
+                const ctx = impressionsCanvas.getContext('2d');
+                window.impressionsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Impressions', data: [], borderColor: 'rgba(79, 70, 229, 0.8)', backgroundColor: 'rgba(79, 70, 229, 0.1)', fill: true, tension: 0.18 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } } }
+                });
+            }
+            // Clicks Chart
+            const clicksCanvas = document.getElementById('clicksChart');
+            if (clicksCanvas) {
+                const ctx = clicksCanvas.getContext('2d');
+                window.clicksChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Clicks', data: [], borderColor: 'rgba(16, 185, 129, 0.8)', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.18 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } } }
+                });
+            }
+            // Installs Chart
+            const installsCanvas = document.getElementById('installsChart');
+            if (installsCanvas) {
+                const ctx = installsCanvas.getContext('2d');
+                window.installsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Installs', data: [], borderColor: 'rgba(245, 158, 66, 0.8)', backgroundColor: 'rgba(245, 158, 66, 0.1)', fill: true, tension: 0.18 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } } }
+                });
+            }
+        }
+
+        function fetchOverviewData() {
+            fetch('/api/overview')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Overview data:', data); // Debug log
+                    // Update each chart
+                    if (window.impressionsChart && data.trend) {
+                        window.impressionsChart.data.labels = data.trend.dates;
+                        window.impressionsChart.data.datasets[0].data = data.trend.impressions;
+                        window.impressionsChart.update();
+                    }
+                    if (window.clicksChart && data.trend) {
+                        window.clicksChart.data.labels = data.trend.dates;
+                        window.clicksChart.data.datasets[0].data = data.trend.clicks;
+                        window.clicksChart.update();
+                    }
+                    if (window.installsChart && data.trend) {
+                        window.installsChart.data.labels = data.trend.dates;
+                        window.installsChart.data.datasets[0].data = data.trend.installs;
+                        window.installsChart.update();
+                    }
+                    // Fallback message if all values are zero
+                    const fallbackMsgId = 'overview-fallback-msg';
+                    let fallbackMsg = document.getElementById(fallbackMsgId);
+                    const allZero = data.trend && data.trend.impressions.concat(data.trend.clicks, data.trend.installs).every(val => val === 0);
+                    if (allZero) {
+                        if (!fallbackMsg) {
+                            fallbackMsg = document.createElement('div');
+                            fallbackMsg.id = fallbackMsgId;
+                            fallbackMsg.className = 'text-sm text-red-500 mt-4';
+                            fallbackMsg.textContent = "No data available. Please run the 'Last 10 Days' report on the Stats page.";
+                            document.querySelector('.bg-white.rounded-lg.shadow.p-6.mb-8')?.appendChild(fallbackMsg);
+                        }
+                    } else if (fallbackMsg) {
+                        fallbackMsg.remove();
+                    }
+                    // Update last updated note for all relevant sections
+                    const lastUpdated = data.last_updated ? `(Last updated: ${data.last_updated})` : '';
+                    document.getElementById('overview-last-updated').textContent = lastUpdated;
+                    document.getElementById('fraud-last-updated').textContent = lastUpdated;
+                    document.getElementById('top-apps-last-updated').textContent = lastUpdated;
+                    // Top Fraudulent Sources (grouped by app)
+                    const badSourcesList = document.getElementById('bad-sources-list');
+                    const badSourcesEmpty = document.getElementById('bad-sources-empty');
+                    let fraudHtml = '';
+                    if (data.topBadSourcesByApp && data.topBadSourcesByApp.length > 0) {
+                        data.topBadSourcesByApp.forEach(app => {
+                            fraudHtml += `<div class='fraud-app-card'>`;
+                            fraudHtml += `<div class='fraud-app-header'>${app.app_name} <span class='text-xs text-gray-400 font-normal ml-2'>(${app.app_id})</span></div>`;
+                            if (app.sources && app.sources.length > 0) {
+                                fraudHtml += `<table class='fraud-table'><thead><tr><th>Media Source</th><th class='fraud-center'>PA Fraud</th><th class='fraud-center'>RT Fraud</th></tr></thead><tbody>`;
+                                app.sources.forEach(source => {
+                                    fraudHtml += `<tr><td class='fraud-media-source'>${source.media_source}</td><td class='fraud-center'><span class='fraud-badge-pa'>${source.pa_fraud.toLocaleString()}</span></td><td class='fraud-center'><span class='fraud-badge-rt'>${source.rt_fraud.toLocaleString()}</span></td></tr>`;
+                                });
+                                fraudHtml += `</tbody></table>`;
+                            } else {
+                                fraudHtml += `<div class='text-gray-400 p-4'>No fraud sources found.</div>`;
+                            }
+                            fraudHtml += `</div>`;
+                        });
+                        badSourcesList.innerHTML = fraudHtml;
+                        badSourcesEmpty.style.display = 'none';
+                    } else {
+                        badSourcesList.innerHTML = '';
+                        badSourcesEmpty.style.display = '';
+                    }
+                })
+                .catch(error => console.error('Error fetching overview data:', error));
+        }
+
+        function updateRecentActivity(activities) {
+            const container = document.getElementById('recent-activity');
+            container.innerHTML = '';
+
+            activities.forEach(activity => {
+                const activityElement = document.createElement('div');
+                activityElement.className = 'flex items-center p-4 bg-gray-50 rounded-lg';
+                
+                const iconClass = getActivityIconClass(activity.type);
+                const timeAgo = getTimeAgo(activity.timestamp);
+
+                activityElement.innerHTML = `
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 ${iconClass} rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                ${getActivityIcon(activity.type)}
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-900">${activity.title}</p>
+                        <p class="text-sm text-gray-500">${activity.description}</p>
+                        <p class="text-xs text-gray-400 mt-1">${timeAgo}</p>
+                    </div>
+                `;
+
+                container.appendChild(activityElement);
+            });
+        }
+
+        function getActivityIconClass(type) {
+            const classes = {
+                'fraud': 'bg-red-500',
+                'revenue': 'bg-green-500',
+                'app': 'bg-indigo-500',
+                'user': 'bg-blue-500'
+            };
+            return classes[type] || 'bg-gray-500';
+        }
+
+        function getActivityIcon(type) {
+            const icons = {
+                'fraud': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>',
+                'revenue': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>',
+                'app': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>',
+                'user': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>'
+            };
+            return icons[type] || '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+        }
+
+        function getTimeAgo(timestamp) {
+            const now = new Date();
+            const activityTime = new Date(timestamp);
+            const diffInSeconds = Math.floor((now - activityTime) / 1000);
+
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        }
+
+        // Initialize Overview tab when it's active
+        document.addEventListener('DOMContentLoaded', function() {
+            const overviewTab = document.getElementById('overview-tab');
+            if (overviewTab && overviewTab.classList.contains('active')) {
+                initializeOverviewTab();
+            }
+        });
+
+        // Fetch and render Top Performing Apps
+        function fetchTopPerformingApps() {
+            fetch('/get_stats?range=last10')
+                .then(response => response.json())
+                .then(data => {
+                    const apps = data.apps || [];
+                    const lastUpdated = data.updated_at ? `(Last updated: ${data.updated_at})` : '';
+                    // Render table
+                    const tbody = document.getElementById('top-apps-list');
+                    let html = '';
+                    apps.slice(0, 5).forEach(app => {
+                        let event1 = app.selected_events && app.selected_events[0] ? app.selected_events[0] : null;
+                        let event2 = app.selected_events && app.selected_events[1] ? app.selected_events[1] : null;
+                        // Detect error events
+                        const isErrorEvent = ev => !ev || ev.toLowerCase().includes('maximum nu') || ev.toLowerCase().includes('subscription') || ev.toLowerCase().includes('error') || ev.toLowerCase().includes('failed') || ev.toLowerCase().includes("doesn't include");
+                        if (isErrorEvent(event1)) event1 = null;
+                        if (isErrorEvent(event2)) event2 = null;
+                        let event1Sum = 0, event2Sum = 0;
+                        if (event1) event1Sum = app.table.reduce((sum, row) => {
+                            if (![row.impressions > 0, row.clicks > 0, row.installs > 0, row.blocked_installs_rt > 0, row.blocked_installs_pa > 0].some(Boolean)) {
+                                return sum;
+                            }
+                            const val = Number(row[event1]);
+                            return sum + (!isNaN(val) ? val : 0);
+                        }, 0);
+                        if (event2) event2Sum = app.table.reduce((sum, row) => {
+                            if (![row.impressions > 0, row.clicks > 0, row.installs > 0, row.blocked_installs_rt > 0, row.blocked_installs_pa > 0].some(Boolean)) {
+                                return sum;
+                            }
+                            const val = Number(row[event2]);
+                            return sum + (!isNaN(val) ? val : 0);
+                        }, 0);
+                        html += `<tr class="hover:bg-green-50 transition"><td class="px-6 py-4 whitespace-nowrap font-extrabold text-green-900 text-lg">${app.app_name} <span class="text-xs text-gray-400">(${app.app_id})</span><div class='text-xs text-gray-500 mt-1'>${event1 || '-'}${event2 ? ' / ' + event2 : ''}</div></td>`;
+                        html += `<td class="px-6 py-4 text-center"><span class="inline-block bg-indigo-100 text-indigo-700 rounded-full px-3 py-1 font-bold">${event1Sum.toLocaleString()}</span></td>`;
+                        html += `<td class="px-6 py-4 text-center"><span class="inline-block bg-pink-100 text-pink-700 rounded-full px-3 py-1 font-bold">${event2Sum.toLocaleString()}</span></td>`;
+                        html += `<td class="px-6 py-4 text-center"><span class="inline-block bg-gray-200 text-gray-900 rounded-full px-3 py-1 font-bold">${(event1Sum + event2Sum).toLocaleString()}</span></td></tr>`;
+                    });
+                    tbody.innerHTML = html;
+                    // Update headers
+                    const event1Header = document.getElementById('event1-header');
+                    const event2Header = document.getElementById('event2-header');
+                    event1Header.textContent = 'Event 1';
+                    event2Header.textContent = 'Event 2';
+                })
+                .catch(() => {
+                    const tbody = document.getElementById('top-apps-list');
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-400 py-4">No data available. Please run the Last 10 Days report on the Stats page.</td></tr>';
+                });
+        }
+
+        // Clear Backend Data button logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const clearBtn = document.getElementById('clear-backend-cache-btn');
+            if (clearBtn) {
+                clearBtn.onclick = function() {
+                    clearBtn.disabled = true;
+                    clearBtn.textContent = 'Clearing...';
+                    fetch('/clear-backend-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            setTimeout(() => {
+                                clearBtn.textContent = 'Clear Backend Data';
+                                clearBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearBtn.textContent = 'Clear Backend Data';
+                                clearBtn.disabled = false;
+                            }, 1500);
+                        });
+                };
+            }
+            // Add Refresh Overview button logic
+            const refreshBtn = document.getElementById('refresh-overview-btn');
+            if (refreshBtn) {
+                refreshBtn.onclick = function() {
+                    refreshBtn.disabled = true;
+                    refreshBtn.textContent = 'Refreshing...';
+                    fetchOverviewData();
+                    setTimeout(() => {
+                        refreshBtn.textContent = 'Refresh Overview';
+                        refreshBtn.disabled = false;
+                    }, 1200);
+                };
+            }
+        });
+    </script>
+</body>
+</html> 
