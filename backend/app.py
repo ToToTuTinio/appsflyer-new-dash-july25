@@ -650,8 +650,16 @@ def save_event_selections():
 @login_required
 def get_apps():
     try:
-        # Always use the test data function for all pages
+        force = request.args.get('force', '0') == '1'
+        if not force and 'cached_apps' in session and 'cached_apps_time' in session:
+            return jsonify({
+                'count': len(session['cached_apps']),
+                'apps': session['cached_apps'],
+                'fetch_time': session['cached_apps_time']
+            })
         result = get_active_apps()
+        session['cached_apps'] = result['apps']
+        session['cached_apps_time'] = result['fetch_time']
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)})
