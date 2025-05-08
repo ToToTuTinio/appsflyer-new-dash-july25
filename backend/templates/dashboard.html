@@ -540,8 +540,24 @@
             const button = document.getElementById('get-apps-btn');
             button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
             fetch('/get_apps')
-                .then(response => response.json())
-                .then(data => {
+                .then(response => response.text())
+                .then(text => {
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        setFetchButtonsDisabled(false);
+                        button.innerHTML = 'Get Apps';
+                        document.getElementById('app-count').textContent = 'The data is being prepared. Please try again in a minute.';
+                        return;
+                    }
+                    if (data.status === 'processing') {
+                        setFetchButtonsDisabled(false);
+                        button.innerHTML = 'Get Apps';
+                        document.getElementById('app-count').textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
+                        setTimeout(fetchApps, 30000);
+                        return;
+                    }
                     setFetchButtonsDisabled(false);
                     button.innerHTML = 'Get Apps';
                     if (data.error) {
@@ -549,7 +565,7 @@
                         return;
                     }
                     fetchedApps = data.apps;
-            renderAppsList(fetchedApps);
+                    renderAppsList(fetchedApps);
                     document.getElementById('app-count').textContent = data.count;
                     document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
                 })
@@ -647,10 +663,33 @@
                     selected_events: eventSelections
                 })
             })
-            .then(r => r.json())
-            .then(data => {
+            .then(r => r.text())
+            .then(text => {
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    setFetchButtonsDisabled(false);
+                    if (loadingElem) loadingElem.style.display = 'none';
+                    const errorElem = document.getElementById('stats-error');
+                    if (errorElem) {
+                        errorElem.textContent = 'The data is being prepared. Please try again in a minute.';
+                        errorElem.style.display = '';
+                    }
+                    return;
+                }
+                if (data.status === 'processing') {
+                    setFetchButtonsDisabled(false);
+                    if (loadingElem) loadingElem.style.display = 'none';
+                    const errorElem = document.getElementById('stats-error');
+                    if (errorElem) {
+                        errorElem.textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
+                        errorElem.style.display = '';
+                    }
+                    setTimeout(() => runStatsReport(range), 30000);
+                    return;
+                }
                 setFetchButtonsDisabled(false);
-                console.log('Stats data for', range, data); // Debug log
                 statsData[range] = data;
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
@@ -1291,7 +1330,6 @@
             document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
                 document.getElementById('fraud-loading').style.display = '';
                 document.getElementById('fraud-error').style.display = 'none';
-                // Use the same app list as Stats (fetchedApps)
                 fetch('/get_fraud', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1300,9 +1338,24 @@
                         period: fraudPeriodMap[range]
                     })
                 })
-                .then(r => r.json())
-                .then(data => {
-                    fraudDataCache[range] = data;
+                .then(r => r.text())
+                .then(text => {
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        document.getElementById('fraud-loading').style.display = 'none';
+                        document.getElementById('fraud-error').textContent = 'The data is being prepared. Please try again in a minute.';
+                        document.getElementById('fraud-error').style.display = '';
+                        return;
+                    }
+                    if (data.status === 'processing') {
+                        document.getElementById('fraud-loading').style.display = 'none';
+                        document.getElementById('fraud-error').textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
+                        document.getElementById('fraud-error').style.display = '';
+                        setTimeout(() => document.getElementById(`run-fraud-${range}-btn`).onclick(), 30000);
+                        return;
+                    }
                     document.getElementById('fraud-loading').style.display = 'none';
                     renderFraudAll(data, range);
                 })
