@@ -86,7 +86,7 @@ def get_apps_with_installs(email, password, max_retries=7):
             print("Opening login page...")
             driver.get("https://hq1.appsflyer.com/auth/login")
             time.sleep(5)
-
+#this is a test
             print("Waiting for email field...")
             try:
                 email_field = WebDriverWait(driver, 30).until(
