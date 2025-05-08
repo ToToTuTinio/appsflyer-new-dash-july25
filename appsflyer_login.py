@@ -89,9 +89,9 @@ def get_apps_with_installs(email, password, max_retries=7):
 
             print("Waiting for email field...")
             try:
-            email_field = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.ID, "user-email"))
-            )
+                email_field = WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located((By.ID, "user-email"))
+                )
                 print("Email field found!")
             except Exception as e:
                 print(f"Error finding email field: {str(e)}")
@@ -105,9 +105,9 @@ def get_apps_with_installs(email, password, max_retries=7):
 
             print("Waiting for password field...")
             try:
-            password_field = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.ID, "password-field"))
-            )
+                password_field = WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located((By.ID, "password-field"))
+                )
                 print("Password field found!")
             except Exception as e:
                 print(f"Error finding password field: {str(e)}")
@@ -121,9 +121,9 @@ def get_apps_with_installs(email, password, max_retries=7):
             
             print("Looking for login button...")
             try:
-            login_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//button[@type="submit"]'))
-            )
+                login_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, '//button[@type="submit"]'))
+                )
                 print("Login button found!")
             except Exception as e:
                 print(f"Error finding login button: {str(e)}")
