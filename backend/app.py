@@ -417,6 +417,9 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
             if attempt < max_retries - 1:
                 print(f"[API] Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
+        except requests.exceptions.Timeout as e:
+            print(f"[API] Timeout error: {str(e)}")
+            return 'timeout'
         except requests.exceptions.RequestException as e:
             print(f"[API] Request error: {str(e)}")
             if hasattr(e, 'response') and e.response is not None:
@@ -477,6 +480,9 @@ def all_apps_stats():
         try:
             print(f"[STATS] Calling daily_report API for {app_id}...")
             resp = make_api_request(url, params)
+            if resp == 'timeout':
+                print(f"[STATS] Timeout detected for {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             daily_stats = {}
             
             if resp and resp.status_code == 200:
@@ -551,33 +557,17 @@ def all_apps_stats():
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
             blocked_rt_params = {"from": start_date, "to": end_date}
             blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
-            if blocked_rt_resp and blocked_rt_resp.status_code == 200:
-                blocked_rows = blocked_rt_resp.text.strip().split("\n")
-                if len(blocked_rows) > 1:
-                    header_rt = blocked_rows[0].split(",")
-                    date_index = header_rt.index("Install Time") if "Install Time" in header_rt else None
-                    for row in blocked_rows[1:]:
-                        cols = row.split(",")
-                        if date_index is not None and len(cols) > date_index:
-                            install_date = cols[date_index].split(" ")[0]
-                            daily_stats.setdefault(install_date, {}).setdefault("blocked_installs_rt", 0)
-                            daily_stats[install_date]["blocked_installs_rt"] += 1
+            if blocked_rt_resp == 'timeout':
+                print(f"[STATS] Timeout detected for blocked_installs_report {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             # Blocked Installs (PA)
             print(f"[STATS] Calling detection API for {app_id}...")
             blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
             blocked_pa_params = {"from": start_date, "to": end_date}
             blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
-            if blocked_pa_resp and blocked_pa_resp.status_code == 200:
-                blocked_pa_rows = blocked_pa_resp.text.strip().split("\n")
-                if len(blocked_pa_rows) > 1:
-                    header_pa = blocked_pa_rows[0].split(",")
-                    date_index = header_pa.index("Install Time") if "Install Time" in header_pa else None
-                    for row in blocked_pa_rows[1:]:
-                        cols = row.split(",")
-                        if date_index is not None and len(cols) > date_index:
-                            install_date = cols[date_index].split(" ")[0]
-                            daily_stats.setdefault(install_date, {}).setdefault("blocked_installs_pa", 0)
-                            daily_stats[install_date]["blocked_installs_pa"] += 1
+            if blocked_pa_resp == 'timeout':
+                print(f"[STATS] Timeout detected for detection API {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             # In-App Events (for selected events)
             event_data = {}
             selected = selected_events.get(app_id, [])
@@ -877,6 +867,9 @@ def get_fraud():
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
             blocked_rt_params = {"from": start_date, "to": end_date}
             blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
+            if blocked_rt_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             if blocked_rt_resp and blocked_rt_resp.status_code == 200:
                 rows = blocked_rt_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -897,6 +890,9 @@ def get_fraud():
             blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
             blocked_pa_params = {"from": start_date, "to": end_date}
             blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
+            if blocked_pa_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for detection API {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             if blocked_pa_resp and blocked_pa_resp.status_code == 200:
                 rows = blocked_pa_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -917,6 +913,9 @@ def get_fraud():
             blocked_events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_in_app_events_report/v5"
             blocked_events_params = {"from": start_date, "to": end_date}
             blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params)
+            if blocked_events_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             if blocked_events_resp and blocked_events_resp.status_code == 200:
                 rows = blocked_events_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -937,6 +936,9 @@ def get_fraud():
             fraud_post_inapps_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/fraud-post-inapps/v5"
             fraud_post_inapps_params = {"from": start_date, "to": end_date}
             fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params)
+            if fraud_post_inapps_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             if fraud_post_inapps_resp and fraud_post_inapps_resp.status_code == 200:
                 rows = fraud_post_inapps_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -957,6 +959,9 @@ def get_fraud():
             blocked_clicks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_clicks_report/v5"
             blocked_clicks_params = {"from": start_date, "to": end_date}
             blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params)
+            if blocked_clicks_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             if blocked_clicks_resp and blocked_clicks_resp.status_code == 200:
                 rows = blocked_clicks_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -977,6 +982,9 @@ def get_fraud():
             blocked_postbacks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_install_postbacks/v5"
             blocked_postbacks_params = {"from": start_date, "to": end_date}
             blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params)
+            if blocked_postbacks_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, returning processing status.")
+                return jsonify({'status': 'processing'})
             if blocked_postbacks_resp and blocked_postbacks_resp.status_code == 200:
                 rows = blocked_postbacks_resp.text.strip().split("\n")
                 if len(rows) > 1:
