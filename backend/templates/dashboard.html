@@ -178,10 +178,6 @@
 
         <!-- Overview Tab Content -->
         <div id="overview-tab" class="tab-content active">
-            <div class="flex justify-end mb-4">
-                <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 transition">Clear Backend Data</button>
-                <button id="refresh-overview-btn" class="ml-2 border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh Overview</button>
-            </div>
             <div class="space-y-12"> <!-- Add vertical spacing between cards -->
                 <!-- Total Performance Card -->
                 <div class="bg-white rounded-2xl shadow-xl p-8">
@@ -248,6 +244,10 @@
                             </table>
                         </div>
                     </div>
+                </div>
+                <!-- Clear Backend Data Button (moved to bottom, smaller) -->
+                <div class="flex justify-center mt-8 mb-2">
+                    <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Backend Data</button>
                 </div>
             </div>
         </div>
@@ -2201,6 +2201,9 @@
             const clearBtn = document.getElementById('clear-backend-cache-btn');
             if (clearBtn) {
                 clearBtn.onclick = function() {
+                    if (!confirm('Are you sure you want to clear all backend cached data? This action cannot be undone.')) {
+                        return;
+                    }
                     clearBtn.disabled = true;
                     clearBtn.textContent = 'Clearing...';
                     fetch('/clear-backend-cache', { method: 'POST' })
