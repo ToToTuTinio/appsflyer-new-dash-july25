@@ -686,16 +686,21 @@
                         errorElem.textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
                         errorElem.style.display = '';
                     }
+                    // --- POLL AGAIN UNTIL DATA IS READY ---
                     setTimeout(() => runStatsReport(range), 30000);
                     return;
                 }
+                // --- DATA IS READY: AUTO-RENDER ---
                 setFetchButtonsDisabled(false);
                 statsData[range] = data;
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
-                // --- NEW: Refresh overview and top apps after RUN completes ---
+                // Refresh overview and top apps after RUN completes
                 fetchOverviewData();
                 fetchTopPerformingApps();
+                // Hide error message if present
+                const errorElem = document.getElementById('stats-error');
+                if (errorElem) errorElem.style.display = 'none';
             })
             .catch(error => {
                 setFetchButtonsDisabled(false);
