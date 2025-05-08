@@ -508,6 +508,14 @@
         // Fallback for fetchedApps
         window.fetchedApps = window.fetchedApps || [];
 
+        // Add a helper to disable/enable all fetch buttons
+        function setFetchButtonsDisabled(disabled) {
+            document.getElementById('get-apps-btn').disabled = disabled;
+            document.getElementById('get-events-btn').disabled = disabled;
+            document.querySelectorAll('.date-range-tab').forEach(btn => btn.disabled = disabled);
+            document.querySelectorAll('[id^="run-report-"]').forEach(btn => btn.disabled = disabled);
+        }
+
         function switchTab(tabName) {
             // Hide all tab contents
             document.querySelectorAll('.tab-content').forEach(content => {
@@ -528,14 +536,13 @@
 
         // Remove static apps and update fetchApps
         fetchApps = function() {
+            setFetchButtonsDisabled(true);
             const button = document.getElementById('get-apps-btn');
-            button.disabled = true;
             button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
-
             fetch('/get_apps')
                 .then(response => response.json())
                 .then(data => {
-                    button.disabled = false;
+                    setFetchButtonsDisabled(false);
                     button.innerHTML = 'Get Apps';
                     if (data.error) {
                         document.getElementById('app-count').textContent = `Error: ${data.error}`;
@@ -547,7 +554,7 @@
                     document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
                 })
                 .catch(error => {
-                    button.disabled = false;
+                    setFetchButtonsDisabled(false);
                     button.innerHTML = 'Get Apps';
                     document.getElementById('app-count').textContent = `Error: ${error.message}`;
                 });
@@ -627,6 +634,7 @@
             }
         });
         function runStatsReport(range) {
+            setFetchButtonsDisabled(true);
             const loadingElem = document.getElementById('stats-loading');
             if (loadingElem) loadingElem.style.display = '';
             let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
@@ -641,12 +649,14 @@
             })
             .then(r => r.json())
             .then(data => {
+                setFetchButtonsDisabled(false);
                 console.log('Stats data for', range, data); // Debug log
                 statsData[range] = data;
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
             })
             .catch(error => {
+                setFetchButtonsDisabled(false);
                 const errorElem = document.getElementById('stats-error');
                 if (errorElem) {
                     errorElem.textContent = error.message;
