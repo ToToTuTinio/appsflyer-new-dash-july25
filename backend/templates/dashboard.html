@@ -302,6 +302,9 @@
                 <div class="flex justify-end mt-8">
                     <button id="save-all-events-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg transition">SAVE ALL</button>
                 </div>
+                <div class="flex justify-center mt-8 mb-2">
+                    <button id="clear-apps-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Apps Cache</button>
+                </div>
             </div>
         </div>
 
@@ -341,6 +344,9 @@
                 </div>
                 <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
                     Error loading stats.
+                </div>
+                <div class="flex justify-center mt-8 mb-2">
+                    <button id="clear-stats-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Stats Cache</button>
                 </div>
             </div>
         </div>
@@ -451,6 +457,9 @@
                     <div id="fraud-source-error" class="text-center text-red-500 mt-8" style="display:none;">
                         Error loading fraud per source data.
                     </div>
+                </div>
+                <div class="flex justify-center mt-8 mb-2">
+                    <button id="clear-fraud-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Fraud Cache</button>
                 </div>
             </div>
         </div>
@@ -2294,6 +2303,81 @@
                         refreshFraudBtn.textContent = 'Refresh';
                         refreshFraudBtn.disabled = false;
                     }, 1200);
+                };
+            }
+            // Add Clear Apps Cache button logic
+            const clearAppsBtn = document.getElementById('clear-apps-cache-btn');
+            if (clearAppsBtn) {
+                clearAppsBtn.onclick = function() {
+                    if (!confirm('Are you sure you want to clear the apps cache?')) return;
+                    clearAppsBtn.disabled = true;
+                    clearAppsBtn.textContent = 'Clearing...';
+                    fetch('/clear-apps-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearAppsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            setTimeout(() => {
+                                clearAppsBtn.textContent = 'Clear Apps Cache';
+                                clearAppsBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearAppsBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearAppsBtn.textContent = 'Clear Apps Cache';
+                                clearAppsBtn.disabled = false;
+                            }, 1500);
+                        });
+                };
+            }
+            // Add Clear Stats Cache button logic
+            const clearStatsBtn = document.getElementById('clear-stats-cache-btn');
+            if (clearStatsBtn) {
+                clearStatsBtn.onclick = function() {
+                    if (!confirm('Are you sure you want to clear the stats cache?')) return;
+                    clearStatsBtn.disabled = true;
+                    clearStatsBtn.textContent = 'Clearing...';
+                    fetch('/clear-stats-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearStatsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            setTimeout(() => {
+                                clearStatsBtn.textContent = 'Clear Stats Cache';
+                                clearStatsBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearStatsBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearStatsBtn.textContent = 'Clear Stats Cache';
+                                clearStatsBtn.disabled = false;
+                            }, 1500);
+                        });
+                };
+            }
+            // Add Clear Fraud Cache button logic
+            const clearFraudBtn = document.getElementById('clear-fraud-cache-btn');
+            if (clearFraudBtn) {
+                clearFraudBtn.onclick = function() {
+                    if (!confirm('Are you sure you want to clear the fraud cache?')) return;
+                    clearFraudBtn.disabled = true;
+                    clearFraudBtn.textContent = 'Clearing...';
+                    fetch('/clear-fraud-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearFraudBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            setTimeout(() => {
+                                clearFraudBtn.textContent = 'Clear Fraud Cache';
+                                clearFraudBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearFraudBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearFraudBtn.textContent = 'Clear Fraud Cache';
+                                clearFraudBtn.disabled = false;
+                            }, 1500);
+                        });
                 };
             }
         });
