@@ -1341,8 +1341,21 @@
                         period: fraudPeriodMap[range]
                     })
                 })
-                .then(r => r.text())
+                .then(r => {
+                    if (!r.ok) {
+                        if (r.status === 504) {
+                            // 504 Gateway Timeout: do nothing (no error message)
+                            return;
+                        }
+                        // Other errors: show a generic error
+                        document.getElementById('fraud-error').textContent = 'Error loading fraud data. Please try again.';
+                        document.getElementById('fraud-error').style.display = '';
+                        return;
+                    }
+                    return r.text();
+                })
                 .then(text => {
+                    if (!text) return; // If no data (due to 504), do nothing
                     let data;
                     try {
                         data = JSON.parse(text);
@@ -1363,8 +1376,8 @@
                     renderFraudAll(data, range);
                 })
                 .catch(() => {
-                    document.getElementById('fraud-loading').style.display = 'none';
-                    document.getElementById('fraud-error').style.display = '';
+                    // Only show error for real network errors (not 504)
+                    // (No-op for 504, error already handled above)
                 });
             };
         });
