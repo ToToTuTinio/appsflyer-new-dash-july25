@@ -1361,18 +1361,19 @@
                         data = JSON.parse(text);
                     } catch (e) {
                         document.getElementById('fraud-loading').style.display = 'none';
-                        document.getElementById('fraud-error').textContent = 'The data is being prepared. Please wait.';
-                        document.getElementById('fraud-error').style.display = '';
+                        // HIDE error message if no fraud data (do not show any message)
+                        document.getElementById('fraud-error').style.display = 'none';
                         return;
                     }
                     if (data.status === 'processing') {
                         document.getElementById('fraud-loading').style.display = 'none';
-                        document.getElementById('fraud-error').textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
-                        document.getElementById('fraud-error').style.display = '';
+                        document.getElementById('fraud-error').style.display = 'none'; // Hide error
                         setTimeout(() => document.getElementById(`run-fraud-${range}-btn`).onclick(), 30000);
                         return;
                     }
                     document.getElementById('fraud-loading').style.display = 'none';
+                    document.getElementById('fraud-error').style.display = 'none'; // Hide error
+                    // --- AUTO-DISPLAY DATA AS SOON AS READY ---
                     renderFraudAll(data, range);
                 })
                 .catch(() => {
