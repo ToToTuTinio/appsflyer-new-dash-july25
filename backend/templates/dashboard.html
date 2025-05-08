@@ -1026,63 +1026,82 @@
         function fetchAndRenderEventsForAllApps() {
             const appsList = document.getElementById('apps-list');
             const spinner = document.getElementById('get-events-spinner');
-            // Remove timer/status from button
             spinner.style.display = 'inline-block';
             document.getElementById('get-events-timer').textContent = '';
             let completed = 0;
             let total = fetchedApps.length;
-            fetchedApps.forEach(app => {
-                // Find the table row for this app by matching the app_id cell
-                let tr = null;
-                Array.from(appsList.querySelectorAll('tr')).forEach(row => {
-                    const firstCell = row.querySelector('td');
-                    if (firstCell && firstCell.textContent.trim() === app.app_id) {
-                        tr = row;
-                    }
-                });
-                if (!tr) {
-                    completed++;
-                    if (completed === total) done();
+            const batchSize = 2; // Number of parallel requests per batch
+            let currentIndex = 0;
+
+            function processBatch() {
+                const batch = fetchedApps.slice(currentIndex, currentIndex + batchSize);
+                let batchCompleted = 0;
+                if (batch.length === 0) {
+                    spinner.style.display = 'none';
+                    document.getElementById('get-events-timer').textContent = '';
                     return;
                 }
-                fetchEventsForApp(app.app_id, function(events, fetchTime, isError, fullErrorMsg) {
-                    const event1Sel = tr.querySelector('.event1-dropdown');
-                    const event2Sel = tr.querySelector('.event2-dropdown');
-                    if (isError && fullErrorMsg) {
-                        const truncated = fullErrorMsg.length > 30 ? fullErrorMsg.slice(0, 30) + '…' : fullErrorMsg;
-                        event1Sel.innerHTML = `<option>${truncated}</option>`;
-                        event2Sel.innerHTML = `<option>${truncated}</option>`;
-                        event1Sel.disabled = true;
-                        event2Sel.disabled = true;
-                        event1Sel.title = fullErrorMsg;
-                        event2Sel.title = fullErrorMsg;
-                    } else if (events.length === 0) {
-                        event1Sel.innerHTML = '<option>No Events Found.</option>';
-                        event2Sel.innerHTML = '<option>No Events Found.</option>';
-                        event1Sel.disabled = true;
-                        event2Sel.disabled = true;
-                        event1Sel.title = '';
-                        event2Sel.title = '';
-                    } else {
-                        event1Sel.innerHTML = events.map(ev => `<option value=\"${ev}\">${ev}</option>`).join('');
-                        event2Sel.innerHTML = events.map(ev => `<option value=\"${ev}\">${ev}</option>`).join('');
-                        event1Sel.disabled = false;
-                        event2Sel.disabled = false;
-                        event1Sel.title = '';
-                        event2Sel.title = '';
-                        // Set saved selection if exists
-                        const [sel1, sel2] = getEventSelection(app.app_id);
-                        if (sel1) event1Sel.value = sel1;
-                        if (sel2) event2Sel.value = sel2;
+                batch.forEach(app => {
+                    // Find the table row for this app by matching the app_id cell
+                    let tr = null;
+                    Array.from(appsList.querySelectorAll('tr')).forEach(row => {
+                        const firstCell = row.querySelector('td');
+                        if (firstCell && firstCell.textContent.trim() === app.app_id) {
+                            tr = row;
+                        }
+                    });
+                    if (!tr) {
+                        completed++;
+                        batchCompleted++;
+                        if (++batchCompleted === batch.length) {
+                            currentIndex += batchSize;
+                            processBatch();
+                        }
+                        return;
                     }
-                    completed++;
-                    if (completed === total) done();
+                    fetchEventsForApp(app.app_id, function(events, fetchTime, isError, fullErrorMsg) {
+                        const event1Sel = tr.querySelector('.event1-dropdown');
+                        const event2Sel = tr.querySelector('.event2-dropdown');
+                        if (isError && fullErrorMsg) {
+                            const truncated = fullErrorMsg.length > 30 ? fullErrorMsg.slice(0, 30) + '…' : fullErrorMsg;
+                            event1Sel.innerHTML = `<option>${truncated}</option>`;
+                            event2Sel.innerHTML = `<option>${truncated}</option>`;
+                            event1Sel.disabled = true;
+                            event2Sel.disabled = true;
+                            event1Sel.title = fullErrorMsg;
+                            event2Sel.title = fullErrorMsg;
+                        } else if (events.length === 0) {
+                            event1Sel.innerHTML = '<option>No Events Found.</option>';
+                            event2Sel.innerHTML = '<option>No Events Found.</option>';
+                            event1Sel.disabled = true;
+                            event2Sel.disabled = true;
+                            event1Sel.title = '';
+                            event2Sel.title = '';
+                        } else {
+                            event1Sel.innerHTML = events.map(ev => `<option value=\"${ev}\">${ev}</option>`).join('');
+                            event2Sel.innerHTML = events.map(ev => `<option value=\"${ev}\">${ev}</option>`).join('');
+                            event1Sel.disabled = false;
+                            event2Sel.disabled = false;
+                            event1Sel.title = '';
+                            event2Sel.title = '';
+                            // Set saved selection if exists
+                            const [sel1, sel2] = getEventSelection(app.app_id);
+                            if (sel1) event1Sel.value = sel1;
+                            if (sel2) event2Sel.value = sel2;
+                        }
+                        completed++;
+                        batchCompleted++;
+                        if (completed === total) {
+                            spinner.style.display = 'none';
+                            document.getElementById('get-events-timer').textContent = '';
+                        } else if (batchCompleted === batch.length) {
+                            currentIndex += batchSize;
+                            processBatch();
+                        }
+                    });
                 });
-            });
-            function done() {
-                spinner.style.display = 'none';
-                document.getElementById('get-events-timer').textContent = '';
             }
+            processBatch();
         }
         // Patch renderAppsList to not auto-fetch events
         function renderAppsList(apps) {
