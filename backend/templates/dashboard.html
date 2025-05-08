@@ -548,7 +548,7 @@
                     } catch (e) {
                         setFetchButtonsDisabled(false);
                         button.innerHTML = 'Get Apps';
-                        document.getElementById('app-count').textContent = 'The data is being prepared. Please try again in a minute.';
+                        document.getElementById('app-count').textContent = 'The data is being prepared. Please wait.';
                         return;
                     }
                     if (data.status === 'processing') {
@@ -673,7 +673,7 @@
                     if (loadingElem) loadingElem.style.display = 'none';
                     const errorElem = document.getElementById('stats-error');
                     if (errorElem) {
-                        errorElem.textContent = 'The data is being prepared. Please try again in a minute.';
+                        errorElem.textContent = 'The data is being prepared. Please wait.';
                         errorElem.style.display = '';
                     }
                     return;
@@ -693,6 +693,9 @@
                 statsData[range] = data;
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
+                // --- NEW: Refresh overview and top apps after RUN completes ---
+                fetchOverviewData();
+                fetchTopPerformingApps();
             })
             .catch(error => {
                 setFetchButtonsDisabled(false);
@@ -1345,7 +1348,7 @@
                         data = JSON.parse(text);
                     } catch (e) {
                         document.getElementById('fraud-loading').style.display = 'none';
-                        document.getElementById('fraud-error').textContent = 'The data is being prepared. Please try again in a minute.';
+                        document.getElementById('fraud-error').textContent = 'The data is being prepared. Please wait.';
                         document.getElementById('fraud-error').style.display = '';
                         return;
                     }
