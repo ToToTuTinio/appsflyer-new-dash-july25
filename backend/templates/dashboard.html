@@ -178,6 +178,9 @@
 
         <!-- Overview Tab Content -->
         <div id="overview-tab" class="tab-content active">
+            <div class="flex justify-end mb-4">
+                <button id="refresh-overview-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh Overview</button>
+            </div>
             <div class="space-y-12"> <!-- Add vertical spacing between cards -->
                 <!-- Total Performance Card -->
                 <div class="bg-white rounded-2xl shadow-xl p-8">
@@ -254,6 +257,9 @@
 
         <!-- Apps Tab Content -->
         <div id="apps-tab" class="tab-content">
+            <div class="flex justify-end mb-4">
+                <button id="refresh-apps-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh</button>
+            </div>
             <div class="bg-white rounded-2xl shadow-xl p-10">
                 <div class="flex justify-between items-center mb-8">
                     <h2 class="text-3xl font-extrabold text-gray-900 flex items-center">Active Apps</h2>
@@ -301,6 +307,9 @@
 
         <!-- Stats Tab Content -->
         <div id="stats-tab" class="tab-content">
+            <div class="flex justify-end mb-4">
+                <button id="refresh-stats-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh</button>
+            </div>
             <div class="bg-white rounded-2xl shadow-xl p-10">
                 <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
                 <!-- Date Range Tabs -->
@@ -338,6 +347,9 @@
 
         <!-- Fraud Tab Content -->
         <div id="fraud-tab" class="tab-content">
+            <div class="flex justify-end mb-4">
+                <button id="refresh-fraud-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh</button>
+            </div>
             <div class="bg-white rounded-lg shadow-lg p-8 max-w-5xl mx-auto">
                 <!-- Sub-tabs for Fraud Analytics and Fraud Per Source -->
                 <div class="flex space-x-4 mb-6">
@@ -2234,6 +2246,53 @@
                     setTimeout(() => {
                         refreshBtn.textContent = 'Refresh Overview';
                         refreshBtn.disabled = false;
+                    }, 1200);
+                };
+            }
+            // Add Refresh Apps button logic
+            const refreshAppsBtn = document.getElementById('refresh-apps-btn');
+            if (refreshAppsBtn) {
+                refreshAppsBtn.onclick = function() {
+                    refreshAppsBtn.disabled = true;
+                    refreshAppsBtn.textContent = 'Refreshing...';
+                    fetchApps();
+                    setTimeout(() => {
+                        refreshAppsBtn.textContent = 'Refresh';
+                        refreshAppsBtn.disabled = false;
+                    }, 1200);
+                };
+            }
+            // Add Refresh Stats button logic
+            const refreshStatsBtn = document.getElementById('refresh-stats-btn');
+            if (refreshStatsBtn) {
+                refreshStatsBtn.onclick = function() {
+                    refreshStatsBtn.disabled = true;
+                    refreshStatsBtn.textContent = 'Refreshing...';
+                    // Re-run the currently selected stats report
+                    const activeRangeBtn = document.querySelector('.date-range-tab.border-green-600');
+                    let range = '10d';
+                    if (activeRangeBtn) range = activeRangeBtn.getAttribute('data-range');
+                    runStatsReport(range);
+                    setTimeout(() => {
+                        refreshStatsBtn.textContent = 'Refresh';
+                        refreshStatsBtn.disabled = false;
+                    }, 1200);
+                };
+            }
+            // Add Refresh Fraud button logic
+            const refreshFraudBtn = document.getElementById('refresh-fraud-btn');
+            if (refreshFraudBtn) {
+                refreshFraudBtn.onclick = function() {
+                    refreshFraudBtn.disabled = true;
+                    refreshFraudBtn.textContent = 'Refreshing...';
+                    // Re-run the currently selected fraud report
+                    const activeFraudRangeBtn = document.querySelector('.fraud-range-tab.border-green-600');
+                    let range = '10d';
+                    if (activeFraudRangeBtn) range = activeFraudRangeBtn.getAttribute('data-range');
+                    document.getElementById(`run-fraud-${range}-btn`).onclick();
+                    setTimeout(() => {
+                        refreshFraudBtn.textContent = 'Refresh';
+                        refreshFraudBtn.disabled = false;
                     }, 1200);
                 };
             }
