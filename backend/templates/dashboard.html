@@ -921,8 +921,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('get-stats-btn').addEventListener('click', function() { fetchAllAppsStats('last10'); });
-            document.getElementById('get-stats-mtd-btn').addEventListener('click', function() { fetchAllAppsStats('mtd'); });
+            var btn10d = document.getElementById('get-stats-btn');
+            if (btn10d) btn10d.addEventListener('click', function() { fetchAllAppsStats('last10'); });
+
+            var btnMtd = document.getElementById('get-stats-mtd-btn');
+            if (btnMtd) btnMtd.addEventListener('click', function() { fetchAllAppsStats('mtd'); });
         });
 
         // Patch fetchAllAppsStats to use static app and accept period
