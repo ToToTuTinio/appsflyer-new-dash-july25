@@ -813,6 +813,15 @@
                     section.innerHTML += table;
                     setTimeout(() => {
                         // 1. Impressions & Clicks
+                        console.log('[DEBUG] Attempting to render Impressions & Clicks chart:', mainId);
+                        const mainCanvas = document.getElementById(mainId);
+                        if (!mainCanvas) {
+                            console.warn('[DEBUG] Canvas not found for', mainId);
+                        } else {
+                            console.log('[DEBUG] Canvas found for', mainId);
+                            console.log('[DEBUG] Data for Impressions:', app.table.map(r=>r.impressions));
+                            console.log('[DEBUG] Data for Clicks:', app.table.map(r=>r.clicks));
+                        }
                         renderChartWithRetry(mainId, (ctxMain) => {
                             if (window._chartInstances[mainId]) {
                                 window._chartInstances[mainId].destroy();
