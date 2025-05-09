@@ -2407,7 +2407,7 @@
             }
         });
 
-        // --- On page load or tab switch, always fetch and render cached data for all tabs ---
+        // --- On page load or tab switch, always fetch and render cached data for all tabs and all ranges ---
         document.addEventListener('DOMContentLoaded', function() {
             // Overview
             if (document.getElementById('overview-tab')) fetchOverviewData();
@@ -2422,33 +2422,41 @@
                     }
                 });
             }
-            // Stats (default to 10d)
+            // Stats - all ranges
             if (document.getElementById('stats-tab')) {
-                fetch('/get_stats?range=last10').then(r => r.json()).then(data => {
-                    if (data && data.apps) {
-                        statsData['10d'] = data;
-                        renderStatsAppsForRange('10d', data.apps || []);
-                    }
+                const statRanges = ['10d','mtd','lastmonth','30d'];
+                const statRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                statRanges.forEach(range => {
+                    fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            statsData[range] = data;
+                            renderStatsAppsForRange(range, data.apps || []);
+                        }
+                    });
                 });
             }
-            // Fraud (default to 10d)
+            // Fraud - all ranges
             if (document.getElementById('fraud-tab')) {
-                fetch('/get_fraud', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10' })
-                }).then(r => r.json()).then(data => {
-                    if (data && data.apps) {
-                        fraudDataCache['10d'] = data;
-                        renderFraudAll(data, '10d');
-                    }
+                const fraudRanges = ['10d','mtd','lastmonth','30d'];
+                const fraudRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                fraudRanges.forEach(range => {
+                    fetch('/get_fraud', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudRangeMap[range] })
+                    }).then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            fraudDataCache[range] = data;
+                            renderFraudAll(data, range);
+                        }
+                    });
                 });
             }
             // Profile
             if (document.getElementById('profile-tab')) loadProfile();
         });
 
-        // --- On tab switch, fetch and render cached data for the selected tab ---
+        // --- On tab switch, fetch and render cached data for the selected tab and all ranges ---
         const origSwitchTab2 = switchTab;
         switchTab = function(tabName) {
             origSwitchTab2(tabName);
@@ -2464,23 +2472,31 @@
                 });
             }
             if (tabName === 'stats') {
-                fetch('/get_stats?range=last10').then(r => r.json()).then(data => {
-                    if (data && data.apps) {
-                        statsData['10d'] = data;
-                        renderStatsAppsForRange('10d', data.apps || []);
-                    }
+                const statRanges = ['10d','mtd','lastmonth','30d'];
+                const statRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                statRanges.forEach(range => {
+                    fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            statsData[range] = data;
+                            renderStatsAppsForRange(range, data.apps || []);
+                        }
+                    });
                 });
             }
             if (tabName === 'fraud') {
-                fetch('/get_fraud', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10' })
-                }).then(r => r.json()).then(data => {
-                    if (data && data.apps) {
-                        fraudDataCache['10d'] = data;
-                        renderFraudAll(data, '10d');
-                    }
+                const fraudRanges = ['10d','mtd','lastmonth','30d'];
+                const fraudRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                fraudRanges.forEach(range => {
+                    fetch('/get_fraud', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudRangeMap[range] })
+                    }).then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            fraudDataCache[range] = data;
+                            renderFraudAll(data, range);
+                        }
+                    });
                 });
             }
             if (tabName === 'profile') loadProfile();
