@@ -2427,6 +2427,21 @@
                         renderAppsList(data.apps);
                         document.getElementById('app-count').textContent = data.count;
                         document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                        // --- Patch: Repopulate Event 1 & 2 dropdowns from cache if available ---
+                        // If event selections are cached, set them for each app
+                        let selections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                        setTimeout(() => {
+                            data.apps.forEach(app => {
+                                const [sel1, sel2] = selections[app.app_id] || [null, null];
+                                const tr = Array.from(document.querySelectorAll('#apps-list tr')).find(row => row.querySelector('td') && row.querySelector('td').textContent.trim() === app.app_id);
+                                if (tr) {
+                                    const event1Sel = tr.querySelector('.event1-dropdown');
+                                    const event2Sel = tr.querySelector('.event2-dropdown');
+                                    if (event1Sel && sel1) event1Sel.value = sel1;
+                                    if (event2Sel && sel2) event2Sel.value = sel2;
+                                }
+                            });
+                        }, 500);
                     }
                 });
             }
@@ -2453,31 +2468,30 @@
                 });
             }
             // Fraud: fetch and render for all ranges, then render the active one
-            // (REMOVED: Do not auto-fetch fraud data on page load)
-            // if (document.getElementById('fraud-tab')) {
-            //     const fraudRanges = ['10d','mtd','lastmonth','30d'];
-            //     const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
-            //     let fetchedCount = 0;
-            //     fraudRanges.forEach(range => {
-            //         fetch('/get_fraud', {
-            //             method: 'POST',
-            //             headers: { 'Content-Type': 'application/json' },
-            //             body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudPeriodMap[range] })
-            //         }).then(r => r.json()).then(data => {
-            //             if (data && data.apps) {
-            //                 fraudDataCache[range] = data;
-            //             }
-            //             fetchedCount++;
-            //             if (fetchedCount === fraudRanges.length) {
-            //                 // After all ranges fetched, render the active one
-            //                 const activeRange = getActiveFraudRange();
-            //                 if (fraudDataCache[activeRange]) {
-            //                     renderFraudAll(fraudDataCache[activeRange], activeRange);
-            //                 }
-            //             }
-            //         });
-            //     });
-            // }
+            if (document.getElementById('fraud-tab')) {
+                const fraudRanges = ['10d','mtd','lastmonth','30d'];
+                const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                let fetchedCount = 0;
+                fraudRanges.forEach(range => {
+                    fetch('/get_fraud', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudPeriodMap[range] })
+                    }).then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            fraudDataCache[range] = data;
+                        }
+                        fetchedCount++;
+                        if (fetchedCount === fraudRanges.length) {
+                            // After all ranges fetched, render the active one
+                            const activeRange = getActiveFraudRange();
+                            if (fraudDataCache[activeRange]) {
+                                renderFraudAll(fraudDataCache[activeRange], activeRange);
+                            }
+                        }
+                    });
+                });
+            }
             // Profile
             if (document.getElementById('profile-tab')) loadProfile();
         });
