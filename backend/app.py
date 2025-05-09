@@ -18,6 +18,7 @@ import sqlite3
 import sys
 import json
 import pytz
+from datetime import datetime, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
 
@@ -611,16 +612,21 @@ def all_apps_stats():
                     print(f"[STATS] in_app_events_report API error for {app_id}: {events_resp.status_code if events_resp else 'No response'}")
             else:
                 print(f"[STATS] Skipping in_app_events_report API for {app_id} (no real events)")
-            # Ensure all dates in the range are present in the table, fill missing with zeros
-            all_dates = sorted(daily_stats.keys())
-            for date in all_dates:
+            # Generate full list of dates in the range
+            date_list = []
+            dt = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            while dt <= end_dt:
+                date_list.append(dt.strftime('%Y-%m-%d'))
+                dt += timedelta(days=1)
+            for date in date_list:
                 row = {
                     "date": date,
-                    "impressions": daily_stats[date].get("impressions", 0),
-                    "clicks": daily_stats[date].get("clicks", 0),
-                    "installs": daily_stats[date].get("installs", 0),
-                    "blocked_installs_rt": daily_stats[date].get("blocked_installs_rt", 0),
-                    "blocked_installs_pa": daily_stats[date].get("blocked_installs_pa", 0),
+                    "impressions": daily_stats.get(date, {}).get("impressions", 0),
+                    "clicks": daily_stats.get(date, {}).get("clicks", 0),
+                    "installs": daily_stats.get(date, {}).get("installs", 0),
+                    "blocked_installs_rt": daily_stats.get(date, {}).get("blocked_installs_rt", 0),
+                    "blocked_installs_pa": daily_stats.get(date, {}).get("blocked_installs_pa", 0),
                 }
                 # Calculated rates
                 row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
