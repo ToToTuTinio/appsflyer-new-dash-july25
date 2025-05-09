@@ -626,7 +626,6 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
-            activeStatsRange = range;
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
             btn.onclick = function() {
@@ -2408,16 +2407,17 @@
                         }
                         fetchedCount++;
                         if (fetchedCount === statRanges.length) {
-                            // Render the currently active range
-                            defineActiveStatsRange();
-                            if (statsData[activeStatsRange]) {
-                                renderStatsAppsForRange(activeStatsRange, statsData[activeStatsRange].apps || []);
+                            const activeRange = getActiveStatsRange();
+                            switchStatsRangeTab(activeRange);
+                            if (statsData[activeRange]) {
+                                renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
                             }
                         }
                     });
                 });
             }
             if (tabName === 'fraud') {
+                // Instead, just render from cache if available
                 const activeRange = getActiveFraudRange();
                 if (fraudDataCache[activeRange]) {
                     renderFraudAll(fraudDataCache[activeRange], activeRange);
@@ -2425,25 +2425,6 @@
             }
             if (tabName === 'profile') loadProfile();
         };
-        // --- Always render graphs when switching between date ranges on STATS tab ---
-        document.querySelectorAll('.date-range-tab').forEach(btn => {
-            btn.onclick = function() {
-                switchStatsRangeTab(this.getAttribute('data-range'));
-                const range = this.getAttribute('data-range');
-                if (statsData[range]) {
-                    renderStatsAppsForRange(range, statsData[range].apps || []);
-                } else {
-                    // Fetch and render if not present
-                    const statRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
-                    fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            statsData[range] = data;
-                            renderStatsAppsForRange(range, data.apps || []);
-                        }
-                    });
-                }
-            };
-        });
 
         // Helper to get the currently active stats range
         function getActiveStatsRange() {
