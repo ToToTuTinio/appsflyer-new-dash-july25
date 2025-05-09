@@ -626,9 +626,12 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
-            // --- NEW: Render cached stats for this range if available ---
+            // --- NEW: Show loading spinner if data not available, else render cached stats ---
+            const container = document.getElementById(`stats-data-${range}`);
             if (statsData[range] && statsData[range].apps) {
                 renderStatsAppsForRange(range, statsData[range].apps);
+            } else {
+                if (container) container.innerHTML = '<div class="text-center text-gray-500 mt-8">Loading stats...</div>';
             }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
@@ -2313,16 +2316,12 @@
                     fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
                         if (data && data.apps) {
                             statsData[range] = data;
-                            // --- NEW: If this range is currently active, render it immediately ---
-                            const activeBtn = document.querySelector('.date-range-tab.border-green-600');
-                            const activeRange = activeBtn ? activeBtn.getAttribute('data-range') : '10d';
-                            if (activeRange === range) {
-                                renderStatsAppsForRange(range, data.apps || []);
-                            }
                         }
                         fetchedCount++;
-                        // --- NEW: Always render cached data for all ranges ---
-                        if (data && data.apps) {
+                        // --- NEW: If this range is currently active, render it immediately ---
+                        const activeBtn = document.querySelector('.date-range-tab.border-green-600');
+                        const activeRange = activeBtn ? activeBtn.getAttribute('data-range') : '10d';
+                        if (activeRange === range && data && data.apps) {
                             renderStatsAppsForRange(range, data.apps || []);
                         }
                         if (fetchedCount === statRanges.length) {
