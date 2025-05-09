@@ -664,15 +664,18 @@
         dateRanges.forEach(range => {
             const btn = document.getElementById(`run-report-${range}-btn`);
             if (btn) {
-                btn.onclick = function() {
+                // Remove any previous event handlers
+                btn.onclick = null;
+                btn.addEventListener('click', function(e) {
                     if (window.isReportFetching) {
                         alert("Hold on! A report is already on its way—please wait for it to finish before starting a new one.");
+                        console.log('Blocked RUN REPORT click: already fetching');
+                        e.preventDefault();
                         return;
                     }
                     window.isReportFetching = true;
                     setRunReportButtonsDisabled(true);
                     console.log('RUN REPORT clicked for', range);
-                    console.log('fetchedApps:', window.fetchedApps);
                     if (!window.fetchedApps || !window.fetchedApps.length) {
                         alert('No apps loaded. Please click Get Apps first.');
                         window.isReportFetching = false;
@@ -680,7 +683,7 @@
                         return;
                     }
                     runStatsReport(range);
-                };
+                });
             } else {
                 console.warn('RUN REPORT button not found for range:', range);
             }
