@@ -630,6 +630,8 @@
         // Date range tab logic
         const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
+            // Persist last selected stats range
+            localStorage.setItem('lastStatsRange', range);
             document.querySelectorAll('.date-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600','text-green-700','bg-white');
                 btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
@@ -644,8 +646,9 @@
                 switchStatsRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Show the first tab by default
-        switchStatsRangeTab('10d');
+        // Show the last selected tab by default (or first if none)
+        const lastStatsRange = localStorage.getItem('lastStatsRange') || '10d';
+        switchStatsRangeTab(lastStatsRange);
 
         // Patch RUN REPORT button logic to add logging and defensive checks
         const periodMap = {
@@ -1377,6 +1380,8 @@
             '30d': 'last30'
         };
         function switchFraudRangeTab(range) {
+            // Persist last selected fraud range
+            localStorage.setItem('lastFraudRange', range);
             document.querySelectorAll('.fraud-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
                 btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
@@ -1393,8 +1398,9 @@
                 switchFraudRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Show the first tab by default
-        switchFraudRangeTab('10d');
+        // Show the last selected fraud tab by default (or first if none)
+        const lastFraudRange = localStorage.getItem('lastFraudRange') || '10d';
+        switchFraudRangeTab(lastFraudRange);
         // RUN button logic
         fraudRanges.forEach(range => {
             document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
@@ -1973,8 +1979,9 @@
                 switchFraudSourceRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Show the first tab by default
-        switchFraudSourceRangeTab('10d');
+        // Show the last selected fraud tab by default (or first if none)
+        const lastFraudSourceRange = localStorage.getItem('lastFraudSourceRange') || '10d';
+        switchFraudSourceRangeTab(lastFraudSourceRange);
         fraudSourceRanges.forEach(range => {
             document.getElementById(`run-fraud-source-${range}-btn`).onclick = function() {
                 // Hide all loading/error for all ranges first
