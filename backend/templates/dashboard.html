@@ -521,7 +521,7 @@
         function setFetchButtonsDisabled(disabled) {
             document.getElementById('get-apps-btn').disabled = disabled;
             document.getElementById('get-events-btn').disabled = disabled;
-            document.querySelectorAll('.date-range-tab').forEach(btn => btn.disabled = disabled);
+            // DO NOT disable date-range-tab buttons anymore
             document.querySelectorAll('[id^="run-report-"]').forEach(btn => btn.disabled = disabled);
         }
 
@@ -632,8 +632,11 @@
                 switchStatsRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Show the first tab by default
-        switchStatsRangeTab('10d');
+        // Always show 'Last 10 Days' as the default tab when entering the STATS page
+        function activateDefaultStatsTab() {
+            switchStatsRangeTab('10d');
+        }
+        activateDefaultStatsTab();
 
         // Patch RUN REPORT button logic to add logging and defensive checks
         const periodMap = {
@@ -2298,6 +2301,7 @@
             }
             // Stats: fetch and render for all ranges, then render the active one
             if (document.getElementById('stats-tab')) {
+                activateDefaultStatsTab();
                 const statRanges = ['10d','mtd','lastmonth','30d'];
                 const statRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
                 let fetchedCount = 0;
@@ -2313,10 +2317,10 @@
                         }
                         if (fetchedCount === statRanges.length) {
                             // After all ranges fetched, render the last selected or active one and force tab UI
-                            const activeRange = getActiveStatsRange();
-                            switchStatsRangeTab(activeRange);
-                            if (statsData[activeRange]) {
-                                renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
+                            // Always default to '10d' tab
+                            activateDefaultStatsTab();
+                            if (statsData['10d']) {
+                                renderStatsAppsForRange('10d', statsData['10d'].apps || []);
                             }
                         }
                     });
