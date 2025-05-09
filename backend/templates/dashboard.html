@@ -694,8 +694,9 @@
                     if (loadingElem) loadingElem.style.display = 'none';
                     const errorElem = document.getElementById('stats-error');
                     if (errorElem) {
-                        errorElem.textContent = 'The data is being prepared. Please wait.';
+                        errorElem.textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
                         errorElem.style.display = '';
+                        errorElem.style.color = '#16a34a'; // green-600
                     }
                     return;
                 }
@@ -706,6 +707,7 @@
                     if (errorElem) {
                         errorElem.textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
                         errorElem.style.display = '';
+                        errorElem.style.color = '#16a34a'; // green-600
                     }
                     // --- POLL AGAIN UNTIL DATA IS READY ---
                     setTimeout(() => runStatsReport(range), 30000);
@@ -729,6 +731,7 @@
                 if (errorElem) {
                     errorElem.textContent = error.message;
                     errorElem.style.display = '';
+                    errorElem.style.color = '#ef4444'; // fallback to red for real errors
                 }
                 if (loadingElem) loadingElem.style.display = 'none';
             });
@@ -2267,6 +2270,7 @@
                 refreshBtn.onclick = function() {
                     refreshBtn.disabled = true;
                     refreshBtn.textContent = 'Refreshing...';
+                    // Only refresh UI with existing data, do not fetch new data
                     fetchOverviewData();
                     setTimeout(() => {
                         refreshBtn.textContent = 'Refresh Overview';
@@ -2280,7 +2284,10 @@
                 refreshAppsBtn.onclick = function() {
                     refreshAppsBtn.disabled = true;
                     refreshAppsBtn.textContent = 'Refreshing...';
-                    fetchApps();
+                    // Only refresh UI with existing data, do not fetch new data
+                    if (window.fetchedApps && window.fetchedApps.length) {
+                        renderAppsList(window.fetchedApps);
+                    }
                     setTimeout(() => {
                         refreshAppsBtn.textContent = 'Refresh';
                         refreshAppsBtn.disabled = false;
@@ -2293,11 +2300,13 @@
                 refreshStatsBtn.onclick = function() {
                     refreshStatsBtn.disabled = true;
                     refreshStatsBtn.textContent = 'Refreshing...';
-                    // Re-run the currently selected stats report
+                    // Only refresh UI with existing data, do not fetch new data
                     const activeRangeBtn = document.querySelector('.date-range-tab.border-green-600');
                     let range = '10d';
                     if (activeRangeBtn) range = activeRangeBtn.getAttribute('data-range');
-                    runStatsReport(range);
+                    if (statsData[range]) {
+                        renderStatsAppsForRange(range, statsData[range].apps || []);
+                    }
                     setTimeout(() => {
                         refreshStatsBtn.textContent = 'Refresh';
                         refreshStatsBtn.disabled = false;
