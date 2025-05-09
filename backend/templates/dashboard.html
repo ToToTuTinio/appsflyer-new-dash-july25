@@ -930,7 +930,9 @@
                         });
                     }, 100);
                 } else {
-                    section.innerHTML += '<div class="text-gray-400">No data available.</div>';
+                    // Always show the card, even if no data
+                    section.innerHTML += '<div class="text-gray-400">No data for this period.</div>';
+                    // Optionally, you could add empty graph containers here for visual consistency
                 }
                 container.appendChild(section);
             });
