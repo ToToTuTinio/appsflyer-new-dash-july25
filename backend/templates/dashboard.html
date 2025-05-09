@@ -626,9 +626,11 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
-            // Render cached data for the selected range if it exists
-            if (statsData[range]) {
+            // Render cached data for the selected range if it exists, otherwise auto-run the report
+            if (statsData[range] && statsData[range].apps && statsData[range].apps.length > 0) {
                 renderStatsAppsForRange(range, statsData[range].apps || []);
+            } else {
+                runStatsReport(range);
             }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
