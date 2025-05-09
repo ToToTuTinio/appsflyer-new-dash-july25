@@ -2422,7 +2422,7 @@
                     }
                 });
             }
-            // Stats - all ranges
+            // Stats: fetch and render for all ranges
             if (document.getElementById('stats-tab')) {
                 const statRanges = ['10d','mtd','lastmonth','30d'];
                 const statRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
@@ -2435,15 +2435,15 @@
                     });
                 });
             }
-            // Fraud - all ranges
+            // Fraud: fetch and render for all ranges
             if (document.getElementById('fraud-tab')) {
                 const fraudRanges = ['10d','mtd','lastmonth','30d'];
-                const fraudRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
                 fraudRanges.forEach(range => {
                     fetch('/get_fraud', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudRangeMap[range] })
+                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudPeriodMap[range] })
                     }).then(r => r.json()).then(data => {
                         if (data && data.apps) {
                             fraudDataCache[range] = data;
@@ -2456,10 +2456,10 @@
             if (document.getElementById('profile-tab')) loadProfile();
         });
 
-        // --- On tab switch, fetch and render cached data for the selected tab and all ranges ---
-        const origSwitchTab2 = switchTab;
+        // --- On tab switch, fetch and render cached data for all ranges of the selected tab ---
+        const origSwitchTab3 = switchTab;
         switchTab = function(tabName) {
-            origSwitchTab2(tabName);
+            origSwitchTab3(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
                 fetch('/get_apps').then(r => r.json()).then(data => {
@@ -2485,12 +2485,12 @@
             }
             if (tabName === 'fraud') {
                 const fraudRanges = ['10d','mtd','lastmonth','30d'];
-                const fraudRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
                 fraudRanges.forEach(range => {
                     fetch('/get_fraud', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudRangeMap[range] })
+                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudPeriodMap[range] })
                     }).then(r => r.json()).then(data => {
                         if (data && data.apps) {
                             fraudDataCache[range] = data;
