@@ -2406,6 +2406,85 @@
                 };
             }
         });
+
+        // --- On page load or tab switch, always fetch and render cached data for all tabs ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Overview
+            if (document.getElementById('overview-tab')) fetchOverviewData();
+            // Apps
+            if (document.getElementById('apps-tab')) {
+                fetch('/get_apps').then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        window.fetchedApps = data.apps;
+                        renderAppsList(data.apps);
+                        document.getElementById('app-count').textContent = data.count;
+                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                    }
+                });
+            }
+            // Stats (default to 10d)
+            if (document.getElementById('stats-tab')) {
+                fetch('/get_stats?range=last10').then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        statsData['10d'] = data;
+                        renderStatsAppsForRange('10d', data.apps || []);
+                    }
+                });
+            }
+            // Fraud (default to 10d)
+            if (document.getElementById('fraud-tab')) {
+                fetch('/get_fraud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10' })
+                }).then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        fraudDataCache['10d'] = data;
+                        renderFraudAll(data, '10d');
+                    }
+                });
+            }
+            // Profile
+            if (document.getElementById('profile-tab')) loadProfile();
+        });
+
+        // --- On tab switch, fetch and render cached data for the selected tab ---
+        const origSwitchTab2 = switchTab;
+        switchTab = function(tabName) {
+            origSwitchTab2(tabName);
+            if (tabName === 'overview') fetchOverviewData();
+            if (tabName === 'apps') {
+                fetch('/get_apps').then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        window.fetchedApps = data.apps;
+                        renderAppsList(data.apps);
+                        document.getElementById('app-count').textContent = data.count;
+                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                    }
+                });
+            }
+            if (tabName === 'stats') {
+                fetch('/get_stats?range=last10').then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        statsData['10d'] = data;
+                        renderStatsAppsForRange('10d', data.apps || []);
+                    }
+                });
+            }
+            if (tabName === 'fraud') {
+                fetch('/get_fraud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10' })
+                }).then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        fraudDataCache['10d'] = data;
+                        renderFraudAll(data, '10d');
+                    }
+                });
+            }
+            if (tabName === 'profile') loadProfile();
+        };
     </script>
 </body>
 </html> 
