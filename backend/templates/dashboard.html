@@ -618,6 +618,8 @@
         // Date range tab logic
         const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
+            // Save the selected range to localStorage
+            localStorage.setItem('lastStatsRange', range);
             document.querySelectorAll('.date-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600','text-green-700','bg-white');
                 btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
@@ -626,11 +628,9 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
-            // Render cached data for the selected range if it exists, otherwise auto-run the report
-            if (statsData[range] && statsData[range].apps && statsData[range].apps.length > 0) {
+            // Render cached data for the selected range if it exists
+            if (statsData[range]) {
                 renderStatsAppsForRange(range, statsData[range].apps || []);
-            } else {
-                runStatsReport(range);
             }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
@@ -638,9 +638,10 @@
                 switchStatsRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Always show 'Last 10 Days' as the default tab when entering the STATS page
+        // Always show last selected stats tab (or '10d' if none) on page load
         function activateDefaultStatsTab() {
-            switchStatsRangeTab('10d');
+            const lastRange = localStorage.getItem('lastStatsRange') || '10d';
+            switchStatsRangeTab(lastRange);
         }
         activateDefaultStatsTab();
 
