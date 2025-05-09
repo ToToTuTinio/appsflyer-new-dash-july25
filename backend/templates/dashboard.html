@@ -626,6 +626,10 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
+            // Render cached data for the selected range if it exists
+            if (statsData[range]) {
+                renderStatsAppsForRange(range, statsData[range].apps || []);
+            }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
             btn.onclick = function() {
