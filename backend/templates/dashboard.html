@@ -626,13 +626,6 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
-            // --- NEW: Show loading spinner if data not available, else render cached stats ---
-            const container = document.getElementById(`stats-data-${range}`);
-            if (statsData[range] && statsData[range].apps) {
-                renderStatsAppsForRange(range, statsData[range].apps);
-            } else {
-                if (container) container.innerHTML = '<div class="text-center text-gray-500 mt-8">Loading stats...</div>';
-            }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
             btn.onclick = function() {
@@ -1718,11 +1711,12 @@
             document.getElementById('fraud-source-tab-btn').classList.add('border-transparent', 'text-gray-500');
             document.getElementById('fraud-analytics-subtab').style.display = 'none';
             document.getElementById('fraud-source-subtab').style.display = 'none';
+            
             if (subtab === 'analytics') {
                 document.getElementById('fraud-analytics-tab-btn').classList.add('border-blue-500', 'text-blue-600');
                 document.getElementById('fraud-analytics-tab-btn').classList.remove('border-transparent', 'text-gray-500');
                 document.getElementById('fraud-analytics-subtab').style.display = '';
-            } else {
+            } else if (subtab === 'source') {
                 document.getElementById('fraud-source-tab-btn').classList.add('border-blue-500', 'text-blue-600');
                 document.getElementById('fraud-source-tab-btn').classList.remove('border-transparent', 'text-gray-500');
                 document.getElementById('fraud-source-subtab').style.display = '';
@@ -2318,10 +2312,8 @@
                             statsData[range] = data;
                         }
                         fetchedCount++;
-                        // --- NEW: If this range is currently active, render it immediately ---
-                        const activeBtn = document.querySelector('.date-range-tab.border-green-600');
-                        const activeRange = activeBtn ? activeBtn.getAttribute('data-range') : '10d';
-                        if (activeRange === range && data && data.apps) {
+                        // --- NEW: Always render cached data for all ranges ---
+                        if (data && data.apps) {
                             renderStatsAppsForRange(range, data.apps || []);
                         }
                         if (fetchedCount === statRanges.length) {
@@ -2416,6 +2408,63 @@
             const activeBtn = document.querySelector('.fraud-range-tab.border-green-600');
             return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... existing code ...
+
+            // Add event listeners for Fraud Per Source range tabs
+            document.querySelectorAll('.fraud-source-range-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const range = this.dataset.range;
+                    document.querySelectorAll('.fraud-source-range-tab').forEach(t => {
+                        t.classList.remove('bg-green-100', 'border-green-500');
+                        t.classList.add('bg-gray-50', 'border-gray-200');
+                    });
+                    this.classList.remove('bg-gray-50', 'border-gray-200');
+                    this.classList.add('bg-green-100', 'border-green-500');
+                    
+                    document.querySelectorAll('.fraud-source-range-content').forEach(content => {
+                        content.style.display = 'none';
+                    });
+                    document.getElementById(`fraud-source-content-${range}`).style.display = '';
+                });
+            });
+
+            // Add event listeners for Fraud Per Source run buttons
+            ['10d', 'mtd', 'lastmonth', '30d'].forEach(range => {
+                const runBtn = document.getElementById(`run-fraud-source-${range}-btn`);
+                if (runBtn) {
+                    runBtn.addEventListener('click', async function() {
+                        const loadingDiv = document.getElementById(`fraud-source-loading-${range}`);
+                        const errorDiv = document.getElementById(`fraud-source-error-${range}`);
+                        const dataDiv = document.getElementById(`fraud-source-data-${range}`);
+                        
+                        loadingDiv.style.display = '';
+                        errorDiv.style.display = 'none';
+                        dataDiv.innerHTML = '';
+                        
+                        try {
+                            const response = await fetch(`/get_fraud?range=${range}`);
+                            if (!response.ok) throw new Error('Network response was not ok');
+                            const data = await response.json();
+                            loadingDiv.style.display = 'none';
+                            renderFraudSource(data, range);
+                        } catch (error) {
+                            console.error('Error fetching fraud source data:', error);
+                            loadingDiv.style.display = 'none';
+                            errorDiv.style.display = '';
+                        }
+                    });
+                }
+            });
+
+            // Automatically select and show Last 10 Days for Fraud Per Source
+            const last10DaysTabSource = document.querySelector('.fraud-source-range-tab[data-range="10d"]');
+            if (last10DaysTabSource) {
+                last10DaysTabSource.click();
+            }
+            // ... existing code ...
+        });
     </script>
 </body>
 </html> 
