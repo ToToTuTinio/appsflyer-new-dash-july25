@@ -1419,24 +1419,26 @@
                         data = JSON.parse(text);
                     } catch (e) {
                         document.getElementById('fraud-loading').style.display = 'none';
-                        // HIDE error message if no fraud data (do not show any message)
                         document.getElementById('fraud-error').style.display = 'none';
                         return;
                     }
                     if (data.status === 'processing') {
                         document.getElementById('fraud-loading').style.display = 'none';
-                        document.getElementById('fraud-error').style.display = 'none'; // Hide error
+                        document.getElementById('fraud-error').style.display = 'none';
                         setTimeout(() => document.getElementById(`run-fraud-${range}-btn`).onclick(), 30000);
                         return;
                     }
                     document.getElementById('fraud-loading').style.display = 'none';
-                    document.getElementById('fraud-error').style.display = 'none'; // Hide error
-                    // --- AUTO-DISPLAY DATA AS SOON AS READY ---
+                    document.getElementById('fraud-error').style.display = 'none';
+                    // --- FIX: Cache the data for this range ---
+                    fraudDataCache[range] = data;
+                    // --- Always render after fetch ---
                     renderFraudAll(data, range);
                 })
                 .catch(() => {
-                    // Only show error for real network errors (not 504)
-                    // (No-op for 504, error already handled above)
+                    document.getElementById('fraud-loading').style.display = 'none';
+                    document.getElementById('fraud-error').textContent = 'Network error. Please try again.';
+                    document.getElementById('fraud-error').style.display = '';
                 });
             };
         });
