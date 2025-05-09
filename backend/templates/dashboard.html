@@ -389,22 +389,22 @@
                     <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Per Source</h2>
                     <!-- Date Range Tabs -->
                     <div class="flex border-b border-gray-200 mb-8 gap-2">
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="last10">Last 10 Days</button>
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
                     </div>
                     <!-- Sub-tab content containers -->
-                    <div id="fraud-source-content-last10" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-last10-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-last10" class="text-center text-gray-500 mt-8" style="display:none;">
+                    <div id="fraud-source-content-10d" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-10d" class="text-center text-gray-500 mt-8" style="display:none;">
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
                             <div>Loading fraud data...</div>
                         </div>
-                        <div id="fraud-source-error-last10" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                        <div id="fraud-source-error-10d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
                             Error loading fraud data. Please try again.
                         </div>
-                        <div id="fraud-source-data-last10"></div>
+                        <div id="fraud-source-data-10d"></div>
                     </div>
                     <div id="fraud-source-content-mtd" class="fraud-source-range-content" style="display:none;">
                         <button id="run-fraud-source-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
@@ -1711,12 +1711,11 @@
             document.getElementById('fraud-source-tab-btn').classList.add('border-transparent', 'text-gray-500');
             document.getElementById('fraud-analytics-subtab').style.display = 'none';
             document.getElementById('fraud-source-subtab').style.display = 'none';
-            
             if (subtab === 'analytics') {
                 document.getElementById('fraud-analytics-tab-btn').classList.add('border-blue-500', 'text-blue-600');
                 document.getElementById('fraud-analytics-tab-btn').classList.remove('border-transparent', 'text-gray-500');
                 document.getElementById('fraud-analytics-subtab').style.display = '';
-            } else if (subtab === 'source') {
+            } else {
                 document.getElementById('fraud-source-tab-btn').classList.add('border-blue-500', 'text-blue-600');
                 document.getElementById('fraud-source-tab-btn').classList.remove('border-transparent', 'text-gray-500');
                 document.getElementById('fraud-source-subtab').style.display = '';
@@ -2408,63 +2407,6 @@
             const activeBtn = document.querySelector('.fraud-range-tab.border-green-600');
             return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // ... existing code ...
-
-            // Add event listeners for Fraud Per Source range tabs
-            document.querySelectorAll('.fraud-source-range-tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    const range = this.dataset.range;
-                    document.querySelectorAll('.fraud-source-range-tab').forEach(t => {
-                        t.classList.remove('bg-green-100', 'border-green-500');
-                        t.classList.add('bg-gray-50', 'border-gray-200');
-                    });
-                    this.classList.remove('bg-gray-50', 'border-gray-200');
-                    this.classList.add('bg-green-100', 'border-green-500');
-                    
-                    document.querySelectorAll('.fraud-source-range-content').forEach(content => {
-                        content.style.display = 'none';
-                    });
-                    document.getElementById(`fraud-source-content-${range}`).style.display = '';
-                });
-            });
-
-            // Add event listeners for Fraud Per Source run buttons
-            ['last10', 'mtd', 'lastmonth', '30d'].forEach(range => {
-                const runBtn = document.getElementById(`run-fraud-source-${range}-btn`);
-                if (runBtn) {
-                    runBtn.addEventListener('click', async function() {
-                        const loadingDiv = document.getElementById(`fraud-source-loading-${range}`);
-                        const errorDiv = document.getElementById(`fraud-source-error-${range}`);
-                        const dataDiv = document.getElementById(`fraud-source-data-${range}`);
-                        
-                        loadingDiv.style.display = '';
-                        errorDiv.style.display = 'none';
-                        dataDiv.innerHTML = '';
-                        
-                        try {
-                            const response = await fetch(`/get_fraud?range=${range}`);
-                            if (!response.ok) throw new Error('Network response was not ok');
-                            const data = await response.json();
-                            loadingDiv.style.display = 'none';
-                            renderFraudSource(data, range);
-                        } catch (error) {
-                            console.error('Error fetching fraud source data:', error);
-                            loadingDiv.style.display = 'none';
-                            errorDiv.style.display = '';
-                        }
-                    });
-                }
-            });
-
-            // Automatically select and show Last 10 Days for Fraud Per Source
-            const last10DaysTabSource = document.querySelector('.fraud-source-range-tab[data-range="last10"]');
-            if (last10DaysTabSource) {
-                last10DaysTabSource.click();
-            }
-            // ... existing code ...
-        });
     </script>
 </body>
 </html> 
