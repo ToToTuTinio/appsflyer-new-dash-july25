@@ -2467,7 +2467,7 @@
                             statsData[range] = data;
                         }
                         fetchedCount++;
-                        // --- NEW: Always render cached data for all ranges ---
+                        // Always render cached data for all ranges
                         if (data && data.apps) {
                             renderStatsAppsForRange(range, data.apps || []);
                         }
@@ -2481,16 +2481,19 @@
                         }
                     });
                 });
+                // --- NEW: After all ranges fetched, always render the active range ---
+                setTimeout(() => {
+                    const activeRange = getActiveStatsRange();
+                    if (statsData[activeRange]) {
+                        renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
+                    }
+                }, 500);
             }
             // Fraud: fetch and render for all ranges, then render the active one
-            // (REMOVED: Do not auto-fetch fraud data on page load)
-            // if (document.getElementById('fraud-tab')) {
-            //     ...
-            // }
-            // --- NEW: Always render cached fraud data for all ranges ---
             if (document.getElementById('fraud-tab')) {
                 const fraudRanges = ['10d','mtd','lastmonth','30d'];
                 const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                let fraudFetchedCount = 0;
                 fraudRanges.forEach(range => {
                     fetch('/get_fraud', {
                         method: 'POST',
@@ -2501,8 +2504,24 @@
                             fraudDataCache[range] = data;
                             renderFraudAll(data, range);
                         }
+                        fraudFetchedCount++;
+                        if (fraudFetchedCount === fraudRanges.length) {
+                            // After all ranges fetched, render the last selected or active one
+                            const activeRange = getActiveFraudRange();
+                            switchFraudRangeTab(activeRange);
+                            if (fraudDataCache[activeRange]) {
+                                renderFraudAll(fraudDataCache[activeRange], activeRange);
+                            }
+                        }
                     });
                 });
+                // --- NEW: After all ranges fetched, always render the active range ---
+                setTimeout(() => {
+                    const activeRange = getActiveFraudRange();
+                    if (fraudDataCache[activeRange]) {
+                        renderFraudAll(fraudDataCache[activeRange], activeRange);
+                    }
+                }, 500);
             }
             // Profile
             if (document.getElementById('profile-tab')) loadProfile();
@@ -2542,6 +2561,13 @@
                         }
                     });
                 });
+                // --- NEW: After all ranges fetched, always render the active range ---
+                setTimeout(() => {
+                    const activeRange = getActiveStatsRange();
+                    if (statsData[activeRange]) {
+                        renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
+                    }
+                }, 500);
             }
             if (tabName === 'fraud') {
                 // Instead, just render from cache if available
