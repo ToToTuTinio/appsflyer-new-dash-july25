@@ -539,46 +539,20 @@
 
         function switchTab(tabName) {
             // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-            // Show selected tab content
-            document.getElementById(`${tabName}-tab`).style.display = '';
-            // Update active tab button
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('border-blue-500', 'text-blue-600');
-                btn.classList.add('border-transparent', 'text-gray-500');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
             });
-            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
-            document.querySelector(`[data-tab="${tabName}"]`).classList.add('border-blue-500', 'text-blue-600');
-            // Save last active tab
-            localStorage.setItem('lastActiveTab', tabName);
-            // Load data for the selected tab
-            if (tabName === 'overview') {
-                initializeOverviewTab();
-            }
-            if (tabName === 'stats') {
-                const statsRanges = ['10d','mtd','lastmonth','30d'];
-                const statsPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
-                let fetchedCount = 0;
-                statsRanges.forEach(range => {
-                    fetch('/all-apps-stats', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ apps: window.fetchedApps || [], period: statsPeriodMap[range] })
-                    }).then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            statsData[range] = data;
-                        }
-                        fetchedCount++;
-                        if (fetchedCount === statsRanges.length) {
-                            const activeRange = getActiveStatsRange();
-                            if (statsData[activeRange]) {
-                                renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
-                            }
-                        }
-                    });
-                });
-            }
-            if (tabName === 'profile') loadProfile();
+            
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            // Activate selected tab button
+            event.target.classList.add('active');
         }
 
         // Remove static apps and update fetchApps
