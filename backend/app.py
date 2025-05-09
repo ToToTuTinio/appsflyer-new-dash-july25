@@ -807,6 +807,30 @@ def find_media_source_idx(header):
     print(f"[FRAUD] WARNING: Could not find Media Source column in header: {header}")
     return None
 
+@app.route('/get_fraud', methods=['GET'])
+@login_required
+def get_fraud_cached():
+    try:
+        range_key = request.args.get('range', 'last10')
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        # Use LIKE query for all ranges to ensure consistent behavior
+        if range_key in ['last10', 'mtd', 'lastmonth', '30d']:
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
+        else:
+            c.execute('SELECT data, updated_at FROM fraud_cache WHERE range = ?', (range_key,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            result['updated_at'] = updated_at
+            return jsonify(result)
+        else:
+            return jsonify({'apps': [], 'updated_at': None})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/get_fraud', methods=['POST'])
 @login_required
 def get_fraud():
@@ -829,7 +853,10 @@ def get_fraud():
         conn.commit()
         if not force:
             # Use LIKE query for all ranges to ensure consistent behavior
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
+            if period in ['last10', 'mtd', 'lastmonth', '30d']:
+                c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
+            else:
+                c.execute('SELECT data, updated_at FROM fraud_cache WHERE range = ?', (period,))
             row = c.fetchone()
             if row:
                 data, updated_at = row
@@ -1020,27 +1047,6 @@ def get_fraud():
         conn.commit()
         conn.close()
         return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/get_fraud', methods=['GET'])
-@login_required
-def get_fraud_cached():
-    try:
-        range_key = request.args.get('range', '10d')
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        # Use LIKE query for all ranges to ensure consistent behavior
-        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
-        row = c.fetchone()
-        conn.close()
-        if row:
-            data, updated_at = row
-            result = json.loads(data)
-            result['updated_at'] = updated_at
-            return jsonify(result)
-        else:
-            return jsonify({'apps': [], 'updated_at': None})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

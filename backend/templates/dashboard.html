@@ -389,22 +389,22 @@
                     <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Per Source</h2>
                     <!-- Date Range Tabs -->
                     <div class="flex border-b border-gray-200 mb-8 gap-2">
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="last10">Last 10 Days</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
                     </div>
                     <!-- Sub-tab content containers -->
-                    <div id="fraud-source-content-10d" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-10d" class="text-center text-gray-500 mt-8" style="display:none;">
+                    <div id="fraud-source-content-last10" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-last10-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-last10" class="text-center text-gray-500 mt-8" style="display:none;">
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
                             <div>Loading fraud data...</div>
                         </div>
-                        <div id="fraud-source-error-10d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                        <div id="fraud-source-error-last10" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
                             Error loading fraud data. Please try again.
                         </div>
-                        <div id="fraud-source-data-10d"></div>
+                        <div id="fraud-source-data-last10"></div>
                     </div>
                     <div id="fraud-source-content-mtd" class="fraud-source-range-content" style="display:none;">
                         <button id="run-fraud-source-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
@@ -2431,7 +2431,7 @@
             });
 
             // Add event listeners for Fraud Per Source run buttons
-            ['10d', 'mtd', 'lastmonth', '30d'].forEach(range => {
+            ['last10', 'mtd', 'lastmonth', '30d'].forEach(range => {
                 const runBtn = document.getElementById(`run-fraud-source-${range}-btn`);
                 if (runBtn) {
                     runBtn.addEventListener('click', async function() {
@@ -2459,7 +2459,7 @@
             });
 
             // Automatically select and show Last 10 Days for Fraud Per Source
-            const last10DaysTabSource = document.querySelector('.fraud-source-range-tab[data-range="10d"]');
+            const last10DaysTabSource = document.querySelector('.fraud-source-range-tab[data-range="last10"]');
             if (last10DaysTabSource) {
                 last10DaysTabSource.click();
             }
