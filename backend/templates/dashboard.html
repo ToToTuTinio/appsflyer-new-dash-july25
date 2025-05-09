@@ -1790,181 +1790,22 @@
         function renderFraudSource(data, range) {
             const container = document.getElementById(`fraud-source-data-${range}`);
             container.innerHTML = '';
-            if (!data.apps || data.apps.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-12">
-                        <div class="text-gray-400 mb-4">
-                            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="text-gray-500 text-lg mb-2">No Fraud Data Available</div>
-                        <div class="text-gray-400 text-sm">Please run the report for this period to see fraud data.</div>
-                    </div>
-                `;
+            if (!selectedFraudAppId) {
+                container.innerHTML = `<div class="text-center text-gray-500 py-12">Please select an app to view its fraud sources.</div>`;
                 return;
             }
-            // Sort apps by total fraud (sum of all 6 metrics, descending)
-            const fraudMetricKeys = [
-                'blocked_installs_rt',
-                'blocked_installs_pa',
-                'blocked_in_app_events',
-                'fraud_post_inapps',
-                'blocked_clicks',
-                'blocked_install_postbacks'
-            ];
-            const sortedApps = [...data.apps].sort((a, b) => {
-                const sumA = (a.table || []).reduce((acc, row) => acc + fraudMetricKeys.reduce((s, k) => s + (parseInt(row[k]) || 0), 0), 0);
-                const sumB = (b.table || []).reduce((acc, row) => acc + fraudMetricKeys.reduce((s, k) => s + (parseInt(row[k]) || 0), 0), 0);
-                return sumB - sumA;
-            });
-
-            sortedApps.forEach((app, idx) => {
-                // Group by media source
-                const grouped = processFraudDataBySource(app);
-                // Sort sources by total fraud (sum of all 6 metrics)
-                const sortedSources = Object.keys(grouped).sort((a, b) => {
-                    const sumA = fraudMetricKeys.reduce((acc, key) => acc + (parseInt(grouped[a][key]) || 0), 0);
-                    const sumB = fraudMetricKeys.reduce((acc, key) => acc + (parseInt(grouped[b][key]) || 0), 0);
-                    return sumB - sumA;
-                });
-                console.log(`[DEBUG] Sorted media sources for ${app.app_name}: ${sortedSources.join(', ')}`);
-                const appSection = document.createElement('div');
-                appSection.className = 'mb-12 p-6 bg-white rounded-2xl shadow-xl border border-gray-100';
-                // App title section
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'text-center mb-6';
-                titleDiv.innerHTML = `
-                    <h2 class="text-2xl font-extrabold text-indigo-900 mb-1">${app.app_name}</h2>
-                    <p class="text-base font-mono text-indigo-600">App ID: ${app.app_id}</p>
-                    <div class="mt-2 text-xs text-gray-500">Data Period: ${app.table[0]?.date || ''} to ${app.table[app.table.length - 1]?.date || ''}</div>
-                `;
-                appSection.appendChild(titleDiv);
-
-                 // Group by media source
-                 const sourcesGrid = document.createElement('div');
-                 sourcesGrid.className = 'flex flex-col gap-6';
-
-                 sortedSources.forEach((source, sidx) => {
-                     // Source card: bordered, rounded, padded, with shadow, horizontal layout
-                     const sourceCard = document.createElement('div');
-                     sourceCard.className = 'flex flex-col md:flex-row items-stretch bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 w-full mb-4';
-
-                     // --- Info column (left) ---
-                     const infoCol = document.createElement('div');
-                     infoCol.className = 'flex flex-col justify-center items-start text-left min-w-[200px] md:pr-8 md:border-r border-gray-200 mb-4 md:mb-0';
-                     // Media Source header
-                     const sourceHeader = document.createElement('div');
-                     sourceHeader.className = 'mb-2 w-full';
-                     sourceHeader.innerHTML = `
-                         <h3 class="text-lg font-bold text-gray-800 mb-1 truncate" title="${source}">${source}</h3>
-                     `;
-                     infoCol.appendChild(sourceHeader);
-                     // Summary metrics
-                     const metricsRow = document.createElement('div');
-                     metricsRow.className = 'flex flex-col gap-1 w-full';
-                     metricsRow.innerHTML = `
-                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Installs (RT): <span class="font-bold text-red-600 ml-2">${grouped[source].blocked_installs_rt}</span></div>
-                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Installs (PA): <span class="font-bold text-indigo-600 ml-2">${grouped[source].blocked_installs_pa}</span></div>
-                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked In-App Events: <span class="font-bold text-yellow-600 ml-2">${grouped[source].blocked_in_app_events}</span></div>
-                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Fraud Post-InApps: <span class="font-bold text-teal-600 ml-2">${grouped[source].fraud_post_inapps}</span></div>
-                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Clicks: <span class="font-bold text-purple-600 ml-2">${grouped[source].blocked_clicks}</span></div>
-                         <div class="text-xs text-gray-500 flex items-center mb-1 whitespace-nowrap">Blocked Install Postbacks: <span class="font-bold text-orange-600 ml-2">${grouped[source].blocked_install_postbacks}</span></div>
-                     `;
-                     infoCol.appendChild(metricsRow);
-
-                     // --- Graphs row (right) ---
-                     const graphsRow = document.createElement('div');
-                     graphsRow.className = 'flex flex-row flex-wrap gap-4 flex-1 pl-0 md:pl-8 items-center justify-start overflow-x-auto py-2';
-
-                     // Create graphs for each metric (side by side, compact)
-                     const metrics = [
-                         { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444' },
-                         { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1' },
-                         { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e42' },
-                         { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6' },
-                         { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf' },
-                         { key: 'blocked_install_postbacks', label: 'Blocked Install Postbacks', color: '#f97316' }
-                     ];
-                     metrics.forEach((metric, midx) => {
-                         const graphContainer = document.createElement('div');
-                         graphContainer.className = 'bg-white p-3 rounded-lg shadow border border-gray-200 flex flex-col items-center';
-                         graphContainer.style.minWidth = '160px';
-                         graphContainer.style.maxWidth = '220px';
-                         graphContainer.style.margin = '0 auto';
-
-                         const graphTitle = document.createElement('div');
-                         graphTitle.className = 'text-xs font-medium text-gray-700 mb-1 text-center';
-                         graphTitle.textContent = metric.label;
-                         graphContainer.appendChild(graphTitle);
-
-                         const canvas = document.createElement('canvas');
-                         canvas.id = `fraudSourceChart_${idx}_${sidx}_${midx}_${range}`;
-                         canvas.width = 200;
-                         canvas.height = 120;
-                         graphContainer.appendChild(canvas);
-                         graphsRow.appendChild(graphContainer);
-                         // Render chart
-                         setTimeout(() => {
-                             const ctx = document.getElementById(`fraudSourceChart_${idx}_${sidx}_${midx}_${range}`);
-                             if (ctx && window.Chart) {
-                                 const dates = [...new Set(grouped[source].rows.map(r => r.date))].sort();
-                                 new Chart(ctx, {
-                                     type: 'line',
-                                     data: {
-                                         labels: dates,
-                                         datasets: [{
-                                             label: metric.label,
-                                             data: dates.map(date => {
-                                                 const row = grouped[source].rows.find(r => r.date === date);
-                                                 return row ? row[metric.key] || 0 : 0;
-                                             }),
-                                             borderColor: metric.color,
-                                             backgroundColor: `${metric.color}20`,
-                                             fill: false,
-                                             tension: 0.18,
-                                             pointRadius: 1.5,
-                                             pointBackgroundColor: metric.color,
-                                             pointBorderColor: metric.color
-                                         }]
-                                     },
-                                     options: {
-                                         plugins: {
-                                             legend: { display: false },
-                                             tooltip: { mode: 'index', intersect: false, callbacks: { label: function(context) { return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} (${context.label})`; } } }
-                                         },
-                                         scales: {
-                                             x: {
-                                                 display: true,
-                                                 ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
-                                                 grid: { display: false },
-                                                 title: { display: false }
-                                             },
-                                             y: {
-                                                 beginAtZero: true,
-                                                 display: true,
-                                                 grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
-                                                 ticks: { font: { size: 9 }, precision: 0 }
-                                             }
-                                         },
-                                         elements: { point: { radius: 1.5 } },
-                                         responsive: false,
-                                         maintainAspectRatio: false
-                                 }
-                             });
-                             }
-                         }, 0);
-                     });
-
-                     // Compose card
-                     sourceCard.appendChild(infoCol);
-                     sourceCard.appendChild(graphsRow);
-                     sourcesGrid.appendChild(sourceCard);
-                 });
-
-                 appSection.appendChild(sourcesGrid);
-                 container.appendChild(appSection);
-            });
+            if (!data.apps || data.apps.length === 0) {
+                container.innerHTML = `<div class="text-center py-12"><div class="text-gray-400 mb-4"><svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><div class="text-gray-500 text-lg mb-2">No Fraud Data Available</div><div class="text-gray-400 text-sm">Please run the report for this period to see fraud data.</div></div>`;
+                return;
+            }
+            // Find the selected app
+            const app = data.apps.find(a => a.app_id === selectedFraudAppId);
+            if (!app) {
+                container.innerHTML = `<div class="text-center text-gray-500 py-12">No data for the selected app in this period.</div>`;
+                return;
+            }
+            // Call the original render logic, but only for this app
+            origRenderFraudSource({ apps: [app] }, range);
         }
 
         // Add RUN button logic for each period range in Fraud Per Source
@@ -2436,6 +2277,73 @@
             const activeBtn = document.querySelector('.fraud-range-tab.border-green-600');
             return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
+
+        // 1. Add the dropdown filter UI above the date range tabs in Fraud Per Source subtab
+        const fraudSourceSubtab = document.getElementById('fraud-source-subtab');
+        const filterDiv = document.createElement('div');
+        filterDiv.className = 'mb-6 flex flex-col sm:flex-row items-center gap-4';
+        filterDiv.innerHTML = `
+          <label for="fraud-app-filter" class="font-semibold text-gray-700 mr-2">Select App:</label>
+          <input id="fraud-app-filter" type="text" placeholder="Search app name or ID..." class="border border-gray-300 rounded px-3 py-2 w-64" autocomplete="off">
+          <select id="fraud-app-dropdown" class="border border-gray-300 rounded px-3 py-2 w-64">
+            <option value="">-- Select an app --</option>
+          </select>
+        `;
+        fraudSourceSubtab.insertBefore(filterDiv, fraudSourceSubtab.children[1]);
+
+        // 2. Populate the dropdown with all available apps (name + app ID)
+        function updateFraudAppDropdown() {
+          const dropdown = document.getElementById('fraud-app-dropdown');
+          const filter = document.getElementById('fraud-app-filter').value.toLowerCase();
+          dropdown.innerHTML = '<option value="">-- Select an app --</option>';
+          (window.fetchedApps || []).forEach(app => {
+            const label = `${app.app_name} (${app.app_id})`;
+            if (!filter || label.toLowerCase().includes(filter)) {
+              const opt = document.createElement('option');
+              opt.value = app.app_id;
+              opt.textContent = label;
+              dropdown.appendChild(opt);
+            }
+          });
+        }
+        document.getElementById('fraud-app-filter').addEventListener('input', updateFraudAppDropdown);
+        // Initial population
+        updateFraudAppDropdown();
+
+        // 3. Store the selected app ID globally
+        let selectedFraudAppId = '';
+        document.getElementById('fraud-app-dropdown').addEventListener('change', function() {
+          selectedFraudAppId = this.value;
+          // Re-render the current range
+          const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
+          const range = activeBtn ? activeBtn.getAttribute('data-range') : '10d';
+          if (fraudSourceDataCache[range]) {
+            renderFraudSource(fraudSourceDataCache[range], range);
+          }
+        });
+
+        // 4. Update renderFraudSource to only show the selected app
+        const origRenderFraudSource = renderFraudSource;
+        renderFraudSource = function(data, range) {
+          const container = document.getElementById(`fraud-source-data-${range}`);
+          container.innerHTML = '';
+          if (!selectedFraudAppId) {
+            container.innerHTML = `<div class="text-center text-gray-500 py-12">Please select an app to view its fraud sources.</div>`;
+            return;
+          }
+          if (!data.apps || data.apps.length === 0) {
+            container.innerHTML = `<div class="text-center py-12"><div class="text-gray-400 mb-4"><svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><div class="text-gray-500 text-lg mb-2">No Fraud Data Available</div><div class="text-gray-400 text-sm">Please run the report for this period to see fraud data.</div></div>`;
+            return;
+          }
+          // Find the selected app
+          const app = data.apps.find(a => a.app_id === selectedFraudAppId);
+          if (!app) {
+            container.innerHTML = `<div class="text-center text-gray-500 py-12">No data for the selected app in this period.</div>`;
+            return;
+          }
+          // Call the original render logic, but only for this app
+          origRenderFraudSource({ apps: [app] }, range);
+        };
     </script>
 </body>
 </html> 
