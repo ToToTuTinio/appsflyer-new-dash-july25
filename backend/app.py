@@ -736,8 +736,8 @@ def get_stats():
         # Return the most recent stats if available
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        if range_key == 'last10':
-            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
+        if range_key in ['last10', 'mtd']:
+            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
         else:
             c.execute('SELECT data, updated_at FROM stats_cache WHERE range = ?', (range_key,))
         row = c.fetchone()
