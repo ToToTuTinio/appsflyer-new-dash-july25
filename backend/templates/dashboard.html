@@ -2313,6 +2313,12 @@
                     fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
                         if (data && data.apps) {
                             statsData[range] = data;
+                            // --- NEW: If this range is currently active, render it immediately ---
+                            const activeBtn = document.querySelector('.date-range-tab.border-green-600');
+                            const activeRange = activeBtn ? activeBtn.getAttribute('data-range') : '10d';
+                            if (activeRange === range) {
+                                renderStatsAppsForRange(range, data.apps || []);
+                            }
                         }
                         fetchedCount++;
                         // --- NEW: Always render cached data for all ranges ---
