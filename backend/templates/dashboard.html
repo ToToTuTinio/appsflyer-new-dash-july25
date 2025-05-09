@@ -618,8 +618,6 @@
         // Date range tab logic
         const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
-            // Save the selected range to localStorage
-            localStorage.setItem('lastStatsRange', range);
             document.querySelectorAll('.date-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600','text-green-700','bg-white');
                 btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
@@ -628,9 +626,9 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
-            // Render cached data for the selected range if it exists
-            if (statsData[range]) {
-                renderStatsAppsForRange(range, statsData[range].apps || []);
+            // --- NEW: Render cached stats for this range if available ---
+            if (statsData[range] && statsData[range].apps) {
+                renderStatsAppsForRange(range, statsData[range].apps);
             }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
@@ -638,10 +636,9 @@
                 switchStatsRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Always show last selected stats tab (or '10d' if none) on page load
+        // Always show 'Last 10 Days' as the default tab when entering the STATS page
         function activateDefaultStatsTab() {
-            const lastRange = localStorage.getItem('lastStatsRange') || '10d';
-            switchStatsRangeTab(lastRange);
+            switchStatsRangeTab('10d');
         }
         activateDefaultStatsTab();
 
@@ -2316,16 +2313,18 @@
                     fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
                         if (data && data.apps) {
                             statsData[range] = data;
-                            // Render cached data for this range immediately
-                            renderStatsAppsForRange(range, data.apps || []);
                         }
                         fetchedCount++;
+                        // --- NEW: Always render cached data for all ranges ---
+                        if (data && data.apps) {
+                            renderStatsAppsForRange(range, data.apps || []);
+                        }
                         if (fetchedCount === statRanges.length) {
                             // After all ranges fetched, render the last selected or active one and force tab UI
+                            // Always default to '10d' tab
                             activateDefaultStatsTab();
-                            const lastRange = localStorage.getItem('lastStatsRange') || '10d';
-                            if (statsData[lastRange]) {
-                                renderStatsAppsForRange(lastRange, statsData[lastRange].apps || []);
+                            if (statsData['10d']) {
+                                renderStatsAppsForRange('10d', statsData['10d'].apps || []);
                             }
                         }
                     });
