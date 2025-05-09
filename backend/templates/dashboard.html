@@ -538,64 +538,51 @@
         }
 
         function switchTab(tabName) {
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
             });
-            
-            // Deactivate all tab buttons
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('active');
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-gray-900', 'border-gray-200');
+                btn.classList.add('bg-gray-50', 'text-gray-500', 'border-transparent');
             });
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).style.display = '';
+            // Add active class to selected tab button
+            document.getElementById(`${tabName}-tab-btn`).classList.remove('bg-gray-50', 'text-gray-500', 'border-transparent');
+            document.getElementById(`${tabName}-tab-btn`).classList.add('bg-white', 'text-gray-900', 'border-gray-200');
             
-            // Show selected tab content
-            document.getElementById(`${tabName}-tab`).classList.add('active');
+            // Update the URL without reloading the page
+            const newUrl = window.location.pathname + '?tab=' + tabName;
+            window.history.pushState({ path: newUrl }, '', newUrl);
             
-            // Activate selected tab button
-            event.target.classList.add('active');
-        }
-
-        // Remove static apps and update fetchApps
-        fetchApps = function() {
-            setFetchButtonsDisabled(true);
-            const button = document.getElementById('get-apps-btn');
-            button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
-            fetch('/get_apps')
-                .then(response => response.text())
-                .then(text => {
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        setFetchButtonsDisabled(false);
-                        button.innerHTML = 'Get Apps';
-                        document.getElementById('app-count').textContent = 'The data is being prepared. Please wait.';
-                        return;
-                    }
-                    if (data.status === 'processing') {
-                        setFetchButtonsDisabled(false);
-                        button.innerHTML = 'Get Apps';
-                        document.getElementById('app-count').textContent = "Hang tight! The system's doing its thing. Just a couple more minutes and your stats will magically appear!";
-                        setTimeout(fetchApps, 30000);
-                        return;
-                    }
-                    setFetchButtonsDisabled(false);
-                    button.innerHTML = 'Get Apps';
-                    if (data.error) {
-                        document.getElementById('app-count').textContent = `Error: ${data.error}`;
-                        return;
-                    }
-                    fetchedApps = data.apps;
-                    renderAppsList(fetchedApps);
-                    document.getElementById('app-count').textContent = data.count;
-                    document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                })
-                .catch(error => {
-                    setFetchButtonsDisabled(false);
-                    button.innerHTML = 'Get Apps';
-                    document.getElementById('app-count').textContent = `Error: ${error.message}`;
+            // Only fetch data for stats tab
+            if (tabName === 'stats') {
+                const statsRanges = ['10d','mtd','lastmonth','30d'];
+                const statsPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+                let fetchedCount = 0;
+                statsRanges.forEach(range => {
+                    fetch('/all-apps-stats', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ apps: window.fetchedApps || [], period: statsPeriodMap[range] })
+                    }).then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            statsData[range] = data;
+                        }
+                        fetchedCount++;
+                        if (fetchedCount === statsRanges.length) {
+                            const activeRange = getActiveStatsRange();
+                            if (statsData[activeRange]) {
+                                renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
+                            }
+                        }
+                    });
                 });
-        }
+            }
+            if (tabName === 'profile') loadProfile();
+        };
 
         function logout() {
             fetch('/logout')
