@@ -2316,18 +2316,16 @@
                     fetch(`/get_stats?range=${statRangeMap[range]}`).then(r => r.json()).then(data => {
                         if (data && data.apps) {
                             statsData[range] = data;
-                        }
-                        fetchedCount++;
-                        // --- NEW: Always render cached data for all ranges ---
-                        if (data && data.apps) {
+                            // Render cached data for this range immediately
                             renderStatsAppsForRange(range, data.apps || []);
                         }
+                        fetchedCount++;
                         if (fetchedCount === statRanges.length) {
                             // After all ranges fetched, render the last selected or active one and force tab UI
-                            // Always default to '10d' tab
                             activateDefaultStatsTab();
-                            if (statsData['10d']) {
-                                renderStatsAppsForRange('10d', statsData['10d'].apps || []);
+                            const lastRange = localStorage.getItem('lastStatsRange') || '10d';
+                            if (statsData[lastRange]) {
+                                renderStatsAppsForRange(lastRange, statsData[lastRange].apps || []);
                             }
                         }
                     });
