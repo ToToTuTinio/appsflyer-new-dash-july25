@@ -1617,6 +1617,14 @@
                         
                         metricsGrid.appendChild(graphContainer);
                         
+                        // --- AGGREGATE METRIC BY DATE ---
+                        const dateSums = {};
+                        (app.table || []).forEach(row => {
+                            if (!dateSums[row.date]) dateSums[row.date] = 0;
+                            dateSums[row.date] += row[metric.key] || 0;
+                        });
+                        const sortedDates = Object.keys(dateSums).sort();
+                        const summedData = sortedDates.map(date => dateSums[date]);
                         // Render individual chart
                         setTimeout(() => {
                             const ctx = document.getElementById(`fraudTrendChart${range}-${idx}-${midx}`);
@@ -1627,10 +1635,10 @@
                                 window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`] = new Chart(ctx, {
                                     type: 'line',
                                     data: {
-                                        labels: app.table.map(r=>r.date),
+                                        labels: sortedDates,
                                         datasets: [{
                                             label: metric.label,
-                                            data: app.table.map(r=>r[metric.key] || 0),
+                                            data: summedData,
                                             borderColor: metric.color,
                                             backgroundColor: `${metric.color}20`,
                                             fill: false,
