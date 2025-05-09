@@ -471,6 +471,8 @@ def all_apps_stats():
     for app in active_apps:
         app_id = app['app_id']
         app_name = app['app_name']
+        print(f"[STATS] Processing app: {app_name} ({app_id})")
+        table = []
         print(f"[STATS] Fetching stats for app: {app_name} (App ID: {app_id})...")
         
         # Use the aggregate daily report endpoint for main stats
@@ -609,14 +611,9 @@ def all_apps_stats():
                     print(f"[STATS] in_app_events_report API error for {app_id}: {events_resp.status_code if events_resp else 'No response'}")
             else:
                 print(f"[STATS] Skipping in_app_events_report API for {app_id} (no real events)")
-            # Prepare daily stats for frontend
+            # Ensure all dates in the range are present in the table, fill missing with zeros
             all_dates = sorted(daily_stats.keys())
-            table = []
             for date in all_dates:
-                # Skip dates that have no stats data
-                if not any(daily_stats[date].get(key, 0) > 0 for key in ["impressions", "clicks", "installs", "blocked_installs_rt", "blocked_installs_pa"]):
-                    continue
-                    
                 row = {
                     "date": date,
                     "impressions": daily_stats[date].get("impressions", 0),

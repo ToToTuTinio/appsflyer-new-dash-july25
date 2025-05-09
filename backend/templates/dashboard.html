@@ -807,9 +807,9 @@
                     let mainId = `trend-main-${app.app_id}-${safeName}`;
                     let eventsId = `trend-events-${app.app_id}-${safeName}`;
                     let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
-                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Impressions & Clicks</div><canvas id='${mainId}'></canvas></div>`;
-                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Installs & Events</div><canvas id='${eventsId}'></canvas></div>`;
-                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#a21caf;margin-bottom:0.5rem;'>Fraud: Blocked Installs</div><canvas id='${fraudId}'></canvas></div>`;
+                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Impressions & Clicks</div><canvas id='${mainId}' width='600' height='260'></canvas></div>`;
+                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Installs & Events</div><canvas id='${eventsId}' width='600' height='260'></canvas></div>`;
+                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#a21caf;margin-bottom:0.5rem;'>Fraud: Blocked Installs</div><canvas id='${fraudId}' width='600' height='260'></canvas></div>`;
                     section.innerHTML += table;
                     setTimeout(() => {
                         // 1. Impressions & Clicks
