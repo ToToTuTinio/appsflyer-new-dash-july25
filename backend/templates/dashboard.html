@@ -647,7 +647,7 @@
         // Show the first tab by default
         switchStatsRangeTab('10d');
 
-        // --- Global RUN REPORT button lock ---
+        // --- Global RUN REPORT button lock (applies to all tabs) ---
         window.isReportFetching = false;
         function setRunReportButtonsDisabled(disabled) {
             document.querySelectorAll('[id^="run-report-"]').forEach(btn => {
@@ -655,52 +655,93 @@
             });
         }
         function showReportFetchPopup() {
-            alert("Hold on! A report is already on its way—please wait for it to finish before starting a new one.");
+            // Use a modal for better UX (fallback to alert)
+            if (window.confirmPopupActive) return;
+            window.confirmPopupActive = true;
+            const popup = document.createElement('div');
+            popup.style.position = 'fixed';
+            popup.style.top = '0';
+            popup.style.left = '0';
+            popup.style.width = '100vw';
+            popup.style.height = '100vh';
+            popup.style.background = 'rgba(0,0,0,0.3)';
+            popup.style.display = 'flex';
+            popup.style.alignItems = 'center';
+            popup.style.justifyContent = 'center';
+            popup.style.zIndex = '9999';
+            popup.innerHTML = `<div style="background:white;padding:2rem 2.5rem;border-radius:1rem;box-shadow:0 4px 32px #0002;text-align:center;font-size:1.2rem;max-width:90vw;">
+                <div style='font-weight:bold;color:#16a34a;margin-bottom:1rem;'>Hold on!</div>
+                <div style='margin-bottom:1.5rem;'>A report is already on its way—please wait for it to finish before starting a new one.</div>
+                <button id='close-report-popup' style='background:#16a34a;color:white;padding:0.5rem 1.5rem;border:none;border-radius:0.5rem;font-size:1rem;cursor:pointer;'>OK</button>
+            </div>`;
+            document.body.appendChild(popup);
+            document.getElementById('close-report-popup').onclick = function() {
+                document.body.removeChild(popup);
+                window.confirmPopupActive = false;
+            };
         }
-        // Patch RUN REPORT button logic for all ranges
+        // Patch RUN REPORT button logic for all ranges and all tabs
         const periodMap = {
             '10d': 'last10',
             'mtd': 'mtd',
             'lastmonth': 'lastmonth',
             '30d': 'last30'
         };
-        dateRanges.forEach(range => {
-            const btn = document.getElementById(`run-report-${range}-btn`);
-            if (btn) {
-                btn.onclick = function(e) {
-                    // If a fetch is in progress, show popup and block
-                    if (window.isReportFetching) {
-                        showReportFetchPopup();
-                        return;
-                    }
-                    // If cached data exists, allow unlimited clicks
-                    if (statsData[range] && statsData[range].apps && statsData[range].apps.length > 0) {
-                        renderStatsAppsForRange(range, statsData[range].apps || []);
-                        return;
-                    }
-                    // Start real fetch
-                    window.isReportFetching = true;
-                    setRunReportButtonsDisabled(true);
+        [...document.querySelectorAll('[id^="run-report-"]')].forEach(btn => {
+            btn.onclick = function(e) {
+                // If a fetch is in progress, show popup and block
+                if (window.isReportFetching) {
+                    showReportFetchPopup();
+                    return;
+                }
+                // Determine range from button id
+                const range = this.id.replace('run-report-','').replace('-btn','');
+                // If cached data exists, allow unlimited clicks
+                if (statsData && statsData[range] && statsData[range].apps && statsData[range].apps.length > 0) {
+                    renderStatsAppsForRange(range, statsData[range].apps || []);
+                    return;
+                }
+                // For Fraud tab, check fraudDataCache
+                if (fraudDataCache && fraudDataCache[range] && fraudDataCache[range].apps && fraudDataCache[range].apps.length > 0) {
+                    renderFraudAll(fraudDataCache[range], range);
+                    return;
+                }
+                // Start real fetch
+                window.isReportFetching = true;
+                setRunReportButtonsDisabled(true);
+                // Stats or Fraud?
+                if (this.id.startsWith('run-report-') && this.closest('#stats-tab')) {
                     runStatsReport(range, function() {
                         window.isReportFetching = false;
                         setRunReportButtonsDisabled(false);
                     });
-                };
-            }
+                } else if (this.id.startsWith('run-fraud-')) {
+                    runFraudReport(range, function() {
+                        window.isReportFetching = false;
+                        setRunReportButtonsDisabled(false);
+                    });
+                } else {
+                    // fallback: just re-enable
+                    setTimeout(() => {
+                        window.isReportFetching = false;
+                        setRunReportButtonsDisabled(false);
+                    }, 2000);
+                }
+            };
         });
-        // Update runStatsReport to accept a callback for when fetch completes
-        function runStatsReport(range, onComplete) {
+        // Update runStatsReport to accept a callback for when fetch completes (already done)
+        // Add runFraudReport for Fraud tab
+        function runFraudReport(range, onComplete) {
             setFetchButtonsDisabled(true);
-            const loadingElem = document.getElementById('stats-loading');
+            const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
+            const loadingElem = document.getElementById('fraud-loading');
             if (loadingElem) loadingElem.style.display = '';
-            let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
-            fetch('/all-apps-stats', {
+            fetch('/get_fraud', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    apps: window.fetchedApps,
-                    period: periodMap[range],
-                    selected_events: eventSelections
+                    apps: window.fetchedApps || [],
+                    period: fraudPeriodMap[range]
                 })
             })
             .then(r => r.text())
@@ -709,51 +750,25 @@
                 try {
                     data = JSON.parse(text);
                 } catch (e) {
-                    setFetchButtonsDisabled(false);
                     if (loadingElem) loadingElem.style.display = 'none';
-                    const errorElem = document.getElementById('stats-error');
-                    if (errorElem) {
-                        errorElem.textContent = "Hang tight! A report is already on its way—please wait for it to finish before starting a new one.";
-                        errorElem.style.display = '';
-                        errorElem.style.color = '#16a34a'; // green-600
-                    }
+                    showReportFetchPopup();
                     if (onComplete) onComplete();
                     return;
                 }
                 if (data.status === 'processing') {
-                    setFetchButtonsDisabled(false);
                     if (loadingElem) loadingElem.style.display = 'none';
-                    const errorElem = document.getElementById('stats-error');
-                    if (errorElem) {
-                        errorElem.textContent = "Hang tight! A report is already on its way—please wait for it to finish before starting a new one.";
-                        errorElem.style.display = '';
-                        errorElem.style.color = '#16a34a'; // green-600
-                    }
+                    showReportFetchPopup();
                     if (onComplete) onComplete();
                     return;
                 }
-                // --- DATA IS READY: AUTO-RENDER ---
-                setFetchButtonsDisabled(false);
-                statsData[range] = data;
-                renderStatsAppsForRange(range, data.apps || []);
+                fraudDataCache[range] = data;
+                renderFraudAll(data, range);
                 if (loadingElem) loadingElem.style.display = 'none';
-                // Refresh overview and top apps after RUN completes
-                fetchOverviewData();
-                fetchTopPerformingApps();
-                // Hide error message if present
-                const errorElem = document.getElementById('stats-error');
-                if (errorElem) errorElem.style.display = 'none';
                 if (onComplete) onComplete();
             })
             .catch(error => {
-                setFetchButtonsDisabled(false);
-                const errorElem = document.getElementById('stats-error');
-                if (errorElem) {
-                    errorElem.textContent = error.message;
-                    errorElem.style.display = '';
-                    errorElem.style.color = '#ef4444'; // fallback to red for real errors
-                }
                 if (loadingElem) loadingElem.style.display = 'none';
+                showReportFetchPopup();
                 if (onComplete) onComplete();
             });
         }
