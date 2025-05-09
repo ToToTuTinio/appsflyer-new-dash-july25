@@ -2015,6 +2015,7 @@
                 .then(data => {
                     fraudSourceDataCache[range] = data;
                     document.getElementById(`fraud-source-loading-${range}`).style.display = 'none';
+                    // Always render after fetch
                     renderFraudSource(data, range);
                 })
                 .catch(() => {
