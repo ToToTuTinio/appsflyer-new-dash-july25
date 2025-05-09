@@ -648,38 +648,13 @@
         switchStatsRangeTab('10d');
 
         // --- Global RUN REPORT lockout ---
-        window.isReportRunning = false;
+        window.isReportFetching = false;
         function setRunReportButtonsDisabled(disabled) {
             document.querySelectorAll('[id^="run-report-"]').forEach(btn => {
                 btn.disabled = disabled;
             });
-            // Optionally, also disable fraud RUN buttons
-            document.querySelectorAll('[id^="run-fraud-"]').forEach(btn => {
-                btn.disabled = disabled;
-            });
-            document.querySelectorAll('[id^="run-fraud-source-"]').forEach(btn => {
-                btn.disabled = disabled;
-            });
         }
-        function showReportLockoutMessage() {
-            let msg = document.getElementById('report-lockout-msg');
-            if (!msg) {
-                msg = document.createElement('div');
-                msg.id = 'report-lockout-msg';
-                msg.className = 'text-center text-green-700 font-semibold my-4';
-                msg.textContent = "Hold on! Another report is on its way—let it finish up first before fetching a new one.";
-                // Place it above the RUN REPORT button or in a visible spot
-                const statsTab = document.getElementById('stats-tab');
-                if (statsTab) statsTab.prepend(msg);
-                else document.body.prepend(msg);
-            }
-            msg.style.display = '';
-        }
-        function hideReportLockoutMessage() {
-            const msg = document.getElementById('report-lockout-msg');
-            if (msg) msg.style.display = 'none';
-        }
-        // Patch all RUN REPORT button handlers to use the lockout
+        // Patch RUN REPORT button logic to add global lockout
         const periodMap = {
             '10d': 'last10',
             'mtd': 'mtd',
@@ -690,26 +665,29 @@
             const btn = document.getElementById(`run-report-${range}-btn`);
             if (btn) {
                 btn.onclick = function() {
-                    if (window.isReportRunning) {
-                        showReportLockoutMessage();
+                    if (window.isReportFetching) {
+                        alert("Hold on! A report is already on its way—please wait for it to finish before starting a new one.");
                         return;
                     }
-                    hideReportLockoutMessage();
-                    window.isReportRunning = true;
+                    window.isReportFetching = true;
                     setRunReportButtonsDisabled(true);
+                    console.log('RUN REPORT clicked for', range);
+                    console.log('fetchedApps:', window.fetchedApps);
                     if (!window.fetchedApps || !window.fetchedApps.length) {
                         alert('No apps loaded. Please click Get Apps first.');
-                        window.isReportRunning = false;
+                        window.isReportFetching = false;
                         setRunReportButtonsDisabled(false);
                         return;
                     }
                     runStatsReport(range);
                 };
+            } else {
+                console.warn('RUN REPORT button not found for range:', range);
             }
         });
-        // Patch runStatsReport to clear lockout on finish
         function runStatsReport(range) {
             setFetchButtonsDisabled(true);
+            setRunReportButtonsDisabled(true);
             const loadingElem = document.getElementById('stats-loading');
             if (loadingElem) loadingElem.style.display = '';
             let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
@@ -729,8 +707,8 @@
                     data = JSON.parse(text);
                 } catch (e) {
                     setFetchButtonsDisabled(false);
-                    window.isReportRunning = false;
                     setRunReportButtonsDisabled(false);
+                    window.isReportFetching = false;
                     if (loadingElem) loadingElem.style.display = 'none';
                     const errorElem = document.getElementById('stats-error');
                     if (errorElem) {
@@ -742,8 +720,8 @@
                 }
                 if (data.status === 'processing') {
                     setFetchButtonsDisabled(false);
-                    window.isReportRunning = false;
                     setRunReportButtonsDisabled(false);
+                    window.isReportFetching = false;
                     if (loadingElem) loadingElem.style.display = 'none';
                     const errorElem = document.getElementById('stats-error');
                     if (errorElem) {
@@ -757,8 +735,8 @@
                 }
                 // --- DATA IS READY: AUTO-RENDER ---
                 setFetchButtonsDisabled(false);
-                window.isReportRunning = false;
                 setRunReportButtonsDisabled(false);
+                window.isReportFetching = false;
                 statsData[range] = data;
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
@@ -771,8 +749,8 @@
             })
             .catch(error => {
                 setFetchButtonsDisabled(false);
-                window.isReportRunning = false;
                 setRunReportButtonsDisabled(false);
+                window.isReportFetching = false;
                 const errorElem = document.getElementById('stats-error');
                 if (errorElem) {
                     errorElem.textContent = error.message;
