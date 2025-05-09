@@ -2434,8 +2434,9 @@
                         }
                         fetchedCount++;
                         if (fetchedCount === statRanges.length) {
-                            // After all ranges fetched, render the active one
+                            // After all ranges fetched, render the active one and force tab UI
                             const activeRange = getActiveStatsRange();
+                            switchStatsRangeTab(activeRange);
                             if (statsData[activeRange]) {
                                 renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
                             }
@@ -2473,9 +2474,9 @@
         });
 
         // --- On tab switch, fetch and render cached data for all ranges of the selected tab ---
-        const origSwitchTab4 = switchTab;
+        const origSwitchTab5 = switchTab;
         switchTab = function(tabName) {
-            origSwitchTab4(tabName);
+            origSwitchTab5(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
                 fetch('/get_apps').then(r => r.json()).then(data => {
@@ -2499,6 +2500,7 @@
                         fetchedCount++;
                         if (fetchedCount === statRanges.length) {
                             const activeRange = getActiveStatsRange();
+                            switchStatsRangeTab(activeRange);
                             if (statsData[activeRange]) {
                                 renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
                             }
