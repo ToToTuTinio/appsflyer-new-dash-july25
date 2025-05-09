@@ -178,9 +178,6 @@
 
         <!-- Overview Tab Content -->
         <div id="overview-tab" class="tab-content active">
-            <div class="flex justify-end mb-4">
-                <button id="refresh-overview-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh Overview</button>
-            </div>
             <div class="space-y-12"> <!-- Add vertical spacing between cards -->
                 <!-- Total Performance Card -->
                 <div class="bg-white rounded-2xl shadow-xl p-8">
@@ -257,9 +254,6 @@
 
         <!-- Apps Tab Content -->
         <div id="apps-tab" class="tab-content">
-            <div class="flex justify-end mb-4">
-                <button id="refresh-apps-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh</button>
-            </div>
             <div class="bg-white rounded-2xl shadow-xl p-10">
                 <div class="flex justify-between items-center mb-8">
                     <h2 class="text-3xl font-extrabold text-gray-900 flex items-center">Active Apps</h2>
@@ -310,9 +304,6 @@
 
         <!-- Stats Tab Content -->
         <div id="stats-tab" class="tab-content">
-            <div class="flex justify-end mb-4">
-                <button id="refresh-stats-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh</button>
-            </div>
             <div class="bg-white rounded-2xl shadow-xl p-10">
                 <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
                 <!-- Date Range Tabs -->
@@ -353,9 +344,6 @@
 
         <!-- Fraud Tab Content -->
         <div id="fraud-tab" class="tab-content">
-            <div class="flex justify-end mb-4">
-                <button id="refresh-fraud-btn" class="border border-blue-400 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">Refresh</button>
-            </div>
             <div class="bg-white rounded-lg shadow-lg p-8 max-w-5xl mx-auto">
                 <!-- Sub-tabs for Fraud Analytics and Fraud Per Source -->
                 <div class="flex space-x-4 mb-6">
@@ -630,8 +618,6 @@
         // Date range tab logic
         const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
-            // Persist last selected stats range
-            localStorage.setItem('lastStatsRange', range);
             document.querySelectorAll('.date-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600','text-green-700','bg-white');
                 btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
@@ -646,9 +632,8 @@
                 switchStatsRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Show the last selected tab by default (or first if none)
-        const lastStatsRange = localStorage.getItem('lastStatsRange') || '10d';
-        switchStatsRangeTab(lastStatsRange);
+        // Show the first tab by default
+        switchStatsRangeTab('10d');
 
         // Patch RUN REPORT button logic to add logging and defensive checks
         const periodMap = {
@@ -1379,19 +1364,344 @@
             'lastmonth': 'lastmonth',
             '30d': 'last30'
         };
-        // --- NEW: Fraud Per Source sub-tab logic ---
-        const fraudSourceRanges = ['10d','mtd','lastmonth','30d'];
-        const fraudSourceDataCache = { '10d': null, 'mtd': null, 'lastmonth': null, '30d': null };
-        const fraudSourcePeriodMap = {
-            '10d': 'last10',
-            'mtd': 'mtd',
-            'lastmonth': 'lastmonth',
-            '30d': 'last30'
-        };
-        // --- Persist and restore last selected sub-tab ---
-        let currentFraudSubTab = localStorage.getItem('lastFraudSubTab') || 'analytics';
+        function switchFraudRangeTab(range) {
+            document.querySelectorAll('.fraud-range-tab').forEach(btn => {
+                btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
+                btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            });
+            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.remove('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.add('border-green-600', 'text-green-700', 'bg-white');
+            document.querySelectorAll('.fraud-range-content').forEach(div => div.style.display = 'none');
+            document.getElementById(`fraud-content-${range}`).style.display = '';
+            // If we have cached data, render it
+            if (fraudDataCache[range]) renderFraudAll(fraudDataCache[range], range);
+        }
+        document.querySelectorAll('.fraud-range-tab').forEach(btn => {
+            btn.onclick = function() {
+                switchFraudRangeTab(this.getAttribute('data-range'));
+            };
+        });
+        // Show the first tab by default
+        switchFraudRangeTab('10d');
+        // RUN button logic
+        fraudRanges.forEach(range => {
+            document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
+                document.getElementById('fraud-loading').style.display = '';
+                document.getElementById('fraud-error').style.display = 'none';
+                fetch('/get_fraud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apps: fetchedApps,
+                        period: fraudPeriodMap[range]
+                    })
+                })
+                .then(r => {
+                    if (!r.ok) {
+                        if (r.status === 504) {
+                            // 504 Gateway Timeout: do nothing (no error message)
+                            return;
+                        }
+                        // Other errors: show a generic error
+                        document.getElementById('fraud-error').textContent = 'Error loading fraud data. Please try again.';
+                        document.getElementById('fraud-error').style.display = '';
+                        return;
+                    }
+                    return r.text();
+                })
+                .then(text => {
+                    if (!text) return; // If no data (due to 504), do nothing
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        document.getElementById('fraud-loading').style.display = 'none';
+                        // HIDE error message if no fraud data (do not show any message)
+                        document.getElementById('fraud-error').style.display = 'none';
+                        return;
+                    }
+                    if (data.status === 'processing') {
+                        document.getElementById('fraud-loading').style.display = 'none';
+                        document.getElementById('fraud-error').style.display = 'none'; // Hide error
+                        setTimeout(() => document.getElementById(`run-fraud-${range}-btn`).onclick(), 30000);
+                        return;
+                    }
+                    document.getElementById('fraud-loading').style.display = 'none';
+                    document.getElementById('fraud-error').style.display = 'none'; // Hide error
+                    // --- AUTO-DISPLAY DATA AS SOON AS READY ---
+                    renderFraudAll(data, range);
+                })
+                .catch(() => {
+                    // Only show error for real network errors (not 504)
+                    // (No-op for 504, error already handled above)
+                });
+            };
+        });
+        function renderFraudAll(data, range) {
+            const container = document.getElementById(`fraud-data-${range}`);
+            container.innerHTML = '';
+            if (data.error) {
+                container.innerHTML = `<div class='text-center text-red-500 mt-8'>${data.error}</div>`;
+                return;
+            }
+            if (!data.apps || data.apps.length === 0) {
+                container.innerHTML = `<div class='text-center text-gray-500 mt-8'>No fraud data for this period.</div>`;
+                return;
+            }
+            // --- Fraud Trends (All Apps) ---
+            const allAppsSection = document.createElement('div');
+            allAppsSection.className = 'app-card mb-10 p-8 bg-white shadow-lg rounded-lg';
+            allAppsSection.innerHTML = `<div style="font-weight:700;font-size:1.4rem;color:#3730a3;margin-bottom:1.2rem;">Fraud Trends (All Apps)</div>`;
+            // Create a grid for 6 small charts
+            const metrics = [
+                { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+                { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
+                { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e42', bg: 'rgba(245,158,66,0.08)' },
+                { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6', bg: 'rgba(20,184,166,0.08)' },
+                { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf', bg: 'rgba(162,28,175,0.08)' },
+                { key: 'blocked_install_postbacks', label: 'Blocked Install Postbacks', color: '#f97316', bg: 'rgba(249,115,22,0.08)' }
+            ];
+            const dateMap = {};
+            data.apps.forEach(app => {
+                (app.table || []).forEach(row => {
+                    if (!dateMap[row.date]) {
+                        dateMap[row.date] = {
+                            blocked_installs_rt: 0,
+                            blocked_installs_pa: 0,
+                            blocked_in_app_events: 0,
+                            fraud_post_inapps: 0,
+                            blocked_clicks: 0,
+                            blocked_install_postbacks: 0
+                        };
+                    }
+                    dateMap[row.date].blocked_installs_rt += row.blocked_installs_rt || 0;
+                    dateMap[row.date].blocked_installs_pa += row.blocked_installs_pa || 0;
+                    dateMap[row.date].blocked_in_app_events += row.blocked_in_app_events || 0;
+                    dateMap[row.date].fraud_post_inapps += row.fraud_post_inapps || 0;
+                    dateMap[row.date].blocked_clicks += row.blocked_clicks || 0;
+                    dateMap[row.date].blocked_install_postbacks += row.blocked_install_postbacks || 0;
+                });
+            });
+            const dates = Object.keys(dateMap).sort();
+            // Grid container
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6';
+            metrics.forEach((metric, i) => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 rounded-xl p-4 flex flex-col items-center shadow border border-gray-100';
+                card.innerHTML = `<div class='text-sm font-bold mb-2' style='color:${metric.color}'>${metric.label}</div>` +
+                    `<canvas id='fraudTrendsAllApps-${metric.key}-${range}' height='140' width='260'></canvas>`;
+                grid.appendChild(card);
+            });
+            allAppsSection.appendChild(grid);
+            container.appendChild(allAppsSection);
+            // Render each chart
+            setTimeout(() => {
+                metrics.forEach((metric, i) => {
+                    const ctx = document.getElementById(`fraudTrendsAllApps-${metric.key}-${range}`);
+                    if (ctx && window.Chart) {
+                        if (window._chartInstances[`fraudTrendsAllApps-${metric.key}-${range}`]) {
+                            window._chartInstances[`fraudTrendsAllApps-${metric.key}-${range}`].destroy();
+                        }
+                        window._chartInstances[`fraudTrendsAllApps-${metric.key}-${range}`] = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: dates,
+                                datasets: [{
+                                    label: metric.label,
+                                    data: dates.map(d => dateMap[d][metric.key]),
+                                    borderColor: metric.color,
+                                    backgroundColor: metric.bg,
+                                    fill: true,
+                                    tension: 0.18
+                                }]
+                            },
+                            options: {
+                                plugins: { legend: { display: false } },
+                                scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: false }, ticks: { precision: 0 } } },
+                                elements: { point: { radius: 2 } },
+                                responsive: false,
+                                maintainAspectRatio: false
+                            }
+                        });
+                    }
+                });
+            }, 100);
+            // --- Per-App Sections ---
+            data.apps.forEach((app, idx) => {
+                const appSection = document.createElement('div');
+                appSection.className = 'app-card mb-12 p-8 bg-gray-50 shadow rounded-lg border border-gray-200';
+                // App header (improved design)
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'flex flex-col items-center justify-center mb-6';
+                titleDiv.innerHTML = `
+                    <div class="text-2xl font-extrabold text-gray-900 mb-1 text-center">${app.app_name}</div>
+                    <div class="text-base font-semibold text-indigo-600 tracking-wide text-center">App ID: <span class="font-mono text-lg text-gray-700">${app.app_id}</span></div>
+                `;
+                appSection.appendChild(titleDiv);
+                // Error display
+                if (app.errors && app.errors.length > 0) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'text-red-500 mt-2 mb-4';
+                    errorDiv.innerHTML = app.errors.map(error => `<div>${error}</div>`).join('');
+                    appSection.appendChild(errorDiv);
+                }
+                // --- 6 Metric Cards ---
+                if (app.table && app.table.length > 0) {
+                    // Calculate totals for this app
+                    const totals = {
+                        blocked_installs_rt: 0,
+                        blocked_installs_pa: 0,
+                        blocked_in_app_events: 0,
+                        fraud_post_inapps: 0,
+                        blocked_clicks: 0,
+                        blocked_install_postbacks: 0
+                    };
+                    app.table.forEach(row => {
+                        totals.blocked_installs_rt += row.blocked_installs_rt || 0;
+                        totals.blocked_installs_pa += row.blocked_installs_pa || 0;
+                        totals.blocked_in_app_events += row.blocked_in_app_events || 0;
+                        totals.fraud_post_inapps += row.fraud_post_inapps || 0;
+                        totals.blocked_clicks += row.blocked_clicks || 0;
+                        totals.blocked_install_postbacks += row.blocked_install_postbacks || 0;
+                    });
+                    // Cards
+                    const cards = [
+                        { label: 'Blocked Installs (RT)', value: totals.blocked_installs_rt, color: 'text-red-500' },
+                        { label: 'Blocked Installs (PA)', value: totals.blocked_installs_pa, color: 'text-indigo-500' },
+                        { label: 'Blocked In-App Events', value: totals.blocked_in_app_events, color: 'text-yellow-500' },
+                        { label: 'Fraud Post-InApps', value: totals.fraud_post_inapps, color: 'text-black' },
+                        { label: 'Blocked Clicks', value: totals.blocked_clicks, color: 'text-purple-500' },
+                        { label: 'Blocked Install Postbacks', value: totals.blocked_install_postbacks, color: 'text-black' }
+                    ];
+                    const cardsRow = document.createElement('div');
+                    cardsRow.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-8';
+                    cards.forEach(card => {
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = 'bg-white rounded-lg shadow p-4 flex flex-col items-center border border-gray-100';
+                        cardDiv.innerHTML = `<div class="text-xs text-gray-500 mb-1">${card.label}</div><div class="text-2xl font-bold ${card.color}">${card.value.toLocaleString()}</div>`;
+                        cardsRow.appendChild(cardDiv);
+                    });
+                    appSection.appendChild(cardsRow);
+                }
+                // --- App Trend Chart & Table ---
+                if (app.table && app.table.length > 0) {
+                    // Chart
+                    const chartSection = document.createElement('div');
+                    chartSection.style.marginTop = '2.5rem';
+                    chartSection.innerHTML = `<div style="font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;">Fraud Trends</div>`;
+                    
+                    // Create a grid container for the 6 metrics
+                    const metricsGrid = document.createElement('div');
+                    metricsGrid.className = 'grid grid-cols-2 md:grid-cols-3 gap-3 mb-6';
+                    
+                    const metrics = [
+                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444' },
+                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1' },
+                        { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e42' },
+                        { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6' },
+                        { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf' },
+                        { key: 'blocked_install_postbacks', label: 'Blocked Install Postbacks', color: '#f97316' }
+                    ];
+
+                    metrics.forEach((metric, midx) => {
+                        const graphContainer = document.createElement('div');
+                        graphContainer.className = 'bg-white p-2 rounded-lg shadow border border-gray-200 flex flex-col items-center justify-center';
+                        graphContainer.style.minWidth = '182px'; // 140 * 1.3
+                        graphContainer.style.maxWidth = '286px'; // 220 * 1.3
+                        graphContainer.style.margin = '0 auto';
+                        
+                        const graphTitle = document.createElement('div');
+                        graphTitle.className = 'text-sm font-semibold text-gray-700 mb-1 text-center'; // was text-xs
+                        graphTitle.textContent = metric.label;
+                        graphContainer.appendChild(graphTitle);
+                        
+                        const canvas = document.createElement('canvas');
+                        canvas.id = `fraudTrendChart${range}-${idx}-${midx}`;
+                        canvas.height = 156; // 120 * 1.3
+                        canvas.width = 260;  // 200 * 1.3
+                        graphContainer.appendChild(canvas);
+                        
+                        metricsGrid.appendChild(graphContainer);
+                        
+                        // --- AGGREGATE METRIC BY DATE ---
+                        const dateSums = {};
+                        (app.table || []).forEach(row => {
+                            if (!dateSums[row.date]) dateSums[row.date] = 0;
+                            dateSums[row.date] += row[metric.key] || 0;
+                        });
+                        const sortedDates = Object.keys(dateSums).sort();
+                        const summedData = sortedDates.map(date => dateSums[date]);
+                        // Render individual chart
+                        setTimeout(() => {
+                            const ctx = document.getElementById(`fraudTrendChart${range}-${idx}-${midx}`);
+                            if (ctx && window.Chart) {
+                                if (window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`]) {
+                                    window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`].destroy();
+                                }
+                                window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`] = new Chart(ctx, {
+                                    type: 'line',
+                                    data: {
+                                        labels: sortedDates,
+                                        datasets: [{
+                                            label: metric.label,
+                                            data: summedData,
+                                            borderColor: metric.color,
+                                            backgroundColor: `${metric.color}20`,
+                                            fill: false,
+                                            tension: 0.18
+                                        }]
+                                    },
+                                    options: {
+                                        plugins: {
+                                            legend: { display: false },
+                                            tooltip: {
+                                                mode: 'index',
+                                                intersect: false,
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        return `${context.dataset.label}: ${context.parsed.y}`;
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        scales: {
+                                            x: {
+                                                display: true,
+                                                ticks: { maxRotation: 45, minRotation: 45, font: { size: 12 } },
+                                                grid: { display: false }
+                                            },
+                                            y: {
+                                                beginAtZero: true,
+                                                display: true,
+                                                grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
+                                                ticks: { font: { size: 12 }, precision: 0 }
+                                            }
+                                        },
+                                        elements: { point: { radius: 2.2 } },
+                                        responsive: false,
+                                        maintainAspectRatio: false
+                                    }
+                                });
+                            }
+                        }, 100);
+                    });
+                    
+                    chartSection.appendChild(metricsGrid);
+                    appSection.appendChild(chartSection);
+                } else {
+                    const noDataDiv = document.createElement('div');
+                    noDataDiv.className = 'text-gray-500 mt-2';
+                    noDataDiv.textContent = 'No fraud data available for this period';
+                    appSection.appendChild(noDataDiv);
+                }
+                container.appendChild(appSection);
+            });
+        }
+
+        // Add JS logic for switching sub-tabs and running fetch/render for both sub-pages
+        let currentFraudSubTab = 'analytics';
         function switchFraudSubTab(subtab) {
-            localStorage.setItem('lastFraudSubTab', subtab);
             document.getElementById('fraud-analytics-tab-btn').classList.remove('border-blue-500', 'text-blue-600');
             document.getElementById('fraud-analytics-tab-btn').classList.add('border-transparent', 'text-gray-500');
             document.getElementById('fraud-source-tab-btn').classList.remove('border-blue-500', 'text-blue-600');
@@ -1409,73 +1719,6 @@
             }
             currentFraudSubTab = subtab;
         }
-        // --- On page load, restore last selected sub-tab and range ---
-        document.addEventListener('DOMContentLoaded', function() {
-            // ... existing code ...
-            if (document.getElementById('fraud-tab')) {
-                // Restore last selected sub-tab
-                const lastFraudSubTab = localStorage.getItem('lastFraudSubTab') || 'analytics';
-                switchFraudSubTab(lastFraudSubTab);
-                // Fetch and render for all ranges for both sub-tabs
-                // Fraud Analytics
-                let fraudFetchedCount = 0;
-                fraudRanges.forEach(range => {
-                    fetch('/get_fraud', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudPeriodMap[range] })
-                    }).then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            fraudDataCache[range] = data;
-                            renderFraudAll(data, range);
-                        }
-                        fraudFetchedCount++;
-                        if (fraudFetchedCount === fraudRanges.length) {
-                            // After all ranges fetched, render the last selected or active one
-                            const activeRange = getActiveFraudRange();
-                            switchFraudRangeTab(activeRange);
-                            if (fraudDataCache[activeRange]) {
-                                renderFraudAll(fraudDataCache[activeRange], activeRange);
-                            }
-                        }
-                    });
-                });
-                setTimeout(() => {
-                    const activeRange = getActiveFraudRange();
-                    if (fraudDataCache[activeRange]) {
-                        renderFraudAll(fraudDataCache[activeRange], activeRange);
-                    }
-                }, 500);
-                // Fraud Per Source: fetch and render for all ranges, then render the active one
-                let fraudSourceFetchedCount = 0;
-                fraudSourceRanges.forEach(range => {
-                    fetch('/get_fraud', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudSourcePeriodMap[range] })
-                    }).then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            fraudSourceDataCache[range] = data;
-                        }
-                        fraudSourceFetchedCount++;
-                        if (fraudSourceFetchedCount === fraudSourceRanges.length) {
-                            // After all ranges fetched, render the last selected or active one
-                            const lastFraudSourceRange = localStorage.getItem('lastFraudSourceRange') || '10d';
-                            switchFraudSourceRangeTab(lastFraudSourceRange);
-                            if (fraudSourceDataCache[lastFraudSourceRange]) {
-                                renderFraudSource(fraudSourceDataCache[lastFraudSourceRange], lastFraudSourceRange);
-                            }
-                        }
-                    });
-                });
-                setTimeout(() => {
-                    const lastFraudSourceRange = localStorage.getItem('lastFraudSourceRange') || '10d';
-                    if (fraudSourceDataCache[lastFraudSourceRange]) {
-                        renderFraudSource(fraudSourceDataCache[lastFraudSourceRange], lastFraudSourceRange);
-                    }
-                }, 500);
-            }
-        });
 
         // Add a helper to group fraud data by media source
         function processFraudDataBySource(app) {
@@ -1614,68 +1857,82 @@
                      ];
                      metrics.forEach((metric, midx) => {
                          const graphContainer = document.createElement('div');
-                         graphContainer.className = 'bg-white p-2 rounded-lg shadow border border-gray-200 flex flex-col items-center justify-center';
-                         graphContainer.style.minWidth = '182px'; // 140 * 1.3
-                         graphContainer.style.maxWidth = '286px'; // 220 * 1.3
+                         graphContainer.className = 'bg-white p-3 rounded-lg shadow border border-gray-200 flex flex-col items-center';
+                         graphContainer.style.minWidth = '160px';
+                         graphContainer.style.maxWidth = '220px';
                          graphContainer.style.margin = '0 auto';
-                         
+
                          const graphTitle = document.createElement('div');
-                         graphTitle.className = 'text-sm font-semibold text-gray-700 mb-1 text-center'; // was text-xs
+                         graphTitle.className = 'text-xs font-medium text-gray-700 mb-1 text-center';
                          graphTitle.textContent = metric.label;
                          graphContainer.appendChild(graphTitle);
-                         
+
                          const canvas = document.createElement('canvas');
-                         canvas.id = `fraudTrendChart${range}-${idx}-${midx}`;
-                         canvas.height = 156; // 120 * 1.3
-                         canvas.width = 260;  // 200 * 1.3
+                         canvas.id = `fraudSourceChart_${idx}_${sidx}_${midx}_${range}`;
+                         canvas.width = 200;
+                         canvas.height = 120;
                          graphContainer.appendChild(canvas);
-                         
-                         metricsGrid.appendChild(graphContainer);
-                         
-                         // --- AGGREGATE METRIC BY DATE ---
-                         const dateSums = {};
-                         (app.table || []).forEach(row => {
-                             if (!dateSums[row.date]) dateSums[row.date] = 0;
-                             dateSums[row.date] += row[metric.key] || 0;
-                         });
-                         const sortedDates = Object.keys(dateSums).sort();
-                         const summedData = sortedDates.map(date => dateSums[date]);
-                         // Render individual chart
+                         graphsRow.appendChild(graphContainer);
+                         // Render chart
                          setTimeout(() => {
-                             const ctx = document.getElementById(`fraudTrendChart${range}-${idx}-${midx}`);
+                             const ctx = document.getElementById(`fraudSourceChart_${idx}_${sidx}_${midx}_${range}`);
                              if (ctx && window.Chart) {
-                                 if (window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`]) {
-                                     window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`].destroy();
-                                 }
-                                 window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`] = new Chart(ctx, {
+                                 const dates = [...new Set(grouped[source].rows.map(r => r.date))].sort();
+                                 new Chart(ctx, {
                                      type: 'line',
                                      data: {
-                                         labels: sortedDates,
+                                         labels: dates,
                                          datasets: [{
                                              label: metric.label,
-                                             data: summedData,
+                                             data: dates.map(date => {
+                                                 const row = grouped[source].rows.find(r => r.date === date);
+                                                 return row ? row[metric.key] || 0 : 0;
+                                             }),
                                              borderColor: metric.color,
                                              backgroundColor: `${metric.color}20`,
                                              fill: false,
-                                             tension: 0.18
+                                             tension: 0.18,
+                                             pointRadius: 1.5,
+                                             pointBackgroundColor: metric.color,
+                                             pointBorderColor: metric.color
                                          }]
                                      },
                                      options: {
-                                         plugins: { legend: { display: false } },
-                                         scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: false }, ticks: { precision: 0 } } },
-                                         elements: { point: { radius: 2 } },
+                                         plugins: {
+                                             legend: { display: false },
+                                             tooltip: { mode: 'index', intersect: false, callbacks: { label: function(context) { return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} (${context.label})`; } } }
+                                         },
+                                         scales: {
+                                             x: {
+                                                 display: true,
+                                                 ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
+                                                 grid: { display: false },
+                                                 title: { display: false }
+                                             },
+                                             y: {
+                                                 beginAtZero: true,
+                                                 display: true,
+                                                 grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
+                                                 ticks: { font: { size: 9 }, precision: 0 }
+                                             }
+                                         },
+                                         elements: { point: { radius: 1.5 } },
                                          responsive: false,
                                          maintainAspectRatio: false
-                                     }
-                                 });
+                                 }
+                             });
                              }
-                         }, 100);
+                         }, 0);
                      });
-                     
-                     chartSection.appendChild(metricsGrid);
-                     appSection.appendChild(chartSection);
-                });
-                container.appendChild(appSection);
+
+                     // Compose card
+                     sourceCard.appendChild(infoCol);
+                     sourceCard.appendChild(graphsRow);
+                     sourcesGrid.appendChild(sourceCard);
+                 });
+
+                 appSection.appendChild(sourcesGrid);
+                 container.appendChild(appSection);
             });
         }
 
@@ -1704,9 +1961,8 @@
                 switchFraudSourceRangeTab(this.getAttribute('data-range'));
             };
         });
-        // Show the last selected fraud tab by default (or first if none)
-        const lastFraudSourceRange = localStorage.getItem('lastFraudSourceRange') || '10d';
-        switchFraudSourceRangeTab(lastFraudSourceRange);
+        // Show the first tab by default
+        switchFraudSourceRangeTab('10d');
         fraudSourceRanges.forEach(range => {
             document.getElementById(`run-fraud-source-${range}-btn`).onclick = function() {
                 // Hide all loading/error for all ranges first
@@ -2023,147 +2279,6 @@
                         });
                 };
             }
-            // Add Refresh Overview button logic
-            const refreshBtn = document.getElementById('refresh-overview-btn');
-            if (refreshBtn) {
-                refreshBtn.onclick = function() {
-                    refreshBtn.disabled = true;
-                    refreshBtn.textContent = 'Refreshing...';
-                    // Only refresh UI with existing data, do not fetch new data
-                    fetchOverviewData();
-                    setTimeout(() => {
-                        refreshBtn.textContent = 'Refresh Overview';
-                        refreshBtn.disabled = false;
-                    }, 1200);
-                };
-            }
-            // Add Refresh Apps button logic
-            const refreshAppsBtn = document.getElementById('refresh-apps-btn');
-            if (refreshAppsBtn) {
-                refreshAppsBtn.onclick = function() {
-                    refreshAppsBtn.disabled = true;
-                    refreshAppsBtn.textContent = 'Refreshing...';
-                    // Only refresh UI with existing data, do not fetch new data
-                    if (window.fetchedApps && window.fetchedApps.length) {
-                        renderAppsList(window.fetchedApps);
-                    }
-                    setTimeout(() => {
-                        refreshAppsBtn.textContent = 'Refresh';
-                        refreshAppsBtn.disabled = false;
-                    }, 1200);
-                };
-            }
-            // Add Refresh Stats button logic
-            const refreshStatsBtn = document.getElementById('refresh-stats-btn');
-            if (refreshStatsBtn) {
-                refreshStatsBtn.onclick = function() {
-                    refreshStatsBtn.disabled = true;
-                    refreshStatsBtn.textContent = 'Refreshing...';
-                    // Only refresh UI with existing data, do not fetch new data
-                    const activeRangeBtn = document.querySelector('.date-range-tab.border-green-600');
-                    let range = '10d';
-                    if (activeRangeBtn) range = activeRangeBtn.getAttribute('data-range');
-                    if (statsData[range]) {
-                        renderStatsAppsForRange(range, statsData[range].apps || []);
-                    }
-                    setTimeout(() => {
-                        refreshStatsBtn.textContent = 'Refresh';
-                        refreshStatsBtn.disabled = false;
-                    }, 1200);
-                };
-            }
-            // Add Refresh Fraud button logic
-            const refreshFraudBtn = document.getElementById('refresh-fraud-btn');
-            if (refreshFraudBtn) {
-                refreshFraudBtn.onclick = function() {
-                    refreshFraudBtn.disabled = true;
-                    refreshFraudBtn.textContent = 'Refreshing...';
-                    // Re-run the currently selected fraud report
-                    const activeFraudRangeBtn = document.querySelector('.fraud-range-tab.border-green-600');
-                    let range = '10d';
-                    if (activeFraudRangeBtn) range = activeFraudRangeBtn.getAttribute('data-range');
-                    document.getElementById(`run-fraud-${range}-btn`).onclick();
-                    setTimeout(() => {
-                        refreshFraudBtn.textContent = 'Refresh';
-                        refreshFraudBtn.disabled = false;
-                    }, 1200);
-                };
-            }
-            // Add Clear Apps Cache button logic
-            const clearAppsBtn = document.getElementById('clear-apps-cache-btn');
-            if (clearAppsBtn) {
-                clearAppsBtn.onclick = function() {
-                    if (!confirm('Are you sure you want to clear the apps cache?')) return;
-                    clearAppsBtn.disabled = true;
-                    clearAppsBtn.textContent = 'Clearing...';
-                    fetch('/clear-apps-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearAppsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            setTimeout(() => {
-                                clearAppsBtn.textContent = 'Clear Apps Cache';
-                                clearAppsBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(() => {
-                            clearAppsBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearAppsBtn.textContent = 'Clear Apps Cache';
-                                clearAppsBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
-            // Add Clear Stats Cache button logic
-            const clearStatsBtn = document.getElementById('clear-stats-cache-btn');
-            if (clearStatsBtn) {
-                clearStatsBtn.onclick = function() {
-                    if (!confirm('Are you sure you want to clear the stats cache?')) return;
-                    clearStatsBtn.disabled = true;
-                    clearStatsBtn.textContent = 'Clearing...';
-                    fetch('/clear-stats-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearStatsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            setTimeout(() => {
-                                clearStatsBtn.textContent = 'Clear Stats Cache';
-                                clearStatsBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(() => {
-                            clearStatsBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearStatsBtn.textContent = 'Clear Stats Cache';
-                                clearStatsBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
-            // Add Clear Fraud Cache button logic
-            const clearFraudBtn = document.getElementById('clear-fraud-cache-btn');
-            if (clearFraudBtn) {
-                clearFraudBtn.onclick = function() {
-                    if (!confirm('Are you sure you want to clear the fraud cache?')) return;
-                    clearFraudBtn.disabled = true;
-                    clearFraudBtn.textContent = 'Clearing...';
-                    fetch('/clear-fraud-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearFraudBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            setTimeout(() => {
-                                clearFraudBtn.textContent = 'Clear Fraud Cache';
-                                clearFraudBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(() => {
-                            clearFraudBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearFraudBtn.textContent = 'Clear Fraud Cache';
-                                clearFraudBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
         });
 
         // --- On page load or tab switch, always fetch and render cached data for all tabs and all ranges ---
@@ -2192,7 +2307,7 @@
                             statsData[range] = data;
                         }
                         fetchedCount++;
-                        // Always render cached data for all ranges
+                        // --- NEW: Always render cached data for all ranges ---
                         if (data && data.apps) {
                             renderStatsAppsForRange(range, data.apps || []);
                         }
@@ -2206,19 +2321,16 @@
                         }
                     });
                 });
-                // --- NEW: After all ranges fetched, always render the active range ---
-                setTimeout(() => {
-                    const activeRange = getActiveStatsRange();
-                    if (statsData[activeRange]) {
-                        renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
-                    }
-                }, 500);
             }
             // Fraud: fetch and render for all ranges, then render the active one
+            // (REMOVED: Do not auto-fetch fraud data on page load)
+            // if (document.getElementById('fraud-tab')) {
+            //     ...
+            // }
+            // --- NEW: Always render cached fraud data for all ranges ---
             if (document.getElementById('fraud-tab')) {
                 const fraudRanges = ['10d','mtd','lastmonth','30d'];
                 const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
-                let fraudFetchedCount = 0;
                 fraudRanges.forEach(range => {
                     fetch('/get_fraud', {
                         method: 'POST',
@@ -2229,24 +2341,8 @@
                             fraudDataCache[range] = data;
                             renderFraudAll(data, range);
                         }
-                        fraudFetchedCount++;
-                        if (fraudFetchedCount === fraudRanges.length) {
-                            // After all ranges fetched, render the last selected or active one
-                            const activeRange = getActiveFraudRange();
-                            switchFraudRangeTab(activeRange);
-                            if (fraudDataCache[activeRange]) {
-                                renderFraudAll(fraudDataCache[activeRange], activeRange);
-                            }
-                        }
                     });
                 });
-                // --- NEW: After all ranges fetched, always render the active range ---
-                setTimeout(() => {
-                    const activeRange = getActiveFraudRange();
-                    if (fraudDataCache[activeRange]) {
-                        renderFraudAll(fraudDataCache[activeRange], activeRange);
-                    }
-                }, 500);
             }
             // Profile
             if (document.getElementById('profile-tab')) loadProfile();
@@ -2286,13 +2382,6 @@
                         }
                     });
                 });
-                // --- NEW: After all ranges fetched, always render the active range ---
-                setTimeout(() => {
-                    const activeRange = getActiveStatsRange();
-                    if (statsData[activeRange]) {
-                        renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
-                    }
-                }, 500);
             }
             if (tabName === 'fraud') {
                 // Instead, just render from cache if available
