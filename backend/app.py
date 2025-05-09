@@ -736,10 +736,8 @@ def get_stats():
         # Return the most recent stats if available
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        if range_key in ['last10', 'mtd']:
-            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
-        else:
-            c.execute('SELECT data, updated_at FROM stats_cache WHERE range = ?', (range_key,))
+        # Use LIKE query for all ranges to ensure consistent behavior
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
         row = c.fetchone()
         conn.close()
         if row:
@@ -830,7 +828,8 @@ def get_fraud():
         )''')
         conn.commit()
         if not force:
-            c.execute('SELECT data, updated_at FROM fraud_cache WHERE range = ?', (cache_key,))
+            # Use LIKE query for all ranges to ensure consistent behavior
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
             row = c.fetchone()
             if row:
                 data, updated_at = row
