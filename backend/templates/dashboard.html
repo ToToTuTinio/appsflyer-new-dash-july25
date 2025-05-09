@@ -2399,12 +2399,8 @@
 
         // Helper to get the currently active stats range
         function getActiveStatsRange() {
-            // Try localStorage first
-            const saved = localStorage.getItem('lastStatsRange');
-            if (saved && dateRanges.includes(saved)) return saved;
-            // Fallback to active button
-            const activeBtn = document.querySelector('.date-range-tab.border-green-600');
-            return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
+            // Always default to '10d' (Last 10 Days)
+            return '10d';
         }
         // Helper to get the currently active fraud range
         function getActiveFraudRange() {
