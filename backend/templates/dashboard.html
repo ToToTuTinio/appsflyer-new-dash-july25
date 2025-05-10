@@ -2541,6 +2541,7 @@
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
+                fetchAndUpdateApps();
             }
             // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
@@ -2555,6 +2556,7 @@
                     document.getElementById('stats-error').textContent = 'No stats data available. Please run a report.';
                     document.getElementById('stats-error').style.display = 'block';
                 }
+                fetchAndUpdateStats();
             }
             // Fraud: fetch and render for all ranges, then render the active one
             // ... existing code ...
@@ -2573,25 +2575,17 @@
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
+                fetchAndUpdateApps();
             }
             if (tabName === 'stats') {
                 const cachedData = loadStatsData();
-                if (cachedData && cachedData.apps) {
-                    renderStatsApps(cachedData.apps);
-                } else {
-                    // Optionally, hide the stats list if no data
-                    document.getElementById('stats-list').innerHTML = '';
-                    document.getElementById('stats-list').style.display = 'none';
-                    document.getElementById('stats-error').textContent = 'No stats data available. Please run a report.';
-                    document.getElementById('stats-error').style.display = 'block';
+                if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
+                    renderStatsAppsForRange('10d', cachedData['10d'].apps);
                 }
+                fetchAndUpdateStats();
             }
             if (tabName === 'fraud') {
-                // Instead, just render from cache if available
-                const activeRange = getActiveFraudRange();
-                if (fraudDataCache[activeRange]) {
-                    renderFraudAll(fraudDataCache[activeRange], activeRange);
-                }
+                fetchAndUpdateFraud();
             }
             if (tabName === 'profile') loadProfile();
         };
@@ -2789,13 +2783,66 @@
                     if (Array.isArray(window.fetchedApps) && window.fetchedApps.length > 0) {
                         renderAppsList(window.fetchedApps);
                         document.getElementById('app-count').textContent = window.fetchedApps.length;
-                        // Optionally, restore last updated time if you store it
-                        // document.getElementById('apps-last-updated').textContent = ...;
                         return true;
                     }
                 } catch (e) { window.fetchedApps = []; }
             }
             return false;
+        }
+
+        // Helper to fetch fresh apps from backend and update cache/UI
+        function fetchAndUpdateApps() {
+            setFetchButtonsDisabled(true);
+            const button = document.getElementById('get-apps-btn');
+            if (button) button.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
+            fetch('/get_apps')
+                .then(response => response.text())
+                .then(text => {
+                    let data;
+                    try { data = JSON.parse(text); } catch (e) { data = null; }
+                    setFetchButtonsDisabled(false);
+                    if (button) button.innerHTML = 'Get Apps';
+                    if (!data || data.error) return;
+                    window.fetchedApps = data.apps;
+                    localStorage.setItem('fetchedApps', JSON.stringify(window.fetchedApps));
+                    renderAppsList(window.fetchedApps);
+                    document.getElementById('app-count').textContent = data.count;
+                    document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                })
+                .catch(() => {
+                    setFetchButtonsDisabled(false);
+                    if (button) button.innerHTML = 'Get Apps';
+                });
+        }
+
+        // Helper to fetch fresh stats from backend and update cache/UI
+        function fetchAndUpdateStats() {
+            // For simplicity, just fetch for the default range (10d)
+            fetch('/get_stats?range=10d')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.apps) {
+                        localStorage.setItem('statsData', JSON.stringify({ '10d': data }));
+                        renderStatsAppsForRange('10d', data.apps);
+                    }
+                });
+        }
+
+        // Helper to fetch fresh fraud data from backend and update cache/UI
+        function fetchAndUpdateFraud() {
+            // For simplicity, just fetch for the default range (10d)
+            fetch('/get_fraud', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.apps) {
+                    // You may want to cache this in localStorage as well
+                    renderFraudAll(data, '10d');
+                }
+            });
         }
     </script>
 </body>
