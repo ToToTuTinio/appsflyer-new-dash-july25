@@ -336,9 +336,6 @@
                 <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
                     Error loading stats.
                 </div>
-                <div class="flex justify-center mt-8 mb-2">
-                    <button id="clear-stats-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Stats Cache</button>
-                </div>
             </div>
         </div>
 
@@ -2444,7 +2441,16 @@
             // Overview
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
-            // (Removed auto-fetch for apps on page load)
+            if (document.getElementById('apps-tab')) {
+                fetch('/get_apps').then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        window.fetchedApps = data.apps;
+                        renderAppsList(data.apps);
+                        document.getElementById('app-count').textContent = data.count;
+                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                    }
+                });
+            }
             // Stats: fetch and render for all ranges, then render the active one
             if (document.getElementById('stats-tab')) {
                 activateDefaultStatsTab();
@@ -2503,7 +2509,16 @@
         switchTab = function(tabName) {
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
-            // Apps: do not auto-fetch on tab switch
+            if (tabName === 'apps') {
+                fetch('/get_apps').then(r => r.json()).then(data => {
+                    if (data && data.apps) {
+                        window.fetchedApps = data.apps;
+                        renderAppsList(data.apps);
+                        document.getElementById('app-count').textContent = data.count;
+                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                    }
+                });
+            }
             if (tabName === 'stats') {
                 const statRanges = ['10d','mtd','lastmonth','30d'];
                 const statRangeMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
@@ -2612,125 +2627,6 @@
           const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
           return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
-
-        // Add error logging to clear cache buttons
-        function logClearCacheError(btnName, error) {
-            console.error(`[Clear Cache Button Error] ${btnName}:`, error);
-            alert(`Error clearing cache for ${btnName}: ${error}`);
-        }
-        // Patch clear cache button handlers to add error logging
-        document.addEventListener('DOMContentLoaded', function() {
-            // Backend
-            const clearBtn = document.getElementById('clear-backend-cache-btn');
-            if (clearBtn) {
-                clearBtn.onclick = function() {
-                    if (!confirm('Are you sure you want to clear all backend cached data? This action cannot be undone.')) {
-                        return;
-                    }
-                    clearBtn.disabled = true;
-                    clearBtn.textContent = 'Clearing...';
-                    fetch('/clear-backend-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            clearAppsUI();
-                            clearStatsUI();
-                            clearFraudUI();
-                            clearOverviewUI();
-                            setTimeout(() => {
-                                clearBtn.textContent = 'Clear Backend Data';
-                                clearBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(error => {
-                            logClearCacheError('Backend', error);
-                            clearBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearBtn.textContent = 'Clear Backend Data';
-                                clearBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
-            // Apps
-            const clearAppsBtn = document.getElementById('clear-apps-cache-btn');
-            if (clearAppsBtn) {
-                clearAppsBtn.onclick = function() {
-                    clearAppsBtn.disabled = true;
-                    clearAppsBtn.textContent = 'Clearing...';
-                    fetch('/clear-apps-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearAppsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            clearAppsUI();
-                            setTimeout(() => {
-                                clearAppsBtn.textContent = 'Clear Apps Cache';
-                                clearAppsBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(error => {
-                            logClearCacheError('Apps', error);
-                            clearAppsBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearAppsBtn.textContent = 'Clear Apps Cache';
-                                clearAppsBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
-            // Stats
-            const clearStatsBtn = document.getElementById('clear-stats-cache-btn');
-            if (clearStatsBtn) {
-                clearStatsBtn.onclick = function() {
-                    clearStatsBtn.disabled = true;
-                    clearStatsBtn.textContent = 'Clearing...';
-                    fetch('/clear-stats-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearStatsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            clearStatsUI();
-                            setTimeout(() => {
-                                clearStatsBtn.textContent = 'Clear Stats Cache';
-                                clearStatsBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(error => {
-                            logClearCacheError('Stats', error);
-                            clearStatsBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearStatsBtn.textContent = 'Clear Stats Cache';
-                                clearStatsBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
-            // Fraud
-            const clearFraudBtn = document.getElementById('clear-fraud-cache-btn');
-            if (clearFraudBtn) {
-                clearFraudBtn.onclick = function() {
-                    clearFraudBtn.disabled = true;
-                    clearFraudBtn.textContent = 'Clearing...';
-                    fetch('/clear-fraud-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearFraudBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            clearFraudUI();
-                            setTimeout(() => {
-                                clearFraudBtn.textContent = 'Clear Fraud Cache';
-                                clearFraudBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(error => {
-                            logClearCacheError('Fraud', error);
-                            clearFraudBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearFraudBtn.textContent = 'Clear Fraud Cache';
-                                clearFraudBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
-            }
-        });
     </script>
 </body>
 </html> 
