@@ -2611,9 +2611,14 @@
                     // Always show the default range (10d)
                     const range = '10d';
                     const statsList = document.getElementById('stats-data-10d');
+                    let apps = null;
                     if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
-                        // Force show cached data
-                        renderStatsAppsForRange(range, stats[range].apps);
+                        apps = stats[range].apps;
+                    } else if (stats && stats.apps && stats.apps.length > 0) {
+                        apps = stats.apps;
+                    }
+                    if (apps) {
+                        renderStatsAppsForRange(range, apps);
                         document.getElementById('stats-error').style.display = 'none';
                     } else {
                         statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
