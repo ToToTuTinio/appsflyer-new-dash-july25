@@ -2284,34 +2284,104 @@
         }
 
         // Clear Backend Data button logic
-        document.addEventListener('DOMContentLoaded', function() {
-            const clearBtn = document.getElementById('clear-backend-cache-btn');
-            if (clearBtn) {
-                clearBtn.onclick = function() {
-                    if (!confirm('Are you sure you want to clear all backend cached data? This action cannot be undone.')) {
-                        return;
-                    }
-                    clearBtn.disabled = true;
-                    clearBtn.textContent = 'Clearing...';
-                    fetch('/clear-backend-cache', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            clearBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                            setTimeout(() => {
-                                clearBtn.textContent = 'Clear Backend Data';
-                                clearBtn.disabled = false;
-                            }, 1500);
-                        })
-                        .catch(() => {
-                            clearBtn.textContent = 'Error';
-                            setTimeout(() => {
-                                clearBtn.textContent = 'Clear Backend Data';
-                                clearBtn.disabled = false;
-                            }, 1500);
-                        });
-                };
+        document.getElementById('clear-backend-cache-btn').onclick = function() {
+            if (!confirm('Are you sure you want to clear all backend cached data? This action cannot be undone.')) {
+                return;
             }
-        });
+            this.disabled = true;
+            this.textContent = 'Clearing...';
+            fetch('/clear-backend-cache', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Backend Data';
+                        this.disabled = false;
+                    }, 1500);
+                })
+                .catch(() => {
+                    this.textContent = 'Error';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Backend Data';
+                        this.disabled = false;
+                    }, 1500);
+                });
+        };
+
+        // Apps Tab Cache Clear
+        document.getElementById('clear-apps-cache-btn').onclick = function() {
+            if (!confirm('Are you sure you want to clear the Apps cache? This action cannot be undone.')) {
+                return;
+            }
+            this.disabled = true;
+            this.textContent = 'Clearing...';
+            fetch('/clear-apps-cache', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Apps Cache';
+                        this.disabled = false;
+                    }, 1500);
+                })
+                .catch(() => {
+                    this.textContent = 'Error';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Apps Cache';
+                        this.disabled = false;
+                    }, 1500);
+                });
+        };
+
+        // Stats Tab Cache Clear
+        document.getElementById('clear-stats-cache-btn').onclick = function() {
+            if (!confirm('Are you sure you want to clear the Stats cache? This action cannot be undone.')) {
+                return;
+            }
+            this.disabled = true;
+            this.textContent = 'Clearing...';
+            fetch('/clear-stats-cache', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Stats Cache';
+                        this.disabled = false;
+                    }, 1500);
+                })
+                .catch(() => {
+                    this.textContent = 'Error';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Stats Cache';
+                        this.disabled = false;
+                    }, 1500);
+                });
+        };
+
+        // Fraud Tab Cache Clear
+        document.getElementById('clear-fraud-cache-btn').onclick = function() {
+            if (!confirm('Are you sure you want to clear the Fraud cache? This action cannot be undone.')) {
+                return;
+            }
+            this.disabled = true;
+            this.textContent = 'Clearing...';
+            fetch('/clear-fraud-cache', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Fraud Cache';
+                        this.disabled = false;
+                    }, 1500);
+                })
+                .catch(() => {
+                    this.textContent = 'Error';
+                    setTimeout(() => {
+                        this.textContent = 'Clear Fraud Cache';
+                        this.disabled = false;
+                    }, 1500);
+                });
+        };
 
         // --- On page load or tab switch, always fetch and render cached data for all tabs and all ranges ---
         document.addEventListener('DOMContentLoaded', function() {
