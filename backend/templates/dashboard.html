@@ -2567,6 +2567,57 @@
                 this.textContent = 'Failed to Clear';
             }
         });
+
+        function clearBackendCache() {
+            if (confirm('Are you sure you want to clear all backend data? This will force a fresh data fetch.')) {
+                fetch('/clear-backend-cache', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Backend data cleared successfully!');
+                        location.reload();
+                    } else {
+                        alert('Failed to clear backend data.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while clearing backend data.');
+                });
+            }
+        }
+
+        function clearAppsCache() {
+            if (confirm('Are you sure you want to clear the apps cache? This will force a fresh apps data fetch.')) {
+                fetch('/clear-apps-cache', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Apps cache cleared successfully!');
+                        location.reload();
+                    } else {
+                        alert('Failed to clear apps cache.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while clearing apps cache.');
+                });
+            }
+        }
+
+        document.getElementById('clear-backend-cache-btn').addEventListener('click', clearBackendCache);
+        document.getElementById('clear-apps-cache-btn').addEventListener('click', clearAppsCache);
     </script>
 </body>
 </html> 
