@@ -2297,6 +2297,11 @@
                         .then(r => r.json())
                         .then(data => {
                             clearBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            // Clear all UI and JS variables/localStorage
+                            clearAppsUI();
+                            clearStatsUI();
+                            clearFraudUI();
+                            clearOverviewUI();
                             setTimeout(() => {
                                 clearBtn.textContent = 'Clear Backend Data';
                                 clearBtn.disabled = false;
@@ -2311,7 +2316,128 @@
                         });
                 };
             }
+            // Apps Cache
+            const clearAppsBtn = document.getElementById('clear-apps-cache-btn');
+            if (clearAppsBtn) {
+                clearAppsBtn.onclick = function() {
+                    clearAppsBtn.disabled = true;
+                    clearAppsBtn.textContent = 'Clearing...';
+                    fetch('/clear-apps-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearAppsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            clearAppsUI();
+                            setTimeout(() => {
+                                clearAppsBtn.textContent = 'Clear Apps Cache';
+                                clearAppsBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearAppsBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearAppsBtn.textContent = 'Clear Apps Cache';
+                                clearAppsBtn.disabled = false;
+                            }, 1500);
+                        });
+                };
+            }
+            // Stats Cache
+            const clearStatsBtn = document.getElementById('clear-stats-cache-btn');
+            if (clearStatsBtn) {
+                clearStatsBtn.onclick = function() {
+                    clearStatsBtn.disabled = true;
+                    clearStatsBtn.textContent = 'Clearing...';
+                    fetch('/clear-stats-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearStatsBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            clearStatsUI();
+                            setTimeout(() => {
+                                clearStatsBtn.textContent = 'Clear Stats Cache';
+                                clearStatsBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearStatsBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearStatsBtn.textContent = 'Clear Stats Cache';
+                                clearStatsBtn.disabled = false;
+                            }, 1500);
+                        });
+                };
+            }
+            // Fraud Cache
+            const clearFraudBtn = document.getElementById('clear-fraud-cache-btn');
+            if (clearFraudBtn) {
+                clearFraudBtn.onclick = function() {
+                    clearFraudBtn.disabled = true;
+                    clearFraudBtn.textContent = 'Clearing...';
+                    fetch('/clear-fraud-cache', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            clearFraudBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            clearFraudUI();
+                            setTimeout(() => {
+                                clearFraudBtn.textContent = 'Clear Fraud Cache';
+                                clearFraudBtn.disabled = false;
+                            }, 1500);
+                        })
+                        .catch(() => {
+                            clearFraudBtn.textContent = 'Error';
+                            setTimeout(() => {
+                                clearFraudBtn.textContent = 'Clear Fraud Cache';
+                                clearFraudBtn.disabled = false;
+                            }, 1500);
+                        });
+                };
+            }
         });
+
+        // Helper functions to clear UI and JS/localStorage
+        function clearAppsUI() {
+            window.fetchedApps = [];
+            localStorage.removeItem('fetchedApps');
+            const appsList = document.getElementById('apps-list');
+            if (appsList) appsList.innerHTML = '';
+            const appCount = document.getElementById('app-count');
+            if (appCount) appCount.textContent = '0';
+            const lastUpdated = document.getElementById('apps-last-updated');
+            if (lastUpdated) lastUpdated.textContent = '';
+        }
+        function clearStatsUI() {
+            window.statsData = {};
+            localStorage.removeItem('statsData');
+            ['10d','mtd','lastmonth','30d'].forEach(range => {
+                const statsDiv = document.getElementById(`stats-data-${range}`);
+                if (statsDiv) statsDiv.innerHTML = '';
+            });
+        }
+        function clearFraudUI() {
+            window.fraudDataCache = {};
+            localStorage.removeItem('fraudDataCache');
+            ['10d','mtd','lastmonth','30d'].forEach(range => {
+                const fraudDiv = document.getElementById(`fraud-data-${range}`);
+                if (fraudDiv) fraudDiv.innerHTML = '';
+                const fraudSourceDiv = document.getElementById(`fraud-source-data-${range}`);
+                if (fraudSourceDiv) fraudSourceDiv.innerHTML = '';
+            });
+        }
+        function clearOverviewUI() {
+            // Clear charts if they exist
+            if (window.impressionsChart) { window.impressionsChart.data.labels = []; window.impressionsChart.data.datasets[0].data = []; window.impressionsChart.update(); }
+            if (window.clicksChart) { window.clicksChart.data.labels = []; window.clicksChart.data.datasets[0].data = []; window.clicksChart.update(); }
+            if (window.installsChart) { window.installsChart.data.labels = []; window.installsChart.data.datasets[0].data = []; window.installsChart.update(); }
+            // Clear top apps and fraud sources
+            const topAppsList = document.getElementById('top-apps-list');
+            if (topAppsList) topAppsList.innerHTML = '';
+            const badSourcesList = document.getElementById('bad-sources-list');
+            if (badSourcesList) badSourcesList.innerHTML = '';
+            const badSourcesEmpty = document.getElementById('bad-sources-empty');
+            if (badSourcesEmpty) badSourcesEmpty.style.display = '';
+            document.getElementById('overview-last-updated').textContent = '';
+            document.getElementById('fraud-last-updated').textContent = '';
+            document.getElementById('top-apps-last-updated').textContent = '';
+        }
 
         // --- On page load or tab switch, always fetch and render cached data for all tabs and all ranges ---
         document.addEventListener('DOMContentLoaded', function() {
