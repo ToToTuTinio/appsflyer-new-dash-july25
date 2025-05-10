@@ -2534,21 +2534,26 @@
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
             if (document.getElementById('apps-tab')) {
-                loadAndRenderCachedApps();
+                pingTab('apps');
+                if (!loadCachedApps()) {
+                    window.fetchedApps = [];
+                    document.getElementById('app-count').textContent = '0';
+                    document.getElementById('apps-last-updated').textContent = '';
+                    document.getElementById('apps-list').innerHTML = '';
+                    fetchAndUpdateApps();
+                }
             }
-            // Stats
+            // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
+                pingTab('stats');
                 const cachedData = loadStatsData();
                 if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
                     renderStatsAppsForRange('10d', cachedData['10d'].apps);
+                } else {
+                    fetchAndUpdateStats();
                 }
-                // fetchAndUpdateStats(); // REMOVE automatic fetch
             }
-            // Fraud
-            if (document.getElementById('fraud-tab')) {
-                // You may want to load cached fraud data if you implement caching
-                // fetchAndUpdateFraud(); // REMOVE automatic fetch
-            }
+            // Fraud: fetch and render for all ranges, then render the active one
             // ... existing code ...
         });
 
@@ -2558,17 +2563,29 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                loadAndRenderCachedApps();
+                pingTab('apps');
+                if (!loadCachedApps()) {
+                    window.fetchedApps = [];
+                    document.getElementById('app-count').textContent = '0';
+                    document.getElementById('apps-last-updated').textContent = '';
+                    document.getElementById('apps-list').innerHTML = '';
+                    fetchAndUpdateApps();
+                }
             }
             if (tabName === 'stats') {
+                pingTab('stats');
                 const cachedData = loadStatsData();
                 if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
                     renderStatsAppsForRange('10d', cachedData['10d'].apps);
+                } else {
+                    fetchAndUpdateStats();
                 }
-                // fetchAndUpdateStats(); // REMOVE automatic fetch
             }
             if (tabName === 'fraud') {
-                // fetchAndUpdateFraud(); // REMOVE automatic fetch
+                pingTab('fraud');
+                // You may want to load cached fraud data if you implement caching
+                // For now, just fetch if no cache (not implemented)
+                fetchAndUpdateFraud();
             }
             if (tabName === 'profile') loadProfile();
         };
@@ -2828,25 +2845,9 @@
             });
         }
 
-        // Helper to load and render cached apps from localStorage
-        function loadAndRenderCachedApps() {
-            const cached = localStorage.getItem('fetchedApps');
-            if (cached) {
-                try {
-                    window.fetchedApps = JSON.parse(cached);
-                    if (Array.isArray(window.fetchedApps) && window.fetchedApps.length > 0) {
-                        renderAppsList(window.fetchedApps);
-                        document.getElementById('app-count').textContent = window.fetchedApps.length;
-                        return true;
-                    }
-                } catch (e) { window.fetchedApps = []; }
-            }
-            // Show empty state if no cache
-            window.fetchedApps = [];
-            document.getElementById('app-count').textContent = '0';
-            document.getElementById('apps-last-updated').textContent = '';
-            document.getElementById('apps-list').innerHTML = '';
-            return false;
+        // Helper to ping backend for tab switch logging/refresh
+        function pingTab(tabName) {
+            fetch(`/tab-refresh?tab=${tabName}`);
         }
     </script>
 </body>
