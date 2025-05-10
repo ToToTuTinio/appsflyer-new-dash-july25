@@ -2586,29 +2586,57 @@
                                 renderAppsList(apps);
                                 document.getElementById('app-count').textContent = apps.length;
                             } else {
-                                document.getElementById('apps-list').innerHTML = '';
+                                document.getElementById('apps-list').innerHTML = '<tr><td colspan="5" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
                                 document.getElementById('app-count').textContent = '0';
                             }
                         } catch (e) {
                             console.error('Error parsing cached apps:', e);
-                            document.getElementById('apps-list').innerHTML = '';
+                            document.getElementById('apps-list').innerHTML = '<tr><td colspan="5" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
                             document.getElementById('app-count').textContent = '0';
                         }
                     } else {
-                        document.getElementById('apps-list').innerHTML = '';
+                        document.getElementById('apps-list').innerHTML = '<tr><td colspan="5" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
                         document.getElementById('app-count').textContent = '0';
                     }
                 });
             }
             if (tabName === 'stats') {
-                const cachedData = loadStatsData();
-                if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
-                    renderStatsAppsForRange('10d', cachedData['10d'].apps);
-                }
-                fetchAndUpdateStats();
+                fetch('/api/stats-page').then(() => {
+                    const cached = localStorage.getItem('statsData');
+                    console.log('Cached statsData:', cached);
+                    let stats = null;
+                    if (cached) {
+                        try {
+                            stats = JSON.parse(cached);
+                        } catch (e) {
+                            console.error('Error parsing cached statsData:', e);
+                        }
+                    }
+                    // Always show the default range (10d)
+                    const range = '10d';
+                    const statsList = document.getElementById('stats-data-10d');
+                    if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
+                        renderStatsAppsForRange(range, stats[range].apps);
+                    } else {
+                        statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                    }
+                });
             }
             if (tabName === 'fraud') {
-                fetchAndUpdateFraud();
+                fetch('/api/fraud-page').then(() => {
+                    const range = '10d';
+                    // For simplicity, just check if fraudDataCache exists and has data
+                    let fraudData = null;
+                    try {
+                        fraudData = window.fraudDataCache && window.fraudDataCache[range];
+                    } catch (e) { fraudData = null; }
+                    const fraudList = document.getElementById('fraud-data-10d');
+                    if (fraudData && fraudData.apps && fraudData.apps.length > 0) {
+                        renderFraudAll(fraudData, range);
+                    } else {
+                        fraudList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached fraud data available. Please run a report to load data.</div>';
+                    }
+                });
             }
             if (tabName === 'profile') loadProfile();
         };

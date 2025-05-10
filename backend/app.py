@@ -1192,5 +1192,13 @@ def clear_fraud_cache():
 def apps_page():
     return {'status': 'ok'}
 
+@app.route('/api/stats-page')
+def stats_page():
+    return {'status': 'ok'}
+
+@app.route('/api/fraud-page')
+def fraud_page():
+    return {'status': 'ok'}
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
