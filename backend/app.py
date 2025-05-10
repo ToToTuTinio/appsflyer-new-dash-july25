@@ -1156,9 +1156,11 @@ def clear_apps_cache():
 @app.route('/clear-stats-cache', methods=['POST'])
 def clear_stats_cache():
     try:
+        period = request.json.get('period', 'last10')  # Default to last10 if not specified
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute('DELETE FROM stats_cache')
+        # Only delete cache entries matching the specified period
+        c.execute('DELETE FROM stats_cache WHERE range LIKE ?', (f'{period}%',))
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -1168,9 +1170,11 @@ def clear_stats_cache():
 @app.route('/clear-fraud-cache', methods=['POST'])
 def clear_fraud_cache():
     try:
+        period = request.json.get('period', 'last10')  # Default to last10 if not specified
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute('DELETE FROM fraud_cache')
+        # Only delete cache entries matching the specified period
+        c.execute('DELETE FROM fraud_cache WHERE range LIKE ?', (f'{period}%',))
         conn.commit()
         conn.close()
         return jsonify({'success': True})

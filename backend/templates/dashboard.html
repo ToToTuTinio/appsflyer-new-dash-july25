@@ -2504,6 +2504,69 @@
           const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
           return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
+
+        // Add this function to get the current period
+        function getCurrentPeriod() {
+            const periodSelect = document.querySelector('select[name="period"]');
+            return periodSelect ? periodSelect.value : 'last10';
+        }
+
+        // Update the clear cache button handlers
+        document.getElementById('clear-stats-cache-btn')?.addEventListener('click', async function() {
+            if (!confirm('Are you sure you want to clear the stats cache for the current time period? This action cannot be undone.')) {
+                return;
+            }
+            const period = getCurrentPeriod();
+            try {
+                const response = await fetch('/clear-stats-cache', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ period })
+                });
+                const data = await response.json();
+                this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                setTimeout(() => {
+                    this.textContent = 'Clear Stats Cache';
+                }, 2000);
+                if (data.success) {
+                    // Refresh the current view
+                    loadStats();
+                }
+            } catch (error) {
+                console.error('Error clearing stats cache:', error);
+                this.textContent = 'Failed to Clear';
+            }
+        });
+
+        document.getElementById('clear-fraud-cache-btn')?.addEventListener('click', async function() {
+            if (!confirm('Are you sure you want to clear the fraud cache for the current time period? This action cannot be undone.')) {
+                return;
+            }
+            const period = getCurrentPeriod();
+            try {
+                const response = await fetch('/clear-fraud-cache', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ period })
+                });
+                const data = await response.json();
+                this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                setTimeout(() => {
+                    this.textContent = 'Clear Fraud Cache';
+                }, 2000);
+                if (data.success) {
+                    // Refresh the current view
+                    loadFraud();
+                }
+            } catch (error) {
+                console.error('Error clearing fraud cache:', error);
+                this.textContent = 'Failed to Clear';
+            }
+        });
     </script>
 </body>
 </html> 
