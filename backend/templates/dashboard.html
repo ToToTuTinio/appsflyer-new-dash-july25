@@ -2504,29 +2504,6 @@
           const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
           return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
-
-        // Add event listener for clear apps cache button
-        document.getElementById('clear-apps-cache-btn').addEventListener('click', async function() {
-            try {
-                const response = await fetch('/clear-apps-cache', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    alert('Apps cache cleared successfully');
-                    // Optionally refresh the page or update the UI
-                    location.reload();
-                } else {
-                    alert('Failed to clear apps cache: ' + (data.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error clearing apps cache:', error);
-                alert('Error clearing apps cache: ' + error.message);
-            }
-        });
     </script>
 </body>
 </html> 
