@@ -1146,11 +1146,7 @@ def clear_apps_cache():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        # Instead of deleting, we'll set a very old timestamp to force refetch
-        old_timestamp = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
-        c.execute('UPDATE apps_cache SET updated_at = ?', (old_timestamp,))
-        if c.rowcount == 0:  # If no rows were updated, insert a dummy row
-            c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', ('{}', old_timestamp))
+        c.execute('DELETE FROM apps_cache')
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -1160,11 +1156,9 @@ def clear_apps_cache():
 @app.route('/clear-stats-cache', methods=['POST'])
 def clear_stats_cache():
     try:
-        period = request.json.get('period', 'last10')  # Default to last10 if not specified
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        # Only delete cache entries matching the specified period
-        c.execute('DELETE FROM stats_cache WHERE range LIKE ?', (f'{period}%',))
+        c.execute('DELETE FROM stats_cache')
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -1174,11 +1168,9 @@ def clear_stats_cache():
 @app.route('/clear-fraud-cache', methods=['POST'])
 def clear_fraud_cache():
     try:
-        period = request.json.get('period', 'last10')  # Default to last10 if not specified
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        # Only delete cache entries matching the specified period
-        c.execute('DELETE FROM fraud_cache WHERE range LIKE ?', (f'{period}%',))
+        c.execute('DELETE FROM fraud_cache')
         conn.commit()
         conn.close()
         return jsonify({'success': True})

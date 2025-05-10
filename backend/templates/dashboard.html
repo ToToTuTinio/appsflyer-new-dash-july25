@@ -2505,147 +2505,28 @@
           return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
 
-        // Add this function to get the current period
-        function getCurrentPeriod() {
-            const periodSelect = document.querySelector('select[name="period"]');
-            return periodSelect ? periodSelect.value : 'last10';
-        }
-
-        // Add loadStats function
-        function loadStats() {
-            const period = getCurrentPeriod();
-            fetch('/get_stats', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ period })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error('Error loading stats:', data.error);
-                    return;
-                }
-                // Refresh the current view
-                if (window.renderStats) {
-                    window.renderStats(data);
-                } else {
+        // Add event listener for clear apps cache button
+        document.getElementById('clear-apps-cache-btn').addEventListener('click', async function() {
+            try {
+                const response = await fetch('/clear-apps-cache', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('Apps cache cleared successfully');
+                    // Optionally refresh the page or update the UI
                     location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error loading stats:', error);
-            });
-        }
-
-        // Update the clear cache button handlers
-        document.getElementById('clear-stats-cache-btn')?.addEventListener('click', async function() {
-            if (!confirm('Are you sure you want to clear the stats cache for the current time period? This action cannot be undone.')) {
-                return;
-            }
-            const period = getCurrentPeriod();
-            try {
-                const response = await fetch('/clear-stats-cache', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ period })
-                });
-                const data = await response.json();
-                this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                setTimeout(() => {
-                    this.textContent = 'Clear Stats Cache';
-                }, 2000);
-                if (data.success) {
-                    // Refresh the current view
-                    loadStats();
+                } else {
+                    alert('Failed to clear apps cache: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Error clearing stats cache:', error);
-                this.textContent = 'Failed to Clear';
+                console.error('Error clearing apps cache:', error);
+                alert('Error clearing apps cache: ' + error.message);
             }
         });
-
-        document.getElementById('clear-fraud-cache-btn')?.addEventListener('click', async function() {
-            if (!confirm('Are you sure you want to clear the fraud cache for the current time period? This action cannot be undone.')) {
-                return;
-            }
-            const period = getCurrentPeriod();
-            try {
-                const response = await fetch('/clear-fraud-cache', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ period })
-                });
-                const data = await response.json();
-                this.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
-                setTimeout(() => {
-                    this.textContent = 'Clear Fraud Cache';
-                }, 2000);
-                if (data.success) {
-                    // Refresh the current view
-                    loadFraud();
-                }
-            } catch (error) {
-                console.error('Error clearing fraud cache:', error);
-                this.textContent = 'Failed to Clear';
-            }
-        });
-
-        function clearBackendCache() {
-            if (confirm('Are you sure you want to clear all backend data? This will force a fresh data fetch.')) {
-                fetch('/clear-backend-cache', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Backend data cleared successfully!');
-                        location.reload();
-                    } else {
-                        alert('Failed to clear backend data.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while clearing backend data.');
-                });
-            }
-        }
-
-        function clearAppsCache() {
-            if (confirm('Are you sure you want to clear the apps cache? This will force a fresh apps data fetch.')) {
-                fetch('/clear-apps-cache', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Apps cache cleared successfully!');
-                        location.reload();
-                    } else {
-                        alert('Failed to clear apps cache.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while clearing apps cache.');
-                });
-            }
-        }
-
-        document.getElementById('clear-backend-cache-btn').addEventListener('click', clearBackendCache);
-        document.getElementById('clear-apps-cache-btn').addEventListener('click', clearAppsCache);
     </script>
 </body>
 </html> 
