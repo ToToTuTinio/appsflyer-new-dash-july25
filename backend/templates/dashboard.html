@@ -2540,6 +2540,7 @@
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
+                // fetchAndUpdateApps(); // REMOVE THIS LINE
             }
             // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
@@ -2566,6 +2567,8 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
+                // Fire a GET to /api/apps-page for logging/monitoring
+                fetch('/api/apps-page');
                 if (!loadCachedApps()) {
                     window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
