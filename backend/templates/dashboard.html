@@ -2535,13 +2535,12 @@
             // Apps
             if (document.getElementById('apps-tab')) {
                 if (!loadCachedApps()) {
-                    // If no cache, show empty state
                     window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
-                fetchAndUpdateApps();
+                // fetchAndUpdateApps(); // REMOVE THIS LINE
             }
             // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
@@ -2569,13 +2568,12 @@
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
                 if (!loadCachedApps()) {
-                    // If no cache, show empty state
                     window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
-                fetchAndUpdateApps();
+                // fetchAndUpdateApps(); // REMOVE THIS LINE
             }
             if (tabName === 'stats') {
                 const cachedData = loadStatsData();
