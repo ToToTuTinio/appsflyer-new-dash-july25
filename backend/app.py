@@ -1188,5 +1188,23 @@ def clear_fraud_cache():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/refresh_apps')
+@login_required
+def refresh_apps():
+    print('[REFRESH] /refresh_apps called')
+    return jsonify({'status': 'ok'})
+
+@app.route('/refresh_stats')
+@login_required
+def refresh_stats():
+    print('[REFRESH] /refresh_stats called')
+    return jsonify({'status': 'ok'})
+
+@app.route('/refresh_fraud')
+@login_required
+def refresh_fraud():
+    print('[REFRESH] /refresh_fraud called')
+    return jsonify({'status': 'ok'})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
