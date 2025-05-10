@@ -2403,6 +2403,8 @@
             if (appCount) appCount.textContent = '0';
             const lastUpdated = document.getElementById('apps-last-updated');
             if (lastUpdated) lastUpdated.textContent = '';
+            // Set a flag to prevent automatic refetching
+            window.appsCacheCleared = true;
         }
         function clearStatsUI() {
             window.statsData = {};
@@ -2445,14 +2447,20 @@
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
             if (document.getElementById('apps-tab')) {
-                fetch('/get_apps').then(r => r.json()).then(data => {
-                    if (data && data.apps) {
-                        window.fetchedApps = data.apps;
-                        renderAppsList(data.apps);
-                        document.getElementById('app-count').textContent = data.count;
-                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                    }
-                });
+                // Only fetch if cache wasn't just cleared
+                if (!window.appsCacheCleared) {
+                    fetch('/get_apps').then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            window.fetchedApps = data.apps;
+                            renderAppsList(data.apps);
+                            document.getElementById('app-count').textContent = data.count;
+                            document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                        }
+                    });
+                } else {
+                    // Reset the flag
+                    window.appsCacheCleared = false;
+                }
             }
             // Stats: fetch and render for all ranges, then render the active one
             if (document.getElementById('stats-tab')) {
@@ -2513,14 +2521,20 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                fetch('/get_apps').then(r => r.json()).then(data => {
-                    if (data && data.apps) {
-                        window.fetchedApps = data.apps;
-                        renderAppsList(data.apps);
-                        document.getElementById('app-count').textContent = data.count;
-                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                    }
-                });
+                // Only fetch if cache wasn't just cleared
+                if (!window.appsCacheCleared) {
+                    fetch('/get_apps').then(r => r.json()).then(data => {
+                        if (data && data.apps) {
+                            window.fetchedApps = data.apps;
+                            renderAppsList(data.apps);
+                            document.getElementById('app-count').textContent = data.count;
+                            document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                        }
+                    });
+                } else {
+                    // Reset the flag
+                    window.appsCacheCleared = false;
+                }
             }
             if (tabName === 'stats') {
                 const statRanges = ['10d','mtd','lastmonth','30d'];
