@@ -1146,7 +1146,11 @@ def clear_apps_cache():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute('DELETE FROM apps_cache')
+        # Instead of deleting, we'll set a very old timestamp to force refetch
+        old_timestamp = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
+        c.execute('UPDATE apps_cache SET updated_at = ?', (old_timestamp,))
+        if c.rowcount == 0:  # If no rows were updated, insert a dummy row
+            c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', ('{}', old_timestamp))
         conn.commit()
         conn.close()
         return jsonify({'success': True})

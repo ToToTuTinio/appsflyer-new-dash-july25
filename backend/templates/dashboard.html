@@ -2511,6 +2511,34 @@
             return periodSelect ? periodSelect.value : 'last10';
         }
 
+        // Add loadStats function
+        function loadStats() {
+            const period = getCurrentPeriod();
+            fetch('/get_stats', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ period })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error loading stats:', data.error);
+                    return;
+                }
+                // Refresh the current view
+                if (window.renderStats) {
+                    window.renderStats(data);
+                } else {
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error loading stats:', error);
+            });
+        }
+
         // Update the clear cache button handlers
         document.getElementById('clear-stats-cache-btn')?.addEventListener('click', async function() {
             if (!confirm('Are you sure you want to clear the stats cache for the current time period? This action cannot be undone.')) {
