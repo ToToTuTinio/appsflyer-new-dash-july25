@@ -2688,6 +2688,120 @@
           const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
           return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
+
+        // Add stats data persistence functions
+        function saveStatsData(data) {
+            if (data && data.apps && data.apps.length > 0) {
+                localStorage.setItem('statsData', JSON.stringify(data));
+            }
+        }
+
+        function loadStatsData() {
+            const cachedData = localStorage.getItem('statsData');
+            if (cachedData) {
+                try {
+                    return JSON.parse(cachedData);
+                } catch (e) {
+                    console.error('Error parsing cached stats data:', e);
+                }
+            }
+            return null;
+        }
+
+        function clearStatsData() {
+            localStorage.removeItem('statsData');
+            const statsList = document.getElementById('stats-list');
+            const error = document.getElementById('stats-error');
+            statsList.style.display = 'none';
+            error.textContent = 'No stats data available. Please run a report.';
+            error.style.display = 'block';
+        }
+
+        // Modify the stats rendering to use cached data
+        function renderStatsApps(apps) {
+            const statsList = document.getElementById('stats-list');
+            statsList.innerHTML = '';
+            apps.forEach(app => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-gray-800">${app.app_id}</td>
+                    <td class="py-3 px-4 text-gray-800">${app.app_name}</td>
+                    <td class="py-3 px-4 text-gray-800">${app.event1 || 'N/A'}</td>
+                    <td class="py-3 px-4 text-gray-800">${app.event2 || 'N/A'}</td>
+                    <td class="py-3 px-4 text-gray-800">${app.total_events || '0'}</td>
+                `;
+                statsList.appendChild(tr);
+            });
+            statsList.style.display = 'block';
+            document.getElementById('stats-error').style.display = 'none';
+        }
+
+        // Modify the fetchStats function to use cached data
+        function fetchStats() {
+            const loading = document.getElementById('stats-loading');
+            const error = document.getElementById('stats-error');
+            const statsList = document.getElementById('stats-list');
+            
+            // Check for cached data first
+            const cachedData = loadStatsData();
+            if (cachedData) {
+                renderStatsApps(cachedData.apps);
+                return;
+            }
+
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            statsList.style.display = 'none';
+
+            const eventSelections = {};
+            document.querySelectorAll('.event-save-btn').forEach(btn => {
+                const appId = btn.getAttribute('data-app-id');
+                const tr = btn.closest('tr');
+                const event1 = tr.querySelector('.event1-dropdown').value;
+                const event2 = tr.querySelector('.event2-dropdown').value;
+                eventSelections[appId] = [event1, event2];
+            });
+
+            fetch('/get_stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    selected_events: eventSelections
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                loading.style.display = 'none';
+                if (data && data.apps && data.apps.length > 0) {
+                    saveStatsData(data);
+                    renderStatsApps(data.apps);
+                } else {
+                    error.textContent = 'No stats found.';
+                    error.style.display = 'block';
+                }
+            })
+            .catch(e => {
+                loading.style.display = 'none';
+                error.textContent = 'Error loading stats.';
+                error.style.display = 'block';
+            });
+        }
+
+        // Modify the clear cache button to also clear stats data
+        document.getElementById('clear-backend-cache-btn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear all cached data? This will remove all stored data from the UI.')) {
+                clearStatsData();
+                // ... existing clear cache code ...
+            }
+        });
+
+        // Add initialization code to load cached stats data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const cachedData = loadStatsData();
+            if (cachedData) {
+                renderStatsApps(cachedData.apps);
+            }
+        });
     </script>
 </body>
 </html> 
