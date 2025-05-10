@@ -1154,6 +1154,18 @@ def clear_apps_cache():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/clear-stats-cache', methods=['POST'])
+def clear_stats_cache():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('DELETE FROM stats_cache')
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/clear-fraud-cache', methods=['POST'])
 def clear_fraud_cache():
     try:
