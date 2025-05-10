@@ -2569,9 +2569,19 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                // Fire a GET to /api/apps-page for logging/monitoring, then force show cached data
                 fetch('/api/apps-page').then(() => {
-                    loadCachedApps();
+                    // Always force UI to show cached data
+                    const cached = localStorage.getItem('fetchedApps');
+                    if (cached) {
+                        try {
+                            const apps = JSON.parse(cached);
+                            if (Array.isArray(apps) && apps.length > 0) {
+                                window.fetchedApps = apps;
+                                renderAppsList(apps);
+                                document.getElementById('app-count').textContent = apps.length;
+                            }
+                        } catch (e) {}
+                    }
                 });
             }
             if (tabName === 'stats') {
