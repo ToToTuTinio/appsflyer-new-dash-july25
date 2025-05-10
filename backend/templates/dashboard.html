@@ -2534,13 +2534,15 @@
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
             if (document.getElementById('apps-tab')) {
-                if (!loadCachedApps()) {
+                // If the Apps tab is active (visible), force show cached data
+                if (document.getElementById('apps-tab').classList.contains('active')) {
+                    loadCachedApps();
+                } else if (!loadCachedApps()) {
                     window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
-                // fetchAndUpdateApps(); // REMOVE THIS LINE
             }
             // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
