@@ -615,6 +615,25 @@
             '30d': null
         };
 
+        // Load stats data from localStorage
+        function loadStatsData() {
+            const savedData = localStorage.getItem('statsData');
+            if (savedData) {
+                const parsedData = JSON.parse(savedData);
+                Object.keys(parsedData).forEach(range => {
+                    statsData[range] = parsedData[range];
+                });
+                return statsData;
+            }
+            return null;
+        }
+
+        // Save stats data to localStorage
+        function saveStatsData(data, range) {
+            statsData[range] = data;
+            localStorage.setItem('statsData', JSON.stringify(statsData));
+        }
+
         // Date range tab logic
         const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
@@ -626,6 +645,11 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
+
+            // Load and render cached data for this range if available
+            if (statsData[range]) {
+                renderStatsAppsForRange(range, statsData[range].apps || []);
+            }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
             btn.onclick = function() {
@@ -706,7 +730,7 @@
                 }
                 // --- DATA IS READY: AUTO-RENDER ---
                 setFetchButtonsDisabled(false);
-                statsData[range] = data;
+                saveStatsData(data, range); // Save to localStorage
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
                 // Refresh overview and top apps after RUN completes
@@ -2414,17 +2438,19 @@
             window.appsCacheCleared = true;
         }
 
+        // Modify the clearStatsUI function to properly clear stats data
         function clearStatsUI() {
             // Clear JS variables
-            window.statsData = {};
+            Object.keys(statsData).forEach(range => {
+                statsData[range] = null;
+            });
             
             // Clear localStorage
             localStorage.removeItem('statsData');
-            localStorage.removeItem('statsRange');
             
             // Clear UI elements for all ranges
             ['10d','mtd','lastmonth','30d'].forEach(range => {
-                const statsDiv = document.getElementById(`stats-data-${range}`);
+                const statsDiv = document.getElementById(`stats-content-${range}`);
                 if (statsDiv) statsDiv.innerHTML = '';
                 const statsLoading = document.getElementById(`stats-loading-${range}`);
                 if (statsLoading) statsLoading.style.display = 'none';
@@ -2753,9 +2779,15 @@
 
         // Add initialization code to load cached stats data on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const cachedData = loadStatsData();
-            if (cachedData) {
-                renderStatsApps(cachedData.apps);
+            // Load cached stats data
+            loadStatsData();
+            
+            // If we're on the stats tab, render the cached data for the active range
+            if (document.getElementById('stats-tab') && document.getElementById('stats-tab').classList.contains('active')) {
+                const activeRange = getActiveStatsRange();
+                if (statsData[activeRange]) {
+                    renderStatsAppsForRange(activeRange, statsData[activeRange].apps || []);
+                }
             }
         });
     </script>
