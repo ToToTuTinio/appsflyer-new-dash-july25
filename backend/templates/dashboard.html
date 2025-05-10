@@ -2534,13 +2534,7 @@
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
             if (document.getElementById('apps-tab')) {
-                if (!loadCachedApps()) {
-                    window.fetchedApps = [];
-                    document.getElementById('app-count').textContent = '0';
-                    document.getElementById('apps-last-updated').textContent = '';
-                    document.getElementById('apps-list').innerHTML = '';
-                }
-                // fetchAndUpdateApps(); // REMOVE automatic fetch
+                loadAndRenderCachedApps();
             }
             // Stats
             if (document.getElementById('stats-tab')) {
@@ -2564,13 +2558,7 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                if (!loadCachedApps()) {
-                    window.fetchedApps = [];
-                    document.getElementById('app-count').textContent = '0';
-                    document.getElementById('apps-last-updated').textContent = '';
-                    document.getElementById('apps-list').innerHTML = '';
-                }
-                // fetchAndUpdateApps(); // REMOVE automatic fetch
+                loadAndRenderCachedApps();
             }
             if (tabName === 'stats') {
                 const cachedData = loadStatsData();
@@ -2838,6 +2826,27 @@
                     renderFraudAll(data, '10d');
                 }
             });
+        }
+
+        // Helper to load and render cached apps from localStorage
+        function loadAndRenderCachedApps() {
+            const cached = localStorage.getItem('fetchedApps');
+            if (cached) {
+                try {
+                    window.fetchedApps = JSON.parse(cached);
+                    if (Array.isArray(window.fetchedApps) && window.fetchedApps.length > 0) {
+                        renderAppsList(window.fetchedApps);
+                        document.getElementById('app-count').textContent = window.fetchedApps.length;
+                        return true;
+                    }
+                } catch (e) { window.fetchedApps = []; }
+            }
+            // Show empty state if no cache
+            window.fetchedApps = [];
+            document.getElementById('app-count').textContent = '0';
+            document.getElementById('apps-last-updated').textContent = '';
+            document.getElementById('apps-list').innerHTML = '';
+            return false;
         }
     </script>
 </body>
