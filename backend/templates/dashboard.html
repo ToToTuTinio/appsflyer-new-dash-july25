@@ -2534,11 +2534,13 @@
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
             if (document.getElementById('apps-tab')) {
-                // Initialize empty state
-                window.fetchedApps = [];
-                document.getElementById('app-count').textContent = '0';
-                document.getElementById('apps-last-updated').textContent = '';
-                document.getElementById('apps-list').innerHTML = '';
+                if (!loadCachedApps()) {
+                    // If no cache, show empty state
+                    window.fetchedApps = [];
+                    document.getElementById('app-count').textContent = '0';
+                    document.getElementById('apps-last-updated').textContent = '';
+                    document.getElementById('apps-list').innerHTML = '';
+                }
             }
             // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
@@ -2564,8 +2566,9 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                // Initialize empty state if no apps are loaded
-                if (!window.fetchedApps || window.fetchedApps.length === 0) {
+                if (!loadCachedApps()) {
+                    // If no cache, show empty state
+                    window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
@@ -2776,6 +2779,24 @@
                 }
             }
         });
+
+        // Helper to load cached apps from localStorage
+        function loadCachedApps() {
+            const cached = localStorage.getItem('fetchedApps');
+            if (cached) {
+                try {
+                    window.fetchedApps = JSON.parse(cached);
+                    if (Array.isArray(window.fetchedApps) && window.fetchedApps.length > 0) {
+                        renderAppsList(window.fetchedApps);
+                        document.getElementById('app-count').textContent = window.fetchedApps.length;
+                        // Optionally, restore last updated time if you store it
+                        // document.getElementById('apps-last-updated').textContent = ...;
+                        return true;
+                    }
+                } catch (e) { window.fetchedApps = []; }
+            }
+            return false;
+        }
     </script>
 </body>
 </html> 
