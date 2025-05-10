@@ -143,9 +143,10 @@ def check_auth():
 def dashboard():
     return render_template('dashboard.html')
 
-def get_active_apps(max_retries=7):
+def get_active_apps(max_retries=7, force_fetch=False):
     """
     Fetch the list of active apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
+    Only fetches new data if force_fetch is True or if there's no cache.
     """
     import pytz
     gmt2 = pytz.timezone('Europe/Berlin')
@@ -164,24 +165,32 @@ def get_active_apps(max_retries=7):
         data, updated_at = row
         updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
         updated_at_dt = gmt2.localize(updated_at_dt)
-        if (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
+        if not force_fetch and (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
             result = json.loads(data)
             result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
             conn.close()
             return result
-    # If no cache or cache is old, fetch new data
-    apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
-    fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
-    result = {
-        "count": len(apps),
-        "apps": apps,
-        "fetch_time": fetch_time
-    }
-    c.execute('DELETE FROM apps_cache')  # Only keep one row
-    c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
-    conn.commit()
-    conn.close()
-    return result
+    # If no cache or cache is old or force_fetch is True, fetch new data
+    if force_fetch or not row:  # Only fetch if explicitly requested or no cache exists
+        apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
+        fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        result = {
+            "count": len(apps),
+            "apps": apps,
+            "fetch_time": fetch_time
+        }
+        c.execute('DELETE FROM apps_cache')  # Only keep one row
+        c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
+        conn.commit()
+        conn.close()
+        return result
+    else:
+        # Return empty result if cache is old but we're not forcing a fetch
+        return {
+            "count": 0,
+            "apps": [],
+            "fetch_time": "Cache expired. Please click 'Get Apps' to fetch new data."
+        }
 
 @app.route('/active-apps')
 @login_required
@@ -690,8 +699,9 @@ def save_event_selections():
 @login_required
 def get_apps():
     try:
-        # Always use the test data function for all pages
-        result = get_active_apps()
+        # Get force parameter from request
+        force = request.args.get('force', 'false').lower() == 'true'
+        result = get_active_apps(force_fetch=force)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)})

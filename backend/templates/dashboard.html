@@ -2395,40 +2395,99 @@
 
         // Helper functions to clear UI and JS/localStorage
         function clearAppsUI() {
+            // Clear JS variables
             window.fetchedApps = [];
+            
+            // Clear localStorage
             localStorage.removeItem('fetchedApps');
+            localStorage.removeItem('eventSelections');
+            
+            // Clear UI elements
             const appsList = document.getElementById('apps-list');
             if (appsList) appsList.innerHTML = '';
             const appCount = document.getElementById('app-count');
             if (appCount) appCount.textContent = '0';
             const lastUpdated = document.getElementById('apps-last-updated');
             if (lastUpdated) lastUpdated.textContent = '';
+            
             // Set a flag to prevent automatic refetching
             window.appsCacheCleared = true;
         }
+
         function clearStatsUI() {
+            // Clear JS variables
             window.statsData = {};
+            
+            // Clear localStorage
             localStorage.removeItem('statsData');
+            localStorage.removeItem('statsRange');
+            
+            // Clear UI elements for all ranges
             ['10d','mtd','lastmonth','30d'].forEach(range => {
                 const statsDiv = document.getElementById(`stats-data-${range}`);
                 if (statsDiv) statsDiv.innerHTML = '';
+                const statsLoading = document.getElementById(`stats-loading-${range}`);
+                if (statsLoading) statsLoading.style.display = 'none';
+                const statsError = document.getElementById(`stats-error-${range}`);
+                if (statsError) statsError.style.display = 'none';
             });
         }
+
         function clearFraudUI() {
+            // Clear JS variables
             window.fraudDataCache = {};
+            window.fraudSourceDataCache = {};
+            
+            // Clear localStorage
             localStorage.removeItem('fraudDataCache');
+            localStorage.removeItem('fraudSourceDataCache');
+            localStorage.removeItem('fraudRange');
+            localStorage.removeItem('fraudSourceRange');
+            
+            // Clear UI elements for all ranges
             ['10d','mtd','lastmonth','30d'].forEach(range => {
+                // Clear fraud analytics data
                 const fraudDiv = document.getElementById(`fraud-data-${range}`);
                 if (fraudDiv) fraudDiv.innerHTML = '';
+                const fraudLoading = document.getElementById(`fraud-loading-${range}`);
+                if (fraudLoading) fraudLoading.style.display = 'none';
+                const fraudError = document.getElementById(`fraud-error-${range}`);
+                if (fraudError) fraudError.style.display = 'none';
+                
+                // Clear fraud source data
                 const fraudSourceDiv = document.getElementById(`fraud-source-data-${range}`);
                 if (fraudSourceDiv) fraudSourceDiv.innerHTML = '';
+                const fraudSourceLoading = document.getElementById(`fraud-source-loading-${range}`);
+                if (fraudSourceLoading) fraudSourceLoading.style.display = 'none';
+                const fraudSourceError = document.getElementById(`fraud-source-error-${range}`);
+                if (fraudSourceError) fraudSourceError.style.display = 'none';
             });
         }
+
         function clearOverviewUI() {
+            // Clear JS variables
+            window.overviewData = null;
+            
+            // Clear localStorage
+            localStorage.removeItem('overviewData');
+            
             // Clear charts if they exist
-            if (window.impressionsChart) { window.impressionsChart.data.labels = []; window.impressionsChart.data.datasets[0].data = []; window.impressionsChart.update(); }
-            if (window.clicksChart) { window.clicksChart.data.labels = []; window.clicksChart.data.datasets[0].data = []; window.clicksChart.update(); }
-            if (window.installsChart) { window.installsChart.data.labels = []; window.installsChart.data.datasets[0].data = []; window.installsChart.update(); }
+            if (window.impressionsChart) { 
+                window.impressionsChart.data.labels = []; 
+                window.impressionsChart.data.datasets[0].data = []; 
+                window.impressionsChart.update(); 
+            }
+            if (window.clicksChart) { 
+                window.clicksChart.data.labels = []; 
+                window.clicksChart.data.datasets[0].data = []; 
+                window.clicksChart.update(); 
+            }
+            if (window.installsChart) { 
+                window.installsChart.data.labels = []; 
+                window.installsChart.data.datasets[0].data = []; 
+                window.installsChart.update(); 
+            }
+            
             // Clear top apps and fraud sources
             const topAppsList = document.getElementById('top-apps-list');
             if (topAppsList) topAppsList.innerHTML = '';
@@ -2436,6 +2495,8 @@
             if (badSourcesList) badSourcesList.innerHTML = '';
             const badSourcesEmpty = document.getElementById('bad-sources-empty');
             if (badSourcesEmpty) badSourcesEmpty.style.display = '';
+            
+            // Clear last updated timestamps
             document.getElementById('overview-last-updated').textContent = '';
             document.getElementById('fraud-last-updated').textContent = '';
             document.getElementById('top-apps-last-updated').textContent = '';
