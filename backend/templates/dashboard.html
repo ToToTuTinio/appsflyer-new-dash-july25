@@ -2540,40 +2540,22 @@
                 document.getElementById('apps-last-updated').textContent = '';
                 document.getElementById('apps-list').innerHTML = '';
             }
-            // Stats: load cached data first, then fetch if needed
+            // Stats: always render cached data if present
             if (document.getElementById('stats-tab')) {
                 activateDefaultStatsTab();
                 const cachedData = loadStatsData();
                 if (cachedData && cachedData.apps) {
                     renderStatsApps(cachedData.apps);
                 } else {
-                    fetchStats();
+                    // Optionally, hide the stats list if no data
+                    document.getElementById('stats-list').innerHTML = '';
+                    document.getElementById('stats-list').style.display = 'none';
+                    document.getElementById('stats-error').textContent = 'No stats data available. Please run a report.';
+                    document.getElementById('stats-error').style.display = 'block';
                 }
             }
             // Fraud: fetch and render for all ranges, then render the active one
-            // (REMOVED: Do not auto-fetch fraud data on page load)
-            // if (document.getElementById('fraud-tab')) {
-            //     ...
-            // }
-            // --- NEW: Always render cached fraud data for all ranges ---
-            if (document.getElementById('fraud-tab')) {
-                const fraudRanges = ['10d','mtd','lastmonth','30d'];
-                const fraudPeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
-                fraudRanges.forEach(range => {
-                    fetch('/get_fraud', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ apps: window.fetchedApps || [], period: fraudPeriodMap[range] })
-                    }).then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            fraudDataCache[range] = data;
-                            renderFraudAll(data, range);
-                        }
-                    });
-                });
-            }
-            // Profile
-            if (document.getElementById('profile-tab')) loadProfile();
+            // ... existing code ...
         });
 
         // --- On tab switch, fetch and render cached data for all ranges of the selected tab ---
@@ -2594,7 +2576,11 @@
                 if (cachedData && cachedData.apps) {
                     renderStatsApps(cachedData.apps);
                 } else {
-                    fetchStats();
+                    // Optionally, hide the stats list if no data
+                    document.getElementById('stats-list').innerHTML = '';
+                    document.getElementById('stats-list').style.display = 'none';
+                    document.getElementById('stats-error').textContent = 'No stats data available. Please run a report.';
+                    document.getElementById('stats-error').style.display = 'block';
                 }
             }
             if (tabName === 'fraud') {
