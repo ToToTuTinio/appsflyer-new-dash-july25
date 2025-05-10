@@ -1126,20 +1126,33 @@ def overview():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/clear-backend-cache', methods=['POST'])
+@login_required
 def clear_backend_cache():
-    import sqlite3
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        
+        # Clear all cache tables
         c.execute('DELETE FROM stats_cache')
         c.execute('DELETE FROM fraud_cache')
         c.execute('DELETE FROM event_cache')
+        c.execute('DELETE FROM apps_cache')
+        
+        # Commit changes
         conn.commit()
         conn.close()
-        return jsonify({'success': True})
+        
+        print("[CACHE CLEAR] Successfully cleared all backend caches")
+        return jsonify({
+            'success': True,
+            'message': 'All backend caches cleared successfully'
+        })
     except Exception as e:
         print(f"[CACHE CLEAR ERROR] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/clear-apps-cache', methods=['POST'])
 def clear_apps_cache():

@@ -247,7 +247,10 @@
                 </div>
                 <!-- Clear Backend Data Button (moved to bottom, smaller) -->
                 <div class="flex justify-center mt-8 mb-2">
-                    <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Backend Data</button>
+                    <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-4 py-2 rounded text-sm font-semibold hover:bg-red-50 transition flex items-center">
+                        <span>Clear Backend Data</span>
+                        <div id="clear-cache-spinner" class="loading-spinner ml-2" style="display: none;"></div>
+                    </button>
                 </div>
             </div>
         </div>
@@ -2504,6 +2507,66 @@
           const activeBtn = document.querySelector('.fraud-source-range-tab.border-green-600');
           return activeBtn ? activeBtn.getAttribute('data-range') : '10d';
         }
+
+        // Add Clear Cache functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const clearCacheBtn = document.getElementById('clear-backend-cache-btn');
+            const clearCacheSpinner = document.getElementById('clear-cache-spinner');
+            
+            if (clearCacheBtn) {
+                clearCacheBtn.addEventListener('click', function() {
+                    if (!confirm('Are you sure you want to clear all backend data? This will require re-fetching all data.')) {
+                        return;
+                    }
+                    
+                    // Show loading spinner
+                    clearCacheSpinner.style.display = 'block';
+                    clearCacheBtn.disabled = true;
+                    
+                    // Call the clear cache endpoint
+                    fetch('/clear-backend-cache', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Show success message
+                            alert('Backend data cleared successfully. Refreshing data...');
+                            
+                            // Clear any cached data in the frontend
+                            localStorage.removeItem('fraudSourceDataCache_10d');
+                            localStorage.removeItem('fraudSourceDataCache_mtd');
+                            localStorage.removeItem('fraudSourceDataCache_lastmonth');
+                            localStorage.removeItem('fraudSourceDataCache_30d');
+                            
+                            // Refresh the current view
+                            if (document.getElementById('overview-tab').classList.contains('active')) {
+                                fetchOverviewData();
+                                fetchTopPerformingApps();
+                            } else if (document.getElementById('stats-tab').classList.contains('active')) {
+                                fetchStats();
+                            } else if (document.getElementById('fraud-tab').classList.contains('active')) {
+                                fetchFraudData();
+                            }
+                        } else {
+                            throw new Error(data.error || 'Failed to clear backend data');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error clearing cache:', error);
+                        alert('Failed to clear backend data: ' + error.message);
+                    })
+                    .finally(() => {
+                        // Hide loading spinner and re-enable button
+                        clearCacheSpinner.style.display = 'none';
+                        clearCacheBtn.disabled = false;
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html> 
