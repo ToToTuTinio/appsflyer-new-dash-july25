@@ -2508,20 +2508,11 @@
             if (document.getElementById('overview-tab')) fetchOverviewData();
             // Apps
             if (document.getElementById('apps-tab')) {
-                // Only fetch if cache wasn't just cleared
-                if (!window.appsCacheCleared) {
-                    fetch('/get_apps').then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            window.fetchedApps = data.apps;
-                            renderAppsList(data.apps);
-                            document.getElementById('app-count').textContent = data.count;
-                            document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                        }
-                    });
-                } else {
-                    // Reset the flag
-                    window.appsCacheCleared = false;
-                }
+                // Initialize empty state
+                window.fetchedApps = [];
+                document.getElementById('app-count').textContent = '0';
+                document.getElementById('apps-last-updated').textContent = '';
+                document.getElementById('apps-list').innerHTML = '';
             }
             // Stats: fetch and render for all ranges, then render the active one
             if (document.getElementById('stats-tab')) {
@@ -2582,19 +2573,11 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                // Only fetch if cache wasn't just cleared
-                if (!window.appsCacheCleared) {
-                    fetch('/get_apps').then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            window.fetchedApps = data.apps;
-                            renderAppsList(data.apps);
-                            document.getElementById('app-count').textContent = data.count;
-                            document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
-                        }
-                    });
-                } else {
-                    // Reset the flag
-                    window.appsCacheCleared = false;
+                // Initialize empty state if no apps are loaded
+                if (!window.fetchedApps || window.fetchedApps.length === 0) {
+                    document.getElementById('app-count').textContent = '0';
+                    document.getElementById('apps-last-updated').textContent = '';
+                    document.getElementById('apps-list').innerHTML = '';
                 }
             }
             if (tabName === 'stats') {
