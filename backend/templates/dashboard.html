@@ -2569,14 +2569,10 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                // Fire a GET to /api/apps-page for logging/monitoring
-                fetch('/api/apps-page');
-                if (!loadCachedApps()) {
-                    window.fetchedApps = [];
-                    document.getElementById('app-count').textContent = '0';
-                    document.getElementById('apps-last-updated').textContent = '';
-                    document.getElementById('apps-list').innerHTML = '';
-                }
+                // Fire a GET to /api/apps-page for logging/monitoring, then force show cached data
+                fetch('/api/apps-page').then(() => {
+                    loadCachedApps();
+                });
             }
             if (tabName === 'stats') {
                 const cachedData = loadStatsData();
