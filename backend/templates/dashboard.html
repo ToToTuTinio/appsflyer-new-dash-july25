@@ -2844,46 +2844,6 @@
                 }
             });
         }
-
-        // Helper to call lightweight refresh endpoints for logging/monitoring
-        function callRefreshEndpoint(tabName) {
-            let url = null;
-            if (tabName === 'apps') url = '/refresh_apps';
-            if (tabName === 'stats') url = '/refresh_stats';
-            if (tabName === 'fraud') url = '/refresh_fraud';
-            if (url) fetch(url).catch(() => {});
-        }
-
-        // On tab switch, show cached data and call refresh endpoint, only fetch if cache is empty or user refreshes
-        const origSwitchTab6 = switchTab;
-        switchTab = function(tabName) {
-            origSwitchTab6(tabName);
-            if (tabName === 'overview') fetchOverviewData();
-            if (tabName === 'apps') {
-                if (!loadCachedApps()) {
-                    window.fetchedApps = [];
-                    document.getElementById('app-count').textContent = '0';
-                    document.getElementById('apps-last-updated').textContent = '';
-                    document.getElementById('apps-list').innerHTML = '';
-                    fetchAndUpdateApps(); // Only fetch if cache is empty
-                }
-                callRefreshEndpoint('apps');
-            }
-            if (tabName === 'stats') {
-                const cachedData = loadStatsData();
-                if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
-                    renderStatsAppsForRange('10d', cachedData['10d'].apps);
-                } else {
-                    fetchAndUpdateStats(); // Only fetch if cache is empty
-                }
-                callRefreshEndpoint('stats');
-            }
-            if (tabName === 'fraud') {
-                // You may want to load cached fraud data if you implement caching
-                callRefreshEndpoint('fraud');
-            }
-            if (tabName === 'profile') loadProfile();
-        };
     </script>
 </body>
 </html> 
