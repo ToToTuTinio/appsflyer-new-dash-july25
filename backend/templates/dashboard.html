@@ -2535,30 +2535,26 @@
             // Apps
             if (document.getElementById('apps-tab')) {
                 if (!loadCachedApps()) {
-                    // If no cache, show empty state
                     window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
-                fetchAndUpdateApps();
+                // fetchAndUpdateApps(); // REMOVE automatic fetch
             }
-            // Stats: always render cached data if present
+            // Stats
             if (document.getElementById('stats-tab')) {
-                activateDefaultStatsTab();
                 const cachedData = loadStatsData();
-                if (cachedData && cachedData.apps) {
-                    renderStatsApps(cachedData.apps);
-                } else {
-                    // Optionally, hide the stats list if no data
-                    document.getElementById('stats-list').innerHTML = '';
-                    document.getElementById('stats-list').style.display = 'none';
-                    document.getElementById('stats-error').textContent = 'No stats data available. Please run a report.';
-                    document.getElementById('stats-error').style.display = 'block';
+                if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
+                    renderStatsAppsForRange('10d', cachedData['10d'].apps);
                 }
-                fetchAndUpdateStats();
+                // fetchAndUpdateStats(); // REMOVE automatic fetch
             }
-            // Fraud: fetch and render for all ranges, then render the active one
+            // Fraud
+            if (document.getElementById('fraud-tab')) {
+                // You may want to load cached fraud data if you implement caching
+                // fetchAndUpdateFraud(); // REMOVE automatic fetch
+            }
             // ... existing code ...
         });
 
@@ -2569,23 +2565,22 @@
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
                 if (!loadCachedApps()) {
-                    // If no cache, show empty state
                     window.fetchedApps = [];
                     document.getElementById('app-count').textContent = '0';
                     document.getElementById('apps-last-updated').textContent = '';
                     document.getElementById('apps-list').innerHTML = '';
                 }
-                fetchAndUpdateApps();
+                // fetchAndUpdateApps(); // REMOVE automatic fetch
             }
             if (tabName === 'stats') {
                 const cachedData = loadStatsData();
                 if (cachedData && cachedData['10d'] && cachedData['10d'].apps) {
                     renderStatsAppsForRange('10d', cachedData['10d'].apps);
                 }
-                fetchAndUpdateStats();
+                // fetchAndUpdateStats(); // REMOVE automatic fetch
             }
             if (tabName === 'fraud') {
-                fetchAndUpdateFraud();
+                // fetchAndUpdateFraud(); // REMOVE automatic fetch
             }
             if (tabName === 'profile') loadProfile();
         };
