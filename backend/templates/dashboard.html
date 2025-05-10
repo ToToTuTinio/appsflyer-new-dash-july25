@@ -574,6 +574,7 @@
                         return;
                     }
                     fetchedApps = data.apps;
+                    localStorage.setItem('fetchedApps', JSON.stringify(fetchedApps)); // <-- Ensure cache is set
                     renderAppsList(fetchedApps);
                     document.getElementById('app-count').textContent = data.count;
                     document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
@@ -1212,6 +1213,10 @@
         function renderAppsList(apps) {
             const appsList = document.getElementById('apps-list');
             appsList.innerHTML = '';
+            if (!apps || !apps.length) {
+                appsList.innerHTML = '<tr><td colspan="5" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                return;
+            }
             apps.forEach(app => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
