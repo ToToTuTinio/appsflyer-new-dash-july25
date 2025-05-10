@@ -1134,6 +1134,7 @@ def clear_backend_cache():
         c.execute('DELETE FROM stats_cache')
         c.execute('DELETE FROM fraud_cache')
         c.execute('DELETE FROM event_cache')
+        c.execute('DELETE FROM apps_cache')
         conn.commit()
         conn.close()
         return jsonify({'success': True})
