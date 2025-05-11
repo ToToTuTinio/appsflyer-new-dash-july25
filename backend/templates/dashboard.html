@@ -2670,19 +2670,9 @@
                     });
             }
             if (tabName === 'fraud') {
-                fetch('/api/fraud-page').then(() => {
-                    const range = '10d';
-                    // For simplicity, just check if fraudDataCache exists and has data
-                    let fraudData = null;
-                    try {
-                        fraudData = window.fraudDataCache && window.fraudDataCache[range];
-                    } catch (e) { fraudData = null; }
-                    const fraudList = document.getElementById('fraud-data-10d');
-                    if (fraudData && fraudData.apps && fraudData.apps.length > 0) {
-                        renderFraudAll(fraudData, range);
-                    } else {
-                        fraudList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached fraud data available. Please run a report to load data.</div>';
-                    }
+                // Instead of /api/fraud-page, fetch /get_fraud_subpage_10d for logging and default data
+                fetch('/get_fraud_subpage_10d').then(() => {
+                    // Fraud Analytics sub-page will handle showing the data
                 });
             }
             if (tabName === 'profile') loadProfile();
