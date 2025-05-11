@@ -1200,29 +1200,29 @@ def stats_page():
 def fraud_page():
     return {'status': 'ok'}
 
-@app.route('/get_fraud_subpage_10d')
-def get_fraud_subpage_10d():
+@app.route('/get_subpage_10d')
+def get_subpage_10d():
     import logging
-    app.logger.debug('GET /get_fraud_subpage_10d')
-    return get_fraud_for_range('10d')
+    app.logger.debug('GET /get_subpage_10d')
+    return get_stats_for_range('10d')
 
-@app.route('/get_fraud_subpage_mtd')
-def get_fraud_subpage_mtd():
+@app.route('/get_subpage_mtd')
+def get_subpage_mtd():
     import logging
-    app.logger.debug('GET /get_fraud_subpage_mtd')
-    return get_fraud_for_range('mtd')
+    app.logger.debug('GET /get_subpage_mtd')
+    return get_stats_for_range('mtd')
 
-@app.route('/get_fraud_subpage_lastmonth')
-def get_fraud_subpage_lastmonth():
+@app.route('/get_subpage_lastmonth')
+def get_subpage_lastmonth():
     import logging
-    app.logger.debug('GET /get_fraud_subpage_lastmonth')
-    return get_fraud_for_range('lastmonth')
+    app.logger.debug('GET /get_subpage_lastmonth')
+    return get_stats_for_range('lastmonth')
 
-@app.route('/get_fraud_subpage_30d')
-def get_fraud_subpage_30d():
+@app.route('/get_subpage_30d')
+def get_subpage_30d():
     import logging
-    app.logger.debug('GET /get_fraud_subpage_30d')
-    return get_fraud_for_range('30d')
+    app.logger.debug('GET /get_subpage_30d')
+    return get_stats_for_range('30d')
 
 # Helper to fetch fraud for a given range
 def get_fraud_for_range(range_key):
