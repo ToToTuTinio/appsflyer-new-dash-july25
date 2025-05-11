@@ -2314,7 +2314,24 @@
                     // Render table
                     const tbody = document.getElementById('top-apps-list');
                     let html = '';
-                    apps.slice(0, 5).forEach(app => {
+                    // Sort apps by total events (Event 1 + Event 2) descending
+                    const sortedApps = [...apps].sort((a, b) => {
+                        let aSum = 0, bSum = 0;
+                        if (a.selected_events && a.selected_events[0]) {
+                            aSum += a.table.reduce((sum, row) => sum + (Number(row[a.selected_events[0]]) || 0), 0);
+                        }
+                        if (a.selected_events && a.selected_events[1]) {
+                            aSum += a.table.reduce((sum, row) => sum + (Number(row[a.selected_events[1]]) || 0), 0);
+                        }
+                        if (b.selected_events && b.selected_events[0]) {
+                            bSum += b.table.reduce((sum, row) => sum + (Number(row[b.selected_events[0]]) || 0), 0);
+                        }
+                        if (b.selected_events && b.selected_events[1]) {
+                            bSum += b.table.reduce((sum, row) => sum + (Number(row[b.selected_events[1]]) || 0), 0);
+                        }
+                        return bSum - aSum;
+                    });
+                    sortedApps.slice(0, 5).forEach(app => {
                         let event1 = app.selected_events && app.selected_events[0] ? app.selected_events[0] : null;
                         let event2 = app.selected_events && app.selected_events[1] ? app.selected_events[1] : null;
                         // Detect error events
