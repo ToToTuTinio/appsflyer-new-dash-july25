@@ -2621,10 +2621,12 @@
                         }
                         if (apps) {
                             renderStatsAppsForRange(range, apps);
-                            document.getElementById('stats-error').style.display = 'none';
+                            // Hide error only for this range if data exists
+                            if (document.getElementById('stats-error')) document.getElementById('stats-error').style.display = 'none';
                         } else if (statsList) {
                             statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
-                            document.getElementById('stats-error').style.display = '';
+                            // Show error only for this range if no data
+                            if (document.getElementById('stats-error')) document.getElementById('stats-error').style.display = '';
                         }
                     });
                 });
