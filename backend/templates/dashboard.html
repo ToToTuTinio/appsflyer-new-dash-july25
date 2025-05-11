@@ -660,8 +660,11 @@
                     .then(r => r.json())
                     .then(data => {
                         if (data && data.apps && data.apps.length > 0) {
-                            renderStatsAppsForRange(range, data.apps);
-                            document.getElementById('stats-error').style.display = 'none';
+                            // Always force re-render with a small delay to ensure DOM is ready
+                            setTimeout(() => {
+                                renderStatsAppsForRange(range, data.apps);
+                                document.getElementById('stats-error').style.display = 'none';
+                            }, 80);
                         } else {
                             document.getElementById(`stats-data-${range}`).innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
                             document.getElementById('stats-error').style.display = '';
