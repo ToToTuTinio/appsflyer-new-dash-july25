@@ -1,8 +1,13 @@
+console.log("Chart.js loaded?", !!window.Chart);
+
 function renderChartWithRetry(canvasId, renderFn, retries = 30) {
     const el = document.getElementById(canvasId);
     if (el && window.Chart) {
+        if (el.chartInstance) {
+            el.chartInstance.destroy();
+        }
         try {
-            renderFn(el);
+            el.chartInstance = renderFn(el);
         } catch (e) {
             console.error("Chart.js error for " + canvasId + ":", e);
         }
@@ -43,12 +48,13 @@ function renderStatsAppsForRange(apps, range) {
     // Force re-render of all charts after a delay to ensure DOM is ready
     setTimeout(() => {
         apps.forEach(app => {
+            console.log("Rendering app:", app);
             let safeName = app.app_name.replace(/\W/g, "");
             let mainId = `trend-main-${app.app_id}-${safeName}`;
             let eventsId = `trend-events-${app.app_id}-${safeName}`;
             let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
             renderChartWithRetry(mainId, (el) => {
-                new Chart(el, {
+                return new Chart(el, {
                     type: 'line',
                     data: {
                         labels: app.dates,
@@ -60,7 +66,7 @@ function renderStatsAppsForRange(apps, range) {
                 });
             });
             renderChartWithRetry(eventsId, (el) => {
-                new Chart(el, {
+                return new Chart(el, {
                     type: 'line',
                     data: {
                         labels: app.dates,
@@ -72,7 +78,7 @@ function renderStatsAppsForRange(apps, range) {
                 });
             });
             renderChartWithRetry(fraudId, (el) => {
-                new Chart(el, {
+                return new Chart(el, {
                     type: 'line',
                     data: {
                         labels: app.dates,
