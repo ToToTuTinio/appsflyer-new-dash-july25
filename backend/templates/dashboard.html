@@ -2614,23 +2614,12 @@
                     }
                     // List of all ranges
                     const ranges = ['10d', 'mtd', 'lastmonth', '30d'];
-                    let anyData = false;
                     ranges.forEach(range => {
                         const statsList = document.getElementById(`stats-data-${range}`);
-                        let apps = null;
                         if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
-                            apps = stats[range].apps;
-                        } else if (stats && stats.apps && stats.apps.length > 0 && range === '10d') {
-                            // fallback for flat cache
-                            apps = stats.apps;
-                        }
-                        if (apps) {
-                            renderStatsAppsForRange(range, apps);
-                            anyData = true;
-                            if (document.getElementById('stats-error')) document.getElementById('stats-error').style.display = 'none';
+                            renderStatsAppsForRange(stats[range].apps, range);
                         } else {
-                            statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
-                            if (document.getElementById('stats-error')) document.getElementById('stats-error').style.display = '';
+                            if (statsList) statsList.innerHTML = '<div class="text-gray-400 text-center">No cached stats data available for this range.</div>';
                         }
                     });
                 });
