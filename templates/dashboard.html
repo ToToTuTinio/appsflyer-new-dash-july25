@@ -40,14 +40,18 @@ function destroyAllStatsCharts() {
     }
 }
 
-function renderStatsAppsForRange(apps, range) {
-    const container = document.getElementById('stats-apps-container');
+function renderStatsAppsForRange(range, apps) {
+    const container = document.getElementById(`stats-data-${range}`);
     if (!container) {
-        console.error('stats-apps-container not found in DOM!');
+        console.error('Stats container not found for range:', range);
         return;
     }
     destroyAllStatsCharts();
     container.innerHTML = '';
+    if (!apps || !apps.length) {
+        container.innerHTML = '<div class="text-gray-500">No data available for this range.</div>';
+        return;
+    }
     apps.forEach(app => {
         let safeName = app.app_name.replace(/\W/g, "");
         let mainId = `trend-main-${app.app_id}-${safeName}`;
@@ -57,17 +61,17 @@ function renderStatsAppsForRange(apps, range) {
         section.className = 'app-section';
         section.innerHTML = `
             <h3>${app.app_name}</h3>
-            <div class="chart-container">
+            <div class=\"chart-container\">
                 <h4>Impressions & Clicks</h4>
-                <canvas id="${mainId}"></canvas>
+                <canvas id=\"${mainId}\"></canvas>
             </div>
-            <div class="chart-container">
+            <div class=\"chart-container\">
                 <h4>Installs & Events</h4>
-                <canvas id="${eventsId}"></canvas>
+                <canvas id=\"${eventsId}\"></canvas>
             </div>
-            <div class="chart-container">
+            <div class=\"chart-container\">
                 <h4>Fraud: Blocked Installs</h4>
-                <canvas id="${fraudId}"></canvas>
+                <canvas id=\"${fraudId}\"></canvas>
             </div>
         `;
         container.appendChild(section);
@@ -77,25 +81,6 @@ function renderStatsAppsForRange(apps, range) {
         let mainId = `trend-main-${app.app_id}-${safeName}`;
         let eventsId = `trend-events-${app.app_id}-${safeName}`;
         let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
-        // Defensive: log data and check for empty arrays
-        if (!app.dates || app.dates.length === 0) {
-            console.warn("No dates for app", app.app_name);
-        }
-        if (!app.impressions || app.impressions.length === 0) {
-            console.warn("No impressions for app", app.app_name);
-        }
-        if (!app.clicks || app.clicks.length === 0) {
-            console.warn("No clicks for app", app.app_name);
-        }
-        if (!app.installs || app.installs.length === 0) {
-            console.warn("No installs for app", app.app_name);
-        }
-        if (!app.events || app.events.length === 0) {
-            console.warn("No events for app", app.app_name);
-        }
-        if (!app.blocked_installs || app.blocked_installs.length === 0) {
-            console.warn("No blocked_installs for app", app.app_name);
-        }
         renderChartWithRetry(mainId, (el) => {
             return new Chart(el, {
                 type: 'line',
@@ -132,26 +117,4 @@ function renderStatsAppsForRange(apps, range) {
             });
         });
     });
-}
-
-function renderStatsApps(apps) {
-    const statsList = document.getElementById('stats-list');
-    if (!statsList) {
-        console.error('stats-list not found in DOM! (renderStatsApps)');
-        return;
-    }
-    statsList.innerHTML = '';
-    apps.forEach(app => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td class="py-3 px-4 text-gray-800">${app.app_id}</td>
-            <td class="py-3 px-4 text-gray-800">${app.app_name}</td>
-            <td class="py-3 px-4 text-gray-800">${app.event1 || 'N/A'}</td>
-            <td class="py-3 px-4 text-gray-800">${app.event2 || 'N/A'}</td>
-            <td class="py-3 px-4 text-gray-800">${app.total_events || '0'}</td>
-        `;
-        statsList.appendChild(tr);
-    });
-    statsList.style.display = 'block';
-    document.getElementById('stats-error').style.display = 'none';
 } 
