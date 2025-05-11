@@ -2615,6 +2615,9 @@
                     // List of all ranges
                     const ranges = ['10d', 'mtd', 'lastmonth', '30d'];
                     ranges.forEach(range => {
+                        // Always show the section for this range
+                        const statsContent = document.getElementById(`stats-content-${range}`);
+                        if (statsContent) statsContent.style.display = '';
                         const statsList = document.getElementById(`stats-data-${range}`);
                         if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
                             renderStatsAppsForRange(range, stats[range].apps);
