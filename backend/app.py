@@ -569,6 +569,20 @@ def all_apps_stats():
             if blocked_rt_resp == 'timeout':
                 print(f"[STATS] Timeout detected for blocked_installs_report {app_id}, returning processing status.")
                 return jsonify({'status': 'processing'})
+            
+            # Process Blocked Installs (RT) data
+            if blocked_rt_resp and blocked_rt_resp.status_code == 200:
+                rows = blocked_rt_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Install Time") if "Install Time" in header else None
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            install_date = cols[date_idx].split(" ")[0]
+                            if install_date in daily_stats:
+                                daily_stats[install_date]["blocked_installs_rt"] = daily_stats[install_date].get("blocked_installs_rt", 0) + 1
+
             # Blocked Installs (PA)
             print(f"[STATS] Calling detection API for {app_id}...")
             blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
@@ -577,6 +591,20 @@ def all_apps_stats():
             if blocked_pa_resp == 'timeout':
                 print(f"[STATS] Timeout detected for detection API {app_id}, returning processing status.")
                 return jsonify({'status': 'processing'})
+            
+            # Process Blocked Installs (PA) data
+            if blocked_pa_resp and blocked_pa_resp.status_code == 200:
+                rows = blocked_pa_resp.text.strip().split("\n")
+                if len(rows) > 1:
+                    header = rows[0].split(",")
+                    date_idx = header.index("Install Time") if "Install Time" in header else None
+                    for row in rows[1:]:
+                        cols = row.split(",")
+                        if date_idx is not None and len(cols) > date_idx:
+                            install_date = cols[date_idx].split(" ")[0]
+                            if install_date in daily_stats:
+                                daily_stats[install_date]["blocked_installs_pa"] = daily_stats[install_date].get("blocked_installs_pa", 0) + 1
+
             # In-App Events (for selected events)
             event_data = {}
             selected = selected_events.get(app_id, [])
