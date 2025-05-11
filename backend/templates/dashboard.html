@@ -2621,7 +2621,32 @@
             }
             if (tabName === 'stats') {
                 fetch('/api/stats-page').then(() => {
-                    loadStatsData();
+                    // Always migrate and save the cache in the new structure
+                    let migrated = false;
+                    let savedData = localStorage.getItem('statsData');
+                    let parsedData;
+                    try {
+                        parsedData = JSON.parse(savedData);
+                    } catch (e) {
+                        try { parsedData = { '10d': JSON.parse(savedData) }; } catch (e2) { parsedData = {}; }
+                    }
+                    // Migrate old flat format if needed
+                    if (parsedData && parsedData.apps && !parsedData['10d']) {
+                        parsedData = { '10d': { apps: parsedData.apps } };
+                        migrated = true;
+                    }
+                    // Ensure all ranges exist
+                    ['10d','mtd','lastmonth','30d'].forEach(range => {
+                        if (!parsedData[range]) parsedData[range] = { apps: [] };
+                    });
+                    // Save back to localStorage if migrated or structure changed
+                    if (migrated || JSON.stringify(parsedData) !== savedData) {
+                        localStorage.setItem('statsData', JSON.stringify(parsedData));
+                    }
+                    // Log the new structure
+                    console.log('Migrated statsData:', parsedData);
+                    // Update statsData in memory
+                    Object.keys(statsData).forEach(range => { statsData[range] = parsedData[range]; });
                     // Get the currently active range (default to 10d)
                     let range = '10d';
                     const activeBtn = document.querySelector('.date-range-tab.border-green-600');
