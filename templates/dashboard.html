@@ -27,6 +27,11 @@ function renderChartWithRetry(canvasId, renderFn, retries = 30) {
 window.statsCharts = {};
 
 function renderStatsAppsForRange(apps, range) {
+    const container = document.getElementById('stats-apps-container');
+    if (!container) {
+        console.error('stats-apps-container not found in DOM!');
+        return;
+    }
     // Destroy all previous charts
     if (window.statsCharts) {
         Object.values(window.statsCharts).forEach(chart => {
@@ -35,7 +40,6 @@ function renderStatsAppsForRange(apps, range) {
         window.statsCharts = {};
     }
 
-    const container = document.getElementById('stats-apps-container');
     container.innerHTML = '';
     apps.forEach(app => {
         let safeName = app.app_name.replace(/\W/g, "");
