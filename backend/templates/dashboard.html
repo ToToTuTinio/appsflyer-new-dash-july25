@@ -2601,9 +2601,9 @@
                 });
             }
             if (tabName === 'stats') {
+                migrateStatsDataCache();
                 fetch('/api/stats-page').then(() => {
                     const cached = localStorage.getItem('statsData');
-                    console.log('Cached statsData:', cached);
                     let stats = null;
                     if (cached) {
                         try {
@@ -2617,7 +2617,7 @@
                     ranges.forEach(range => {
                         const statsList = document.getElementById(`stats-data-${range}`);
                         if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
-                            renderStatsAppsForRange(stats[range].apps, range);
+                            renderStatsAppsForRange(range, stats[range].apps);
                         } else {
                             if (statsList) statsList.innerHTML = '<div class="text-gray-400 text-center">No cached stats data available for this range.</div>';
                         }
@@ -2897,6 +2897,22 @@
                 }
             });
         }
+
+        // --- MIGRATE FLAT statsData TO PER-RANGE STRUCTURE ON LOAD ---
+        function migrateStatsDataCache() {
+            const cached = localStorage.getItem('statsData');
+            if (cached) {
+                try {
+                    const stats = JSON.parse(cached);
+                    // If flat (has apps at top level), migrate to '10d'
+                    if (stats && stats.apps && Array.isArray(stats.apps)) {
+                        localStorage.setItem('statsData', JSON.stringify({ '10d': stats }));
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        }
+        // Call migration on load
+        migrateStatsDataCache();
     </script>
 </body>
 </html> 
