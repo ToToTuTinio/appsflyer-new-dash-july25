@@ -1229,8 +1229,21 @@ def get_stats_for_range(range_key):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
-        row = c.fetchone()
+        # Map short keys to legacy keys
+        period_map = {
+            '10d': ['10d', 'last10'],
+            'mtd': ['mtd'],
+            'lastmonth': ['lastmonth'],
+            '30d': ['30d', 'last30']
+        }
+        keys = period_map.get(range_key, [range_key])
+        # Try all possible keys for this range
+        row = None
+        for key in keys:
+            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
+            row = c.fetchone()
+            if row:
+                break
         conn.close()
         if row:
             data, updated_at = row
