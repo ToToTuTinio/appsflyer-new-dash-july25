@@ -629,9 +629,18 @@
             return null;
         }
 
-        // Save stats data to localStorage
+        // Save stats data to localStorage under the correct range
         function saveStatsData(data, range) {
-            statsData[range] = data;
+            let statsData = {};
+            try {
+                statsData = JSON.parse(localStorage.getItem('statsData') || '{}');
+            } catch (e) { statsData = {}; }
+            // Migrate old flat structure if present
+            if (statsData.apps && Array.isArray(statsData.apps)) {
+                statsData['10d'] = { apps: statsData.apps };
+                delete statsData.apps;
+            }
+            statsData[range] = { apps: data.apps };
             localStorage.setItem('statsData', JSON.stringify(statsData));
         }
 
@@ -731,7 +740,7 @@
                 }
                 // --- DATA IS READY: AUTO-RENDER ---
                 setFetchButtonsDisabled(false);
-                saveStatsData(data, range); // Save to localStorage
+                saveStatsData(data, range); // Save to localStorage under correct range
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
                 // Refresh overview and top apps after RUN completes
