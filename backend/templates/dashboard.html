@@ -2618,34 +2618,31 @@
                 });
             }
             if (tabName === 'stats') {
-                fetch('/api/stats-page').then(() => {
-                    const cached = localStorage.getItem('statsData');
-                    console.log('Cached statsData:', cached);
-                    let stats = null;
-                    if (cached) {
-                        try {
-                            stats = JSON.parse(cached);
-                        } catch (e) {
-                            console.error('Error parsing cached statsData:', e);
-                        }
-                    }
-                    // Always show the default range (10d)
-                    const range = '10d';
-                    const statsList = document.getElementById('stats-data-10d');
-                    let apps = null;
-                    if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
-                        apps = stats[range].apps;
-                    } else if (stats && stats.apps && stats.apps.length > 0) {
-                        apps = stats.apps;
-                    }
-                    if (apps) {
-                        renderStatsAppsForRange(range, apps);
-                        document.getElementById('stats-error').style.display = 'none';
-                    } else {
-                        statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
-                        document.getElementById('stats-error').style.display = '';
-                    }
+                // Visually activate the 'Last 10 Days' tab
+                document.querySelectorAll('.date-range-tab').forEach(btn => {
+                    btn.classList.remove('border-green-600','text-green-700','bg-white');
+                    btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
                 });
+                document.querySelector('.date-range-tab[data-range="10d"]').classList.remove('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
+                document.querySelector('.date-range-tab[data-range="10d"]').classList.add('border-green-600','text-green-700','bg-white');
+                document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
+                document.getElementById('stats-content-10d').style.display = '';
+                // Fetch and render the default range (10d)
+                fetch('/get_subpage_10d')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.apps && data.apps.length > 0) {
+                            renderStatsAppsForRange('10d', data.apps);
+                            document.getElementById('stats-error').style.display = 'none';
+                        } else {
+                            document.getElementById('stats-data-10d').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                            document.getElementById('stats-error').style.display = '';
+                        }
+                    })
+                    .catch(() => {
+                        document.getElementById('stats-data-10d').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
+                        document.getElementById('stats-error').style.display = '';
+                    });
             }
             if (tabName === 'fraud') {
                 fetch('/api/fraud-page').then(() => {
