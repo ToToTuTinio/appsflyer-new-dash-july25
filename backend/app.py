@@ -1278,5 +1278,34 @@ def get_fraud_for_range(range_key):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Helper to fetch stats for a given range (for Stats endpoints)
+def get_stats_for_range(range_key):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        period_map = {
+            '10d': ['10d', 'last10'],
+            'mtd': ['mtd'],
+            'lastmonth': ['lastmonth'],
+            '30d': ['30d', 'last30']
+        }
+        keys = period_map.get(range_key, [range_key])
+        row = None
+        for key in keys:
+            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
+            row = c.fetchone()
+            if row:
+                break
+        conn.close()
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            result['updated_at'] = updated_at
+            return jsonify(result)
+        else:
+            return jsonify({'apps': [], 'updated_at': None})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
