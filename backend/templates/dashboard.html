@@ -2602,6 +2602,12 @@
             }
             if (tabName === 'stats') {
                 migrateStatsDataCache();
+                // Always show all stats range sections
+                const ranges = ['10d', 'mtd', 'lastmonth', '30d'];
+                ranges.forEach(range => {
+                    const statsContent = document.getElementById(`stats-content-${range}`);
+                    if (statsContent) statsContent.style.display = '';
+                });
                 fetch('/api/stats-page').then(() => {
                     const cached = localStorage.getItem('statsData');
                     let stats = null;
@@ -2612,12 +2618,7 @@
                             console.error('Error parsing cached statsData:', e);
                         }
                     }
-                    // List of all ranges
-                    const ranges = ['10d', 'mtd', 'lastmonth', '30d'];
                     ranges.forEach(range => {
-                        // Always show the section for this range
-                        const statsContent = document.getElementById(`stats-content-${range}`);
-                        if (statsContent) statsContent.style.display = '';
                         const statsList = document.getElementById(`stats-data-${range}`);
                         if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
                             renderStatsAppsForRange(range, stats[range].apps);
