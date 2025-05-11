@@ -2610,14 +2610,14 @@
                     }
                     // Render cached data for all ranges
                     const ranges = ['10d', 'mtd', 'lastmonth', '30d'];
+                    const flatApps = (stats && stats.apps && stats.apps.length > 0) ? stats.apps : null;
                     ranges.forEach(range => {
                         const statsList = document.getElementById(`stats-data-${range}`);
                         let apps = null;
                         if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
                             apps = stats[range].apps;
-                        } else if (stats && stats.apps && stats.apps.length > 0 && range === '10d') {
-                            // Fallback for flat structure only for 10d
-                            apps = stats.apps;
+                        } else if (flatApps) {
+                            apps = flatApps;
                         }
                         if (apps) {
                             renderStatsAppsForRange(range, apps);
