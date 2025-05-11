@@ -18,7 +18,17 @@ function renderChartWithRetry(canvasId, renderFn, retries = 30) {
     }
 }
 
+window.statsCharts = {};
+
 function renderStatsAppsForRange(apps, range) {
+    // Destroy all previous charts
+    if (window.statsCharts) {
+        Object.values(window.statsCharts).forEach(chart => {
+            if (chart && typeof chart.destroy === 'function') chart.destroy();
+        });
+        window.statsCharts = {};
+    }
+
     const container = document.getElementById('stats-apps-container');
     container.innerHTML = '';
     apps.forEach(app => {
@@ -45,16 +55,16 @@ function renderStatsAppsForRange(apps, range) {
         `;
         container.appendChild(section);
     });
-    // Force re-render of all charts after a delay to ensure DOM is ready
+
     setTimeout(() => {
         apps.forEach(app => {
-            console.log("Rendering app:", app);
             let safeName = app.app_name.replace(/\W/g, "");
             let mainId = `trend-main-${app.app_id}-${safeName}`;
             let eventsId = `trend-events-${app.app_id}-${safeName}`;
             let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
-            renderChartWithRetry(mainId, (el) => {
-                return new Chart(el, {
+
+            if (document.getElementById(mainId)) {
+                window.statsCharts[mainId] = new Chart(document.getElementById(mainId), {
                     type: 'line',
                     data: {
                         labels: app.dates,
@@ -64,9 +74,9 @@ function renderStatsAppsForRange(apps, range) {
                         ]
                     }
                 });
-            });
-            renderChartWithRetry(eventsId, (el) => {
-                return new Chart(el, {
+            }
+            if (document.getElementById(eventsId)) {
+                window.statsCharts[eventsId] = new Chart(document.getElementById(eventsId), {
                     type: 'line',
                     data: {
                         labels: app.dates,
@@ -76,9 +86,9 @@ function renderStatsAppsForRange(apps, range) {
                         ]
                     }
                 });
-            });
-            renderChartWithRetry(fraudId, (el) => {
-                return new Chart(el, {
+            }
+            if (document.getElementById(fraudId)) {
+                window.statsCharts[fraudId] = new Chart(document.getElementById(fraudId), {
                     type: 'line',
                     data: {
                         labels: app.dates,
@@ -87,7 +97,7 @@ function renderStatsAppsForRange(apps, range) {
                         ]
                     }
                 });
-            });
+            }
         });
     }, 500);
 } 
