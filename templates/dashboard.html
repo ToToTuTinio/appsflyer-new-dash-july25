@@ -128,4 +128,26 @@ function renderStatsAppsForRange(apps, range) {
             });
         });
     });
+}
+
+function renderStatsApps(apps) {
+    const statsList = document.getElementById('stats-list');
+    if (!statsList) {
+        console.error('stats-list not found in DOM! (renderStatsApps)');
+        return;
+    }
+    statsList.innerHTML = '';
+    apps.forEach(app => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="py-3 px-4 text-gray-800">${app.app_id}</td>
+            <td class="py-3 px-4 text-gray-800">${app.app_name}</td>
+            <td class="py-3 px-4 text-gray-800">${app.event1 || 'N/A'}</td>
+            <td class="py-3 px-4 text-gray-800">${app.event2 || 'N/A'}</td>
+            <td class="py-3 px-4 text-gray-800">${app.total_events || '0'}</td>
+        `;
+        statsList.appendChild(tr);
+    });
+    statsList.style.display = 'block';
+    document.getElementById('stats-error').style.display = 'none';
 } 
