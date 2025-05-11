@@ -629,8 +629,12 @@
             return null;
         }
 
-        // Save stats data to localStorage
+        // Save stats data to localStorage for each range
         function saveStatsData(data, range) {
+            let statsData = {};
+            try {
+                statsData = JSON.parse(localStorage.getItem('statsData') || '{}');
+            } catch (e) { statsData = {}; }
             statsData[range] = data;
             localStorage.setItem('statsData', JSON.stringify(statsData));
         }
@@ -731,7 +735,7 @@
                 }
                 // --- DATA IS READY: AUTO-RENDER ---
                 setFetchButtonsDisabled(false);
-                saveStatsData(data, range); // Save to localStorage
+                saveStatsData(data, range); // Save to localStorage for this range
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
                 // Refresh overview and top apps after RUN completes
