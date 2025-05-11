@@ -616,36 +616,50 @@
             '30d': null
         };
 
-        // Load stats data from localStorage
+        // Load stats data from localStorage (multi-range structure)
         function loadStatsData() {
             const savedData = localStorage.getItem('statsData');
             if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                Object.keys(parsedData).forEach(range => {
-                    statsData[range] = parsedData[range];
+                let parsedData;
+                try {
+                    parsedData = JSON.parse(savedData);
+                } catch (e) {
+                    // Try to migrate old flat format
+                    try {
+                        parsedData = { '10d': JSON.parse(savedData) };
+                    } catch (e2) {
+                        parsedData = {};
+                    }
+                }
+                // Migrate old flat format if needed
+                if (parsedData && parsedData.apps && !parsedData['10d']) {
+                    parsedData = { '10d': { apps: parsedData.apps } };
+                }
+                // Copy to statsData
+                Object.keys(statsData).forEach(range => {
+                    if (parsedData[range]) statsData[range] = parsedData[range];
                 });
                 return statsData;
             }
             return null;
         }
 
-        // Save stats data to localStorage
+        // Save stats data to localStorage (multi-range structure)
         function saveStatsData(data, range) {
+            // Load existing
+            let allData = {};
+            const saved = localStorage.getItem('statsData');
+            if (saved) {
+                try { allData = JSON.parse(saved); } catch (e) { allData = {}; }
+            }
+            allData[range] = data;
+            localStorage.setItem('statsData', JSON.stringify(allData));
             statsData[range] = data;
-            localStorage.setItem('statsData', JSON.stringify(statsData));
         }
 
         // Date range tab logic
         const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
-            // Always reload cache from localStorage
-            const savedData = localStorage.getItem('statsData');
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                Object.keys(parsedData).forEach(r => {
-                    statsData[r] = parsedData[r];
-                });
-            }
             document.querySelectorAll('.date-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600','text-green-700','bg-white');
                 btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
@@ -656,8 +670,9 @@
             document.getElementById(`stats-content-${range}`).style.display = '';
 
             // Load and render cached data for this range if available
-            if (statsData[range]) {
-                renderStatsAppsForRange(range, statsData[range].apps || []);
+            loadStatsData();
+            if (statsData[range] && statsData[range].apps && statsData[range].apps.length > 0) {
+                renderStatsAppsForRange(range, statsData[range].apps);
             }
         }
         document.querySelectorAll('.date-range-tab').forEach(btn => {
@@ -671,7 +686,7 @@
         }
         activateDefaultStatsTab();
 
-        // Patch RUN REPORT button logic to add logging and defensive checks
+        // Patch RUN REPORT button logic to save per-range
         const periodMap = {
             '10d': 'last10',
             'mtd': 'mtd',
@@ -739,7 +754,7 @@
                 }
                 // --- DATA IS READY: AUTO-RENDER ---
                 setFetchButtonsDisabled(false);
-                saveStatsData(data, range); // Save to localStorage
+                saveStatsData(data, range); // Save to localStorage (per range)
                 renderStatsAppsForRange(range, data.apps || []);
                 if (loadingElem) loadingElem.style.display = 'none';
                 // Refresh overview and top apps after RUN completes
@@ -2606,33 +2621,23 @@
             }
             if (tabName === 'stats') {
                 fetch('/api/stats-page').then(() => {
-                    const cached = localStorage.getItem('statsData');
-                    console.log('Cached statsData:', cached);
-                    let stats = null;
-                    if (cached) {
-                        try {
-                            stats = JSON.parse(cached);
-                        } catch (e) {
-                            console.error('Error parsing cached statsData:', e);
-                        }
+                    loadStatsData();
+                    // Get the currently active range (default to 10d)
+                    let range = '10d';
+                    const activeBtn = document.querySelector('.date-range-tab.border-green-600');
+                    if (activeBtn) range = activeBtn.getAttribute('data-range');
+                    const statsList = document.getElementById(`stats-data-${range}`);
+                    let apps = null;
+                    if (statsData[range] && statsData[range].apps && statsData[range].apps.length > 0) {
+                        apps = statsData[range].apps;
                     }
-                    const dateRanges = ['10d', 'mtd', 'lastmonth', '30d'];
-                    dateRanges.forEach(range => {
-                        const statsList = document.getElementById(`stats-data-${range}`);
-                        let apps = null;
-                        if (stats && stats[range] && stats[range].apps && stats[range].apps.length > 0) {
-                            apps = stats[range].apps;
-                        } else if (stats && stats.apps && stats.apps.length > 0 && range === '10d') {
-                            apps = stats.apps;
-                        }
-                        if (apps) {
-                            renderStatsAppsForRange(range, apps);
-                            document.getElementById('stats-error').style.display = 'none';
-                        } else {
-                            statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
-                            document.getElementById('stats-error').style.display = '';
-                        }
-                    });
+                    if (apps) {
+                        renderStatsAppsForRange(range, apps);
+                        document.getElementById('stats-error').style.display = 'none';
+                    } else {
+                        statsList.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                        document.getElementById('stats-error').style.display = '';
+                    }
                 });
             }
             if (tabName === 'fraud') {
