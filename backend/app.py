@@ -1200,5 +1200,47 @@ def stats_page():
 def fraud_page():
     return {'status': 'ok'}
 
+@app.route('/get_subpage_10d')
+def get_subpage_10d():
+    import logging
+    app.logger.debug('GET /get_subpage_10d')
+    return get_stats_for_range('10d')
+
+@app.route('/get_subpage_mtd')
+def get_subpage_mtd():
+    import logging
+    app.logger.debug('GET /get_subpage_mtd')
+    return get_stats_for_range('mtd')
+
+@app.route('/get_subpage_lastmonth')
+def get_subpage_lastmonth():
+    import logging
+    app.logger.debug('GET /get_subpage_lastmonth')
+    return get_stats_for_range('lastmonth')
+
+@app.route('/get_subpage_30d')
+def get_subpage_30d():
+    import logging
+    app.logger.debug('GET /get_subpage_30d')
+    return get_stats_for_range('30d')
+
+# Helper to fetch stats for a given range
+def get_stats_for_range(range_key):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            result['updated_at'] = updated_at
+            return jsonify(result)
+        else:
+            return jsonify({'apps': [], 'updated_at': None})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
