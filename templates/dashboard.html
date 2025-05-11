@@ -1,14 +1,11 @@
 function renderChartWithRetry(canvasId, renderFn, retries = 30) {
     const el = document.getElementById(canvasId);
     if (el && window.Chart) {
-        // Use requestAnimationFrame to ensure DOM is painted
-        requestAnimationFrame(() => {
-            try {
-                renderFn(el);
-            } catch (e) {
-                console.error("Chart.js error for " + canvasId + ":", e);
-            }
-        });
+        try {
+            renderFn(el);
+        } catch (e) {
+            console.error("Chart.js error for " + canvasId + ":", e);
+        }
     } else if (retries > 0) {
         setTimeout(() => renderChartWithRetry(canvasId, renderFn, retries - 1), 200);
     } else {
@@ -16,119 +13,75 @@ function renderChartWithRetry(canvasId, renderFn, retries = 30) {
     }
 }
 
-function forceRenderChartsForApp(appId, data) {
-    // Force re-render all charts for this app
-    const chartIds = [
-        `impressions-clicks-${appId}`,
-        `installs-events-${appId}`,
-        `fraud-blocked-${appId}`
-    ];
-    
-    chartIds.forEach(canvasId => {
-        const el = document.getElementById(canvasId);
-        if (el) {
-            // Destroy existing chart if it exists
-            const existingChart = Chart.getChart(el);
-            if (existingChart) {
-                existingChart.destroy();
-            }
-            
-            // Re-render the chart
-            renderChartWithRetry(canvasId, (canvas) => {
-                if (canvasId.includes('impressions-clicks')) {
-                    renderImpressionsClicksChart(canvas, data);
-                } else if (canvasId.includes('installs-events')) {
-                    renderInstallsEventsChart(canvas, data);
-                } else if (canvasId.includes('fraud-blocked')) {
-                    renderFraudBlockedChart(canvas, data);
-                }
-            });
-        }
-    });
-}
-
-function renderAppCard(app, data) {
-    const card = document.createElement('div');
-    card.className = 'app-card';
-    card.innerHTML = `
-        <div class="app-header">
+function renderStatsAppsForRange(apps, range) {
+    const container = document.getElementById('stats-apps-container');
+    container.innerHTML = '';
+    apps.forEach(app => {
+        let safeName = app.app_name.replace(/\W/g, "");
+        let mainId = `trend-main-${app.app_id}-${safeName}`;
+        let eventsId = `trend-events-${app.app_id}-${safeName}`;
+        let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
+        let section = document.createElement('div');
+        section.className = 'app-section';
+        section.innerHTML = `
             <h3>${app.app_name}</h3>
-            <span class="app-id">${app.app_id}</span>
-        </div>
-        <div class="app-charts">
             <div class="chart-container">
                 <h4>Impressions & Clicks</h4>
-                <canvas id="impressions-clicks-${app.app_id}"></canvas>
+                <canvas id="${mainId}"></canvas>
             </div>
             <div class="chart-container">
                 <h4>Installs & Events</h4>
-                <canvas id="installs-events-${app.app_id}"></canvas>
+                <canvas id="${eventsId}"></canvas>
             </div>
             <div class="chart-container">
                 <h4>Fraud: Blocked Installs</h4>
-                <canvas id="fraud-blocked-${app.app_id}"></canvas>
+                <canvas id="${fraudId}"></canvas>
             </div>
-        </div>
-    `;
-    
-    // Append the card first
-    document.getElementById('apps-container').appendChild(card);
-    
-    // Force render all charts for this app
-    forceRenderChartsForApp(app.app_id, data);
-    
-    return card;
-}
-
-function showStatsPage() {
-    document.getElementById('apps-page').style.display = 'none';
-    document.getElementById('stats-page').style.display = 'block';
-    document.getElementById('fraud-page').style.display = 'none';
-    
-    // Add re-render button if it doesn't exist
-    if (!document.getElementById('re-render-charts-btn')) {
-        const btn = document.createElement('button');
-        btn.id = 're-render-charts-btn';
-        btn.className = 'btn btn-secondary';
-        btn.innerHTML = 'Re-render Charts';
-        btn.onclick = forceRenderAllCharts;
-        document.querySelector('.stats-controls').appendChild(btn);
-    }
-    
-    // Call the logging endpoint
-    fetch('/api/stats-page')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Stats page activated:', data);
-            // After logging, try to show cached data
-            const cachedData = localStorage.getItem('statsData');
-            if (cachedData) {
-                const data = JSON.parse(cachedData);
-                renderStatsData(data);
-            } else {
-                document.getElementById('stats-container').innerHTML = '<p>No cached data available. Please run a report.</p>';
-            }
-        })
-        .catch(error => {
-            console.error('Error activating stats page:', error);
-            // Even if logging fails, try to show cached data
-            const cachedData = localStorage.getItem('statsData');
-            if (cachedData) {
-                const data = JSON.parse(cachedData);
-                renderStatsData(data);
-            } else {
-                document.getElementById('stats-container').innerHTML = '<p>No cached data available. Please run a report.</p>';
-            }
+        `;
+        container.appendChild(section);
+    });
+    // Force re-render of all charts after a delay to ensure DOM is ready
+    setTimeout(() => {
+        apps.forEach(app => {
+            let safeName = app.app_name.replace(/\W/g, "");
+            let mainId = `trend-main-${app.app_id}-${safeName}`;
+            let eventsId = `trend-events-${app.app_id}-${safeName}`;
+            let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
+            renderChartWithRetry(mainId, (el) => {
+                new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels: app.dates,
+                        datasets: [
+                            { label: 'Impressions', data: app.impressions, borderColor: 'blue' },
+                            { label: 'Clicks', data: app.clicks, borderColor: 'green' }
+                        ]
+                    }
+                });
+            });
+            renderChartWithRetry(eventsId, (el) => {
+                new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels: app.dates,
+                        datasets: [
+                            { label: 'Installs', data: app.installs, borderColor: 'red' },
+                            { label: 'Events', data: app.events, borderColor: 'orange' }
+                        ]
+                    }
+                });
+            });
+            renderChartWithRetry(fraudId, (el) => {
+                new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels: app.dates,
+                        datasets: [
+                            { label: 'Blocked Installs', data: app.blocked_installs, borderColor: 'purple' }
+                        ]
+                    }
+                });
+            });
         });
-}
-
-function forceRenderAllCharts() {
-    const cachedData = localStorage.getItem('statsData');
-    if (cachedData) {
-        const data = JSON.parse(cachedData);
-        // Re-render charts for each app
-        data.apps.forEach(app => {
-            forceRenderChartsForApp(app.app_id, data);
-        });
-    }
+    }, 500);
 } 
