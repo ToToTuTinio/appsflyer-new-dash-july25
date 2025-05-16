@@ -18,6 +18,12 @@ import sqlite3
 import sys
 import json
 import pytz
+from rq import Queue
+from redis import Redis
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_sock import Sock
+import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
 
@@ -38,7 +44,98 @@ if env_path.exists():
 
 app = Flask(__name__)
 CORS(app)
-app.secret_key = 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%$^&*()_+'  # Required for session management
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%$^&*()_+')
+
+# Initialize Redis connection
+redis_conn = Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379)
+task_queue = Queue(connection=redis_conn)
+
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_sock_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+# Initialize WebSocket
+sock = Sock(app)
+
+# Store connected WebSocket clients
+connected_clients = set()
+
+@sock.route('/ws')
+def websocket(ws):
+    connected_clients.add(ws)
+    try:
+        while True:
+            # Keep the connection alive
+            ws.receive()
+    except Exception as e:
+        print(f"WebSocket error: {str(e)}")
+    finally:
+        connected_clients.remove(ws)
+
+def broadcast_update(data):
+    """Broadcast data update to all connected clients"""
+    for client in connected_clients.copy():
+        try:
+            client.send(json.dumps({
+                'type': 'stats_update',
+                'data': data
+            }))
+        except Exception as e:
+            print(f"Error broadcasting to client: {str(e)}")
+            connected_clients.remove(client)
+
+def background_update():
+    """Background thread to periodically update and broadcast data"""
+    while True:
+        try:
+            # Get fresh data
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            
+            # Update shared cache
+            apps = get_active_apps(force_fetch=True)
+            if apps and apps.get('apps'):
+                # Create initial cache
+                result = {
+                    'totals': {
+                        'apps': len(apps['apps']),
+                        'impressions': 0,
+                        'clicks': 0,
+                        'installs': 0
+                    },
+                    'trend': {
+                        'dates': [],
+                        'impressions': [],
+                        'clicks': [],
+                        'installs': []
+                    },
+                    'topBadSourcesByApp': [],
+                    'last_updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                # Save as shared cache
+                c.execute('''
+                    INSERT OR REPLACE INTO stats_cache (range, data, updated_at, is_shared) 
+                    VALUES (?, ?, CURRENT_TIMESTAMP, 1)
+                ''', ('last10:shared', json.dumps(result)))
+                conn.commit()
+                
+                # Broadcast update to all connected clients
+                broadcast_update(result)
+            
+            conn.close()
+        except Exception as e:
+            print(f"Error in background update: {str(e)}")
+        
+        # Wait for 5 minutes before next update
+        time.sleep(300)
+
+# Start background update thread
+update_thread = threading.Thread(target=background_update, daemon=True)
+update_thread.start()
 
 # --- GLOBAL JSON ERROR HANDLER ---
 from werkzeug.exceptions import HTTPException
@@ -59,8 +156,11 @@ def handle_exception(e):
     }), 500
 
 # Dashboard Configuration
-DASHBOARD_USERNAME = "nexamob"
-DASHBOARD_PASSWORD = "NexamobTech$"
+DASHBOARD_USERNAME = os.getenv('DASHBOARD_USERNAME')
+DASHBOARD_PASSWORD = os.getenv('DASHBOARD_PASSWORD')
+
+if not all([DASHBOARD_USERNAME, DASHBOARD_PASSWORD]):
+    raise ValueError("DASHBOARD_USERNAME and DASHBOARD_PASSWORD not found in environment variables")
 
 # AppsFlyer Configuration
 EMAIL = os.getenv('EMAIL')
@@ -75,31 +175,51 @@ DB_PATH = 'event_selections.db'
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # Create apps table to store app information and status
+    c.execute('''CREATE TABLE IF NOT EXISTS apps (
+        app_id TEXT PRIMARY KEY,
+        app_name TEXT,
+        is_active BOOLEAN,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Create app_event_selections table to store event selections
     c.execute('''CREATE TABLE IF NOT EXISTS app_event_selections (
         app_id TEXT PRIMARY KEY,
         event1 TEXT,
-        event2 TEXT
+        event2 TEXT,
+        is_custom_event1 BOOLEAN DEFAULT 0,
+        is_custom_event2 BOOLEAN DEFAULT 0,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (app_id) REFERENCES apps(app_id)
     )''')
+    
+    # Create stats_cache table
     c.execute('''CREATE TABLE IF NOT EXISTS stats_cache (
         range TEXT PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_shared BOOLEAN DEFAULT 1
     )''')
+    
+    # Create fraud_cache table
     c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
         range TEXT PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_shared BOOLEAN DEFAULT 1
     )''')
+    
+    # Create event_cache table
     c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
         app_id TEXT PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_shared BOOLEAN DEFAULT 1,
+        FOREIGN KEY (app_id) REFERENCES apps(app_id)
     )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
-        id INTEGER PRIMARY KEY,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
+    
     conn.commit()
     conn.close()
 
@@ -120,12 +240,13 @@ def login():
     return render_template('login.html')
 
 @app.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def handle_login():
     data = request.get_json()
     if data['email'] == DASHBOARD_USERNAME and data['password'] == DASHBOARD_PASSWORD:
         session['logged_in'] = True
         return jsonify({'success': True})
-    return jsonify({'success': False}), 401
+    return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
 
 @app.route('/logout')
 def logout():
@@ -145,45 +266,53 @@ def dashboard():
 
 def get_active_apps(max_retries=7, force_fetch=False):
     """
-    Fetch the list of active apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
+    Fetch the list of apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
     Only fetches new data if force_fetch is True or if there's no cache.
     """
     import pytz
     gmt2 = pytz.timezone('Europe/Berlin')
     now = datetime.datetime.now(gmt2)
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
-        id INTEGER PRIMARY KEY,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    conn.commit()
-    c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
-    row = c.fetchone()
-    if row:
-        data, updated_at = row
-        updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
-        updated_at_dt = gmt2.localize(updated_at_dt)
-        if not force_fetch and (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
-            result = json.loads(data)
-            result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Check if we need to fetch new data
+    c.execute('SELECT MAX(last_updated) FROM apps')
+    last_update = c.fetchone()[0]
+    
+    if last_update:
+        last_update_dt = datetime.datetime.strptime(last_update, '%Y-%m-%d %H:%M:%S')
+        last_update_dt = gmt2.localize(last_update_dt)
+        if not force_fetch and (now - last_update_dt).total_seconds() < 86400:  # 24 hours
+            # Return cached data
+            c.execute('SELECT app_id, app_name, is_active FROM apps')
+            apps = [{"app_id": row[0], "app_name": row[1], "is_active": bool(row[2])} for row in c.fetchall()]
             conn.close()
-            return result
-    # If no cache or cache is old or force_fetch is True, fetch new data
-    if force_fetch or not row:  # Only fetch if explicitly requested or no cache exists
+            return {
+                "count": len(apps),
+                "apps": apps,
+                "fetch_time": last_update
+            }
+    
+    # Fetch new data
+    if force_fetch or not last_update:
         apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
         fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
-        result = {
+        
+        # Update database with new app data
+        c.execute('DELETE FROM apps')  # Clear existing apps
+        for app in apps:
+            c.execute('INSERT OR REPLACE INTO apps (app_id, app_name, is_active, last_updated) VALUES (?, ?, ?, ?)',
+                     (app['app_id'], app['app_name'], app['is_active'], fetch_time))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
             "count": len(apps),
             "apps": apps,
             "fetch_time": fetch_time
         }
-        c.execute('DELETE FROM apps_cache')  # Only keep one row
-        c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
-        conn.commit()
-        conn.close()
-        return result
     else:
         # Return empty result if cache is old but we're not forcing a fetch
         return {
@@ -1070,23 +1199,65 @@ def overview():
         # Read the most recent 'last10' stats_cache entry (regardless of event selections or app IDs)
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
+        
+        # First, try to get shared cache
+        c.execute("""
+            SELECT data, updated_at 
+            FROM stats_cache 
+            WHERE range LIKE 'last10%' 
+            AND is_shared = 1 
+            ORDER BY updated_at DESC 
+            LIMIT 1
+        """)
         row = c.fetchone()
+        
+        # If no shared cache exists, create one
+        if not row:
+            # Get active apps
+            apps = get_active_apps(force_fetch=True)
+            if apps and apps.get('apps'):
+                # Create initial cache
+                result = {
+                    'totals': {
+                        'apps': len(apps['apps']),
+                        'impressions': 0,
+                        'clicks': 0,
+                        'installs': 0
+                    },
+                    'trend': {
+                        'dates': [],
+                        'impressions': [],
+                        'clicks': [],
+                        'installs': []
+                    },
+                    'topBadSourcesByApp': [],
+                    'last_updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                # Save as shared cache
+                c.execute('''
+                    INSERT INTO stats_cache (range, data, updated_at, is_shared) 
+                    VALUES (?, ?, CURRENT_TIMESTAMP, 1)
+                ''', ('last10:shared', json.dumps(result)))
+                conn.commit()
+                row = (json.dumps(result), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        
         total_impressions = 0
         total_clicks = 0
         total_installs = 0
         last_updated = None
         date_map = {}
+        
         if row:
             data, updated_at = row
             stats = json.loads(data)
             # Convert last_updated to GMT+2
             if updated_at:
-                import datetime
                 utc_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
                 utc_dt = utc_dt.replace(tzinfo=pytz.utc)
                 gmt2 = pytz.timezone('Europe/Berlin')
                 last_updated = utc_dt.astimezone(gmt2).strftime('%Y-%m-%d %H:%M:%S')
+            
             for app in stats.get('apps', []):
                 for entry in app.get('table', []):
                     date = entry.get('date')
@@ -1099,53 +1270,58 @@ def overview():
                     total_impressions += int(entry.get('impressions', 0))
                     total_clicks += int(entry.get('clicks', 0))
                     total_installs += int(entry.get('installs', 0))
+        
         trend_dates = sorted(date_map.keys())
         trend_impressions = [date_map[d]['impressions'] for d in trend_dates]
         trend_clicks = [date_map[d]['clicks'] for d in trend_dates]
         trend_installs = [date_map[d]['installs'] for d in trend_dates]
 
-        # Use only the most recent 'last10:' fraud_cache entry for Top Fraudulent Sources
-        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last10:%' ORDER BY updated_at DESC LIMIT 1")
-        fraud_cache_row = c.fetchone()
+        # Get shared fraud cache
+        c.execute("""
+            SELECT data 
+            FROM fraud_cache 
+            WHERE range LIKE 'last10%' 
+            AND is_shared = 1 
+            ORDER BY updated_at DESC 
+            LIMIT 1
+        """)
+        fraud_row = c.fetchone()
+        
         top_bad_sources_by_app = []
-        if fraud_cache_row:
-            fraud_cache_key = fraud_cache_row[0]
-            c.execute('SELECT data FROM fraud_cache WHERE range = ?', (fraud_cache_key,))
-            fraud_row = c.fetchone()
-            if fraud_row:
-                fraud_data = json.loads(fraud_row[0])
-                # For each app, group by media_source and sum fraud
-                for app in fraud_data.get('apps', []):
-                    app_name = app.get('app_name', '')
-                    app_id = app.get('app_id', '')
-                    source_map = {}
-                    for row in app.get('table', []):
-                        media_source = row.get('media_source', '')
-                        pa_fraud = int(row.get('blocked_installs_pa', 0))
-                        rt_fraud = int(row.get('blocked_installs_rt', 0))
-                        if pa_fraud > 0 or rt_fraud > 0:
-                            if media_source not in source_map:
-                                source_map[media_source] = {'media_source': media_source, 'pa_fraud': 0, 'rt_fraud': 0}
-                            source_map[media_source]['pa_fraud'] += pa_fraud
-                            source_map[media_source]['rt_fraud'] += rt_fraud
-                    # Top 5 sources for this app
-                    sources = list(source_map.values())
-                    sources.sort(key=lambda x: x['pa_fraud'] + x['rt_fraud'], reverse=True)
-                    top_sources = sources[:5]
-                    total_fraud = sum(s['pa_fraud'] + s['rt_fraud'] for s in top_sources)
+        if fraud_row:
+            fraud_data = json.loads(fraud_row[0])
+            for app in fraud_data.get('apps', []):
+                app_name = app.get('app_name', '')
+                app_id = app.get('app_id', '')
+                source_map = {}
+                for row in app.get('table', []):
+                    media_source = row.get('media_source', '')
+                    pa_fraud = int(row.get('blocked_installs_pa', 0))
+                    rt_fraud = int(row.get('blocked_installs_rt', 0))
+                    if pa_fraud > 0 or rt_fraud > 0:
+                        if media_source not in source_map:
+                            source_map[media_source] = {'media_source': media_source, 'pa_fraud': 0, 'rt_fraud': 0}
+                        source_map[media_source]['pa_fraud'] += pa_fraud
+                        source_map[media_source]['rt_fraud'] += rt_fraud
+                sources = list(source_map.values())
+                sources.sort(key=lambda x: x['pa_fraud'] + x['rt_fraud'], reverse=True)
+                top_sources = sources[:5]
+                total_fraud = sum(s['pa_fraud'] + s['rt_fraud'] for s in top_sources)
+                if total_fraud > 0:
                     top_bad_sources_by_app.append({
                         'app_id': app_id,
                         'app_name': app_name,
                         'sources': top_sources,
                         'total_fraud': total_fraud
                     })
-                # Sort apps by total fraud, take top 5
-                top_bad_sources_by_app.sort(key=lambda x: x['total_fraud'], reverse=True)
-                top_bad_sources_by_app = top_bad_sources_by_app[:5]
+            top_bad_sources_by_app.sort(key=lambda x: x['total_fraud'], reverse=True)
+            top_bad_sources_by_app = top_bad_sources_by_app[:5]
+        
         conn.close()
 
         return jsonify({
             'totals': {
+                'apps': len(get_active_apps().get('apps', [])),
                 'impressions': total_impressions,
                 'clicks': total_clicks,
                 'installs': total_installs
@@ -1334,6 +1510,132 @@ def get_stats_for_range(range_key):
             return jsonify({'apps': [], 'updated_at': None})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def process_report_async(apps, period, selected_events):
+    """Background task to process report data"""
+    # Move the report processing logic here
+    # This will run in a separate worker process
+    pass
+
+@app.route('/start-report', methods=['POST'])
+@login_required
+def start_report():
+    data = request.get_json()
+    apps = data.get('apps', [])
+    period = data.get('period')
+    selected_events = data.get('selected_events', [])
+    
+    # Start background task
+    job = task_queue.enqueue(process_report_async, apps, period, selected_events)
+    
+    return jsonify({
+        'status': 'processing',
+        'job_id': job.id
+    })
+
+@app.route('/report-status/<job_id>')
+@login_required
+def report_status(job_id):
+    job = task_queue.fetch_job(job_id)
+    if job is None:
+        return jsonify({'status': 'not_found'})
+    
+    if job.is_finished:
+        return jsonify({
+            'status': 'completed',
+            'result': job.result
+        })
+    elif job.is_failed:
+        return jsonify({
+            'status': 'failed',
+            'error': str(job.exc_info)
+        })
+    else:
+        return jsonify({'status': 'processing'})
+
+@app.route('/save_event_selections', methods=['POST'])
+@login_required
+def save_event_selections():
+    try:
+        data = request.get_json()
+        app_id = data.get('app_id')
+        event1 = data.get('event1')
+        event2 = data.get('event2')
+        is_custom_event1 = data.get('is_custom_event1', False)
+        is_custom_event2 = data.get('is_custom_event2', False)
+        
+        if not app_id:
+            return jsonify({"error": "app_id is required"}), 400
+            
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Update or insert event selections
+        c.execute('''INSERT OR REPLACE INTO app_event_selections 
+                    (app_id, event1, event2, is_custom_event1, is_custom_event2, last_updated)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''',
+                 (app_id, event1, event2, is_custom_event1, is_custom_event2))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_event_selections/<app_id>')
+@login_required
+def get_event_selections(app_id):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        c.execute('''SELECT event1, event2, is_custom_event1, is_custom_event2 
+                    FROM app_event_selections WHERE app_id = ?''', (app_id,))
+        row = c.fetchone()
+        
+        conn.close()
+        
+        if row:
+            return jsonify({
+                "event1": row[0],
+                "event2": row[1],
+                "is_custom_event1": bool(row[2]),
+                "is_custom_event2": bool(row[3])
+            })
+        else:
+            return jsonify({
+                "event1": None,
+                "event2": None,
+                "is_custom_event1": False,
+                "is_custom_event2": False
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/update_app_status', methods=['POST'])
+@login_required
+def update_app_status():
+    try:
+        data = request.get_json()
+        app_id = data.get('app_id')
+        is_active = data.get('is_active')
+        
+        if not app_id or is_active is None:
+            return jsonify({"error": "app_id and is_active are required"}), 400
+            
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Update app status
+        c.execute('UPDATE apps SET is_active = ? WHERE app_id = ?', (is_active, app_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

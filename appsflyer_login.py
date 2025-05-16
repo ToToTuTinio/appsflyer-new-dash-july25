@@ -86,7 +86,7 @@ def get_apps_with_installs(email, password, max_retries=7):
             print("Opening login page...")
             driver.get("https://hq1.appsflyer.com/auth/login")
             time.sleep(5)
-#this is a test
+
             print("Waiting for email field...")
             try:
                 email_field = WebDriverWait(driver, 30).until(
@@ -139,42 +139,47 @@ def get_apps_with_installs(email, password, max_retries=7):
             driver.get("https://hq1.appsflyer.com/apps/myapps")
             time.sleep(15)
 
-            print("Loading all apps via scrolling...")
-            app_elements = []
-            while True:
-                current_app_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
+            print("Loading all apps...")
+            apps = []
+            
+            # Find all app cards
+            app_cards = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
+            
+            for card in app_cards:
+                try:
+                    # Get app ID
+                    app_id = card.text
+                    
+                    # Get app name (parent element of the card)
+                    app_name_element = card.find_element(By.XPATH, './ancestor::div[contains(@class, "MuiCard-root")]//h5')
+                    app_name = app_name_element.text if app_name_element else "N/A"
+                    
+                    # Check if app is active by looking for the active status indicator
+                    is_active = False
+                    try:
+                        status_element = card.find_element(By.XPATH, './ancestor::div[contains(@class, "MuiCard-root")]//div[contains(@class, "status")]')
+                        is_active = "active" in status_element.text.lower()
+                    except:
+                        pass
+                    
+                    apps.append({
+                        "app_id": app_id,
+                        "app_name": app_name,
+                        "is_active": is_active
+                    })
+                except Exception as e:
+                    print(f"Error processing app card: {str(e)}")
+                    continue
 
-                if len(current_app_elements) > len(app_elements):
-                    app_elements = current_app_elements
-                    driver.execute_script("arguments[0].scrollIntoView();", app_elements[-1])
-                    time.sleep(5)
-                else:
-                    break
-
-            print("Scrolling complete. Extracting apps...")
-            apps_with_installs = []
-            app_name_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-name"]')
-            app_id_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
-            install_elements = driver.find_elements(By.CSS_SELECTOR, 'div.installs')
-
-            for index, app_element in enumerate(app_id_elements):
-                app_id = app_element.text
-                app_name = app_name_elements[index].text if index < len(app_name_elements) else "N/A"
-                install_count = int(install_elements[index].text.replace(",", "")) if index < len(install_elements) else 0
-
-                if install_count > 0:
-                    apps_with_installs.append({"app_id": app_id, "app_name": app_name, "install_count": install_count})
-
-            print(f"Apps with installs > 0: {len(apps_with_installs)}")
-            return [{"app_id": app["app_id"], "app_name": app["app_name"]} for app in apps_with_installs]
+            print(f"Total apps found: {len(apps)}")
+            return apps
 
         except Exception as e:
             error_message = str(e).lower()
-            # Check for specific API limitations that don't need retries
             if "maximum number of install reports" in error_message or "subscription package doesn't include raw data" in error_message:
                 print(f"API limitation detected: {error_message}")
                 print("Skipping retries for this app due to API limitations.")
-                return []  # Return empty list immediately for these cases
+                return []
             
             retries += 1
             print(f"An error occurred: {e}. Retrying ({retries}/{max_retries})...")

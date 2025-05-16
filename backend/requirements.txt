@@ -1,7 +1,10 @@
-flask
-flask-cors
-selenium
-webdriver-manager
-requests
-python-dotenv
+flask==2.0.1
+flask-cors==3.0.10
+selenium==4.1.0
+requests==2.26.0
+python-dotenv==0.19.0
+rq==1.9.0
+redis==4.0.2
+flask-limiter==3.3.0
 gunicorn
+flask-sock==0.6.0

@@ -3,36 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AppsFlyer Dashboard - Login</title>
+    <title>AppsFlyer Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@heroicons/react@2.0.18/outline.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             background: #f4f8f7;
         }
-        .login-container {
-            min-height: 100vh;
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 1000;
         }
-        .login-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
             width: 100%;
-            max-width: 400px;
-        }
-        .error-message {
-            color: #ef4444;
-            margin-top: 0.5rem;
-            font-size: 0.875rem;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-card">
+    <div id="loading" class="loading hidden">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div id="loginView" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
             <h1 class="text-2xl font-bold text-center mb-6">AppsFlyer Dashboard</h1>
             <form id="loginForm" class="space-y-4">
                 <div>
@@ -45,7 +61,7 @@
                     <input type="password" id="password" name="password" required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                 </div>
-                <div id="errorMessage" class="error-message hidden"></div>
+                <div id="errorMessage" class="text-red-500 text-sm hidden"></div>
                 <button type="submit"
                     class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     Sign in
@@ -54,12 +70,346 @@
         </div>
     </div>
 
+    <div id="dashboardView" class="hidden">
+        <nav class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex">
+                        <div class="flex-shrink-0 flex items-center">
+                            <h1 class="text-xl font-bold">AppsFlyer Dashboard</h1>
+                        </div>
+                        <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                            <a href="#" class="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                Overview
+                            </a>
+                            <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                Apps
+                            </a>
+                            <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                Stats
+                            </a>
+                            <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                Fraud
+                            </a>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <button id="logoutBtn" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div id="dashboardContent" class="px-4 py-6 sm:px-0">
+                <!-- Apps Section -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Apps</h2>
+                        <button id="getAppsBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            Get Apps
+                        </button>
+                    </div>
+                    <div id="appsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Apps will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
     <script>
+        const loading = document.getElementById('loading');
+        const loginView = document.getElementById('loginView');
+        const dashboardView = document.getElementById('dashboardView');
+        const errorMessage = document.getElementById('errorMessage');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        function showLoading() {
+            loading.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loading.classList.add('hidden');
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+        async function loadDashboardContent() {
+            showLoading();
+            try {
+                const response = await fetch('/api/overview');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update dashboard content with the data
+                    document.getElementById('dashboardContent').innerHTML = `
+                        <div class="space-y-6">
+                            <!-- Stats Overview Cards -->
+                            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                                <div class="bg-white overflow-hidden shadow rounded-lg">
+                                    <div class="p-5">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                </svg>
+                                            </div>
+                                            <div class="ml-5 w-0 flex-1">
+                                                <dl>
+                                                    <dt class="text-sm font-medium text-gray-500 truncate">Total Apps</dt>
+                                                    <dd class="text-lg font-medium text-gray-900">${data.totals?.apps || 0}</dd>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-white overflow-hidden shadow rounded-lg">
+                                    <div class="p-5">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            </div>
+                                            <div class="ml-5 w-0 flex-1">
+                                                <dl>
+                                                    <dt class="text-sm font-medium text-gray-500 truncate">Total Impressions</dt>
+                                                    <dd class="text-lg font-medium text-gray-900">${data.totals?.impressions?.toLocaleString() || 0}</dd>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-white overflow-hidden shadow rounded-lg">
+                                    <div class="p-5">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                                </svg>
+                                            </div>
+                                            <div class="ml-5 w-0 flex-1">
+                                                <dl>
+                                                    <dt class="text-sm font-medium text-gray-500 truncate">Total Clicks</dt>
+                                                    <dd class="text-lg font-medium text-gray-900">${data.totals?.clicks?.toLocaleString() || 0}</dd>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-white overflow-hidden shadow rounded-lg">
+                                    <div class="p-5">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                            <div class="ml-5 w-0 flex-1">
+                                                <dl>
+                                                    <dt class="text-sm font-medium text-gray-500 truncate">Total Installs</dt>
+                                                    <dd class="text-lg font-medium text-gray-900">${data.totals?.installs?.toLocaleString() || 0}</dd>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Charts Section -->
+                            <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                                <!-- Performance Trends Chart -->
+                                <div class="bg-white overflow-hidden shadow rounded-lg">
+                                    <div class="p-5">
+                                        <h3 class="text-lg font-medium text-gray-900">Performance Trends</h3>
+                                        <div class="chart-container mt-4">
+                                            <canvas id="performanceChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Fraud Overview Chart -->
+                                <div class="bg-white overflow-hidden shadow rounded-lg">
+                                    <div class="p-5">
+                                        <h3 class="text-lg font-medium text-gray-900">Fraud Overview</h3>
+                                        <div class="chart-container mt-4">
+                                            <canvas id="fraudChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Top Fraudulent Sources -->
+                            <div class="bg-white overflow-hidden shadow rounded-lg">
+                                <div class="p-5">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Top Fraudulent Sources</h3>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">App</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PA Fraud</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RT Fraud</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fraud</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                ${data.topBadSourcesByApp?.map(app => 
+                                                    app.sources.map((source, index) => `
+                                                        <tr>
+                                                            ${index === 0 ? `<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" rowspan="${app.sources.length}">${app.app_name}</td>` : ''}
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${source.media_source}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${source.pa_fraud}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${source.rt_fraud}</td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${source.pa_fraud + source.rt_fraud}</td>
+                                                        </tr>
+                                                    `).join('')
+                                                ).join('') || '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No data available</td></tr>'}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Last Updated -->
+                            <div class="text-sm text-gray-500 text-right">
+                                Last updated: ${data.last_updated || 'Never'}
+                            </div>
+                        </div>
+                    `;
+
+                    // Initialize charts
+                    if (data.trend) {
+                        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+                        new Chart(performanceCtx, {
+                            type: 'line',
+                            data: {
+                                labels: data.trend.dates,
+                                datasets: [
+                                    {
+                                        label: 'Impressions',
+                                        data: data.trend.impressions,
+                                        borderColor: 'rgb(59, 130, 246)',
+                                        tension: 0.1
+                                    },
+                                    {
+                                        label: 'Clicks',
+                                        data: data.trend.clicks,
+                                        borderColor: 'rgb(16, 185, 129)',
+                                        tension: 0.1
+                                    },
+                                    {
+                                        label: 'Installs',
+                                        data: data.trend.installs,
+                                        borderColor: 'rgb(245, 158, 11)',
+                                        tension: 0.1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    if (data.topBadSourcesByApp) {
+                        const fraudCtx = document.getElementById('fraudChart').getContext('2d');
+                        const fraudData = data.topBadSourcesByApp.reduce((acc, app) => {
+                            app.sources.forEach(source => {
+                                acc.labels.push(\`\${app.app_name} - \${source.media_source}\`);
+                                acc.paData.push(source.pa_fraud);
+                                acc.rtData.push(source.rt_fraud);
+                            });
+                            return acc;
+                        }, { labels: [], paData: [], rtData: [] });
+
+                        new Chart(fraudCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: fraudData.labels,
+                                datasets: [
+                                    {
+                                        label: 'PA Fraud',
+                                        data: fraudData.paData,
+                                        backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                                        borderColor: 'rgb(239, 68, 68)',
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'RT Fraud',
+                                        data: fraudData.rtData,
+                                        backgroundColor: 'rgba(245, 158, 11, 0.5)',
+                                        borderColor: 'rgb(245, 158, 11)',
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        ticks: {
+                                            maxRotation: 45,
+                                            minRotation: 45
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                showError('Error loading dashboard data');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Add auto-refresh functionality
+        let refreshInterval;
+        
+        function startAutoRefresh() {
+            // Refresh every 5 minutes
+            refreshInterval = setInterval(loadDashboardContent, 5 * 60 * 1000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+
+        // Start auto-refresh when dashboard is loaded
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            hideError();
+            showLoading();
+
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('errorMessage');
 
             try {
                 const response = await fetch('/login', {
@@ -71,30 +421,379 @@
                 });
 
                 if (response.ok) {
-                    window.location.href = '/dashboard';
+                    loginView.classList.add('hidden');
+                    dashboardView.classList.remove('hidden');
+                    loadDashboardContent();
+                    startAutoRefresh();
                 } else {
-                    errorMessage.textContent = 'Invalid credentials';
-                    errorMessage.classList.remove('hidden');
+                    showError('Invalid credentials');
                 }
             } catch (error) {
-                errorMessage.textContent = 'An error occurred. Please try again.';
-                errorMessage.classList.remove('hidden');
+                showError('An error occurred. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Stop auto-refresh when logging out
+        logoutBtn.addEventListener('click', async () => {
+            stopAutoRefresh();
+            showLoading();
+            try {
+                await fetch('/logout');
+                window.location.reload();
+            } catch (error) {
+                showError('Error logging out. Please try again.');
+            } finally {
+                hideLoading();
             }
         });
 
         // Check if already logged in
         async function checkAuth() {
+            showLoading();
             try {
                 const response = await fetch('/check-auth');
                 if (response.ok) {
-                    window.location.href = '/dashboard';
+                    loginView.classList.add('hidden');
+                    dashboardView.classList.remove('hidden');
+                    loadDashboardContent();
+                    startAutoRefresh();
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
+            } finally {
+                hideLoading();
             }
         }
 
         checkAuth();
+
+        // Add WebSocket connection for real-time updates
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 5000; // 5 seconds
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'stats_update') {
+                    updateDashboard(data.data);
+                }
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    setTimeout(() => {
+                        reconnectAttempts++;
+                        connectWebSocket();
+                    }, reconnectDelay);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Initialize WebSocket connection when dashboard is shown
+        function showDashboard() {
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('dashboardView').classList.remove('hidden');
+            connectWebSocket();
+            loadDashboardData();
+        }
+
+        // Update dashboard with new data
+        function updateDashboard(data) {
+            // Update totals
+            document.getElementById('totalApps').textContent = data.totals.apps.toLocaleString();
+            document.getElementById('totalImpressions').textContent = data.totals.impressions.toLocaleString();
+            document.getElementById('totalClicks').textContent = data.totals.clicks.toLocaleString();
+            document.getElementById('totalInstalls').textContent = data.totals.installs.toLocaleString();
+
+            // Update trend chart
+            updateTrendChart(data.trend);
+
+            // Update top bad sources
+            updateTopBadSources(data.topBadSourcesByApp);
+
+            // Update last updated time
+            document.getElementById('lastUpdated').textContent = `Last updated: ${data.last_updated}`;
+        }
+
+        // Update trend chart with new data
+        function updateTrendChart(trend) {
+            if (window.trendChart) {
+                window.trendChart.data.labels = trend.dates;
+                window.trendChart.data.datasets[0].data = trend.impressions;
+                window.trendChart.data.datasets[1].data = trend.clicks;
+                window.trendChart.data.datasets[2].data = trend.installs;
+                window.trendChart.update();
+            }
+        }
+
+        // Update top bad sources with new data
+        function updateTopBadSources(sources) {
+            const container = document.getElementById('topBadSources');
+            container.innerHTML = '';
+            
+            sources.forEach(app => {
+                const appCard = document.createElement('div');
+                appCard.className = 'bg-white rounded-lg shadow p-4 mb-4';
+                appCard.innerHTML = `
+                    <h3 class="text-lg font-semibold mb-2">${app.app_name}</h3>
+                    <div class="space-y-2">
+                        ${app.sources.map(source => `
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">${source.media_source}</span>
+                                <div class="flex space-x-4">
+                                    <span class="text-red-600">PA: ${source.pa_fraud}</span>
+                                    <span class="text-orange-600">RT: ${source.rt_fraud}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(appCard);
+            });
+        }
+
+        // Load initial dashboard data
+        function loadDashboardData() {
+            fetch('/api/overview')
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboard(data);
+                })
+                .catch(error => {
+                    console.error('Error loading dashboard data:', error);
+                    showError('Failed to load dashboard data. Please try again.');
+                });
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in
+            fetch('/api/check_auth')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        showDashboard();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking authentication:', error);
+                });
+        });
+
+        // Function to load apps
+        async function loadApps() {
+            showLoading();
+            try {
+                const response = await fetch('/get_active_apps');
+                if (response.ok) {
+                    const data = await response.json();
+                    const appsList = document.getElementById('appsList');
+                    appsList.innerHTML = '';
+                    
+                    data.apps.forEach(app => {
+                        const appCard = document.createElement('div');
+                        appCard.className = 'bg-white rounded-lg shadow p-4';
+                        appCard.innerHTML = `
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-semibold">${app.app_name}</h3>
+                                    <p class="text-sm text-gray-600">${app.app_id}</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 app-status" 
+                                               data-app-id="${app.app_id}" ${app.is_active ? 'checked' : ''}>
+                                        <span class="ml-2 text-sm">Active</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Event 1</label>
+                                    <div class="mt-1 flex rounded-md shadow-sm">
+                                        <input type="text" class="event1-input flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                               placeholder="Select or enter custom event" data-app-id="${app.app_id}">
+                                        <button class="event1-custom-btn inline-flex items-center px-3 py-2 border border-gray-300 bg-gray-50 text-gray-500 rounded-r-md hover:bg-gray-100"
+                                                data-app-id="${app.app_id}">
+                                            Custom
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Event 2</label>
+                                    <div class="mt-1 flex rounded-md shadow-sm">
+                                        <input type="text" class="event2-input flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                               placeholder="Select or enter custom event" data-app-id="${app.app_id}">
+                                        <button class="event2-custom-btn inline-flex items-center px-3 py-2 border border-gray-300 bg-gray-50 text-gray-500 rounded-r-md hover:bg-gray-100"
+                                                data-app-id="${app.app_id}">
+                                            Custom
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        appsList.appendChild(appCard);
+                        
+                        // Load saved event selections
+                        loadEventSelections(app.app_id);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading apps:', error);
+                showError('Failed to load apps. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Function to load event selections for an app
+        async function loadEventSelections(appId) {
+            try {
+                const response = await fetch(`/get_event_selections/${appId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const event1Input = document.querySelector(`.event1-input[data-app-id="${appId}"]`);
+                    const event2Input = document.querySelector(`.event2-input[data-app-id="${appId}"]`);
+                    
+                    if (event1Input && data.event1) {
+                        event1Input.value = data.event1;
+                        if (data.is_custom_event1) {
+                            event1Input.classList.add('custom-event');
+                        }
+                    }
+                    
+                    if (event2Input && data.event2) {
+                        event2Input.value = data.event2;
+                        if (data.is_custom_event2) {
+                            event2Input.classList.add('custom-event');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading event selections:', error);
+            }
+        }
+
+        // Function to save event selections
+        async function saveEventSelections(appId, event1, event2, isCustomEvent1, isCustomEvent2) {
+            try {
+                const response = await fetch('/save_event_selections', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        app_id: appId,
+                        event1: event1,
+                        event2: event2,
+                        is_custom_event1: isCustomEvent1,
+                        is_custom_event2: isCustomEvent2
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save event selections');
+                }
+            } catch (error) {
+                console.error('Error saving event selections:', error);
+                showError('Failed to save event selections. Please try again.');
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get Apps button
+            const getAppsBtn = document.getElementById('getAppsBtn');
+            if (getAppsBtn) {
+                getAppsBtn.addEventListener('click', loadApps);
+            }
+            
+            // Event selection handlers
+            document.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('event1-custom-btn') || e.target.classList.contains('event2-custom-btn')) {
+                    const appId = e.target.dataset.appId;
+                    const isEvent1 = e.target.classList.contains('event1-custom-btn');
+                    const input = document.querySelector(`.${isEvent1 ? 'event1' : 'event2'}-input[data-app-id="${appId}"]`);
+                    
+                    if (input) {
+                        input.classList.toggle('custom-event');
+                        const isCustom = input.classList.contains('custom-event');
+                        const eventValue = input.value;
+                        
+                        await saveEventSelections(
+                            appId,
+                            isEvent1 ? eventValue : document.querySelector(`.event1-input[data-app-id="${appId}"]`).value,
+                            isEvent1 ? document.querySelector(`.event2-input[data-app-id="${appId}"]`).value : eventValue,
+                            isEvent1 ? isCustom : document.querySelector(`.event1-input[data-app-id="${appId}"]`).classList.contains('custom-event'),
+                            isEvent1 ? document.querySelector(`.event2-input[data-app-id="${appId}"]`).classList.contains('custom-event') : isCustom
+                        );
+                    }
+                }
+            });
+            
+            // Event input change handlers
+            document.addEventListener('change', async (e) => {
+                if (e.target.classList.contains('event1-input') || e.target.classList.contains('event2-input')) {
+                    const appId = e.target.dataset.appId;
+                    const isEvent1 = e.target.classList.contains('event1-input');
+                    
+                    await saveEventSelections(
+                        appId,
+                        isEvent1 ? e.target.value : document.querySelector(`.event1-input[data-app-id="${appId}"]`).value,
+                        isEvent1 ? document.querySelector(`.event2-input[data-app-id="${appId}"]`).value : e.target.value,
+                        isEvent1 ? e.target.classList.contains('custom-event') : document.querySelector(`.event1-input[data-app-id="${appId}"]`).classList.contains('custom-event'),
+                        isEvent1 ? document.querySelector(`.event2-input[data-app-id="${appId}"]`).classList.contains('custom-event') : e.target.classList.contains('custom-event')
+                    );
+                }
+            });
+            
+            // App status change handler
+            document.addEventListener('change', async (e) => {
+                if (e.target.classList.contains('app-status')) {
+                    const appId = e.target.dataset.appId;
+                    const isActive = e.target.checked;
+                    
+                    // Update app status in the database
+                    try {
+                        const response = await fetch('/update_app_status', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                app_id: appId,
+                                is_active: isActive
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Failed to update app status');
+                        }
+                    } catch (error) {
+                        console.error('Error updating app status:', error);
+                        showError('Failed to update app status. Please try again.');
+                        e.target.checked = !isActive; // Revert the checkbox
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>
+
