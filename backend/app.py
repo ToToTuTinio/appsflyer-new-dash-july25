@@ -22,8 +22,6 @@ from rq import Queue
 from redis import Redis
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_sock import Sock
-import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
 
@@ -50,98 +48,12 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%
 redis_conn = Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379)
 task_queue = Queue(connection=redis_conn)
 
-def get_remote_address():
-    """Get the IP address of the client."""
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0]
-    return request.remote_addr
-
 # Initialize rate limiter
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
-
-# Initialize WebSocket
-sock = Sock(app)
-
-# Store connected WebSocket clients
-connected_clients = set()
-
-@sock.route('/ws')
-def websocket(ws):
-    connected_clients.add(ws)
-    try:
-        while True:
-            # Keep the connection alive
-            ws.receive()
-    except Exception as e:
-        print(f"WebSocket error: {str(e)}")
-    finally:
-        connected_clients.remove(ws)
-
-def broadcast_update(data):
-    """Broadcast data update to all connected clients"""
-    for client in connected_clients.copy():
-        try:
-            client.send(json.dumps({
-                'type': 'stats_update',
-                'data': data
-            }))
-        except Exception as e:
-            print(f"Error broadcasting to client: {str(e)}")
-            connected_clients.remove(client)
-
-def background_update():
-    """Background thread to periodically update and broadcast data"""
-    while True:
-        try:
-            # Get fresh data
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            
-            # Update shared cache
-            apps = get_active_apps(force_fetch=True)
-            if apps and apps.get('apps'):
-                # Create initial cache
-                result = {
-                    'totals': {
-                        'apps': len(apps['apps']),
-                        'impressions': 0,
-                        'clicks': 0,
-                        'installs': 0
-                    },
-                    'trend': {
-                        'dates': [],
-                        'impressions': [],
-                        'clicks': [],
-                        'installs': []
-                    },
-                    'topBadSourcesByApp': [],
-                    'last_updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                
-                # Save as shared cache
-                c.execute('''
-                    INSERT OR REPLACE INTO stats_cache (range, data, updated_at, is_shared) 
-                    VALUES (?, ?, CURRENT_TIMESTAMP, 1)
-                ''', ('last10:shared', json.dumps(result)))
-                conn.commit()
-                
-                # Broadcast update to all connected clients
-                broadcast_update(result)
-            
-            conn.close()
-        except Exception as e:
-            print(f"Error in background update: {str(e)}")
-        
-        # Wait for 5 minutes before next update
-        time.sleep(300)
-
-# Start background update thread
-update_thread = threading.Thread(target=background_update, daemon=True)
-update_thread.start()
 
 # --- GLOBAL JSON ERROR HANDLER ---
 from werkzeug.exceptions import HTTPException
@@ -189,26 +101,22 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS stats_cache (
         range TEXT PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_shared BOOLEAN DEFAULT 1
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
         range TEXT PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_shared BOOLEAN DEFAULT 1
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
         app_id TEXT PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_shared BOOLEAN DEFAULT 1
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
         id INTEGER PRIMARY KEY,
         data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_shared BOOLEAN DEFAULT 1
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     conn.commit()
     conn.close()
@@ -1181,65 +1089,23 @@ def overview():
         # Read the most recent 'last10' stats_cache entry (regardless of event selections or app IDs)
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        
-        # First, try to get shared cache
-        c.execute("""
-            SELECT data, updated_at 
-            FROM stats_cache 
-            WHERE range LIKE 'last10%' 
-            AND is_shared = 1 
-            ORDER BY updated_at DESC 
-            LIMIT 1
-        """)
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
         row = c.fetchone()
-        
-        # If no shared cache exists, create one
-        if not row:
-            # Get active apps
-            apps = get_active_apps(force_fetch=True)
-            if apps and apps.get('apps'):
-                # Create initial cache
-                result = {
-                    'totals': {
-                        'apps': len(apps['apps']),
-                        'impressions': 0,
-                        'clicks': 0,
-                        'installs': 0
-                    },
-                    'trend': {
-                        'dates': [],
-                        'impressions': [],
-                        'clicks': [],
-                        'installs': []
-                    },
-                    'topBadSourcesByApp': [],
-                    'last_updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                
-                # Save as shared cache
-                c.execute('''
-                    INSERT INTO stats_cache (range, data, updated_at, is_shared) 
-                    VALUES (?, ?, CURRENT_TIMESTAMP, 1)
-                ''', ('last10:shared', json.dumps(result)))
-                conn.commit()
-                row = (json.dumps(result), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        
         total_impressions = 0
         total_clicks = 0
         total_installs = 0
         last_updated = None
         date_map = {}
-        
         if row:
             data, updated_at = row
             stats = json.loads(data)
             # Convert last_updated to GMT+2
             if updated_at:
+                import datetime
                 utc_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
                 utc_dt = utc_dt.replace(tzinfo=pytz.utc)
                 gmt2 = pytz.timezone('Europe/Berlin')
                 last_updated = utc_dt.astimezone(gmt2).strftime('%Y-%m-%d %H:%M:%S')
-            
             for app in stats.get('apps', []):
                 for entry in app.get('table', []):
                     date = entry.get('date')
@@ -1252,58 +1118,53 @@ def overview():
                     total_impressions += int(entry.get('impressions', 0))
                     total_clicks += int(entry.get('clicks', 0))
                     total_installs += int(entry.get('installs', 0))
-        
         trend_dates = sorted(date_map.keys())
         trend_impressions = [date_map[d]['impressions'] for d in trend_dates]
         trend_clicks = [date_map[d]['clicks'] for d in trend_dates]
         trend_installs = [date_map[d]['installs'] for d in trend_dates]
 
-        # Get shared fraud cache
-        c.execute("""
-            SELECT data 
-            FROM fraud_cache 
-            WHERE range LIKE 'last10%' 
-            AND is_shared = 1 
-            ORDER BY updated_at DESC 
-            LIMIT 1
-        """)
-        fraud_row = c.fetchone()
-        
+        # Use only the most recent 'last10:' fraud_cache entry for Top Fraudulent Sources
+        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last10:%' ORDER BY updated_at DESC LIMIT 1")
+        fraud_cache_row = c.fetchone()
         top_bad_sources_by_app = []
-        if fraud_row:
-            fraud_data = json.loads(fraud_row[0])
-            for app in fraud_data.get('apps', []):
-                app_name = app.get('app_name', '')
-                app_id = app.get('app_id', '')
-                source_map = {}
-                for row in app.get('table', []):
-                    media_source = row.get('media_source', '')
-                    pa_fraud = int(row.get('blocked_installs_pa', 0))
-                    rt_fraud = int(row.get('blocked_installs_rt', 0))
-                    if pa_fraud > 0 or rt_fraud > 0:
-                        if media_source not in source_map:
-                            source_map[media_source] = {'media_source': media_source, 'pa_fraud': 0, 'rt_fraud': 0}
-                        source_map[media_source]['pa_fraud'] += pa_fraud
-                        source_map[media_source]['rt_fraud'] += rt_fraud
-                sources = list(source_map.values())
-                sources.sort(key=lambda x: x['pa_fraud'] + x['rt_fraud'], reverse=True)
-                top_sources = sources[:5]
-                total_fraud = sum(s['pa_fraud'] + s['rt_fraud'] for s in top_sources)
-                if total_fraud > 0:
+        if fraud_cache_row:
+            fraud_cache_key = fraud_cache_row[0]
+            c.execute('SELECT data FROM fraud_cache WHERE range = ?', (fraud_cache_key,))
+            fraud_row = c.fetchone()
+            if fraud_row:
+                fraud_data = json.loads(fraud_row[0])
+                # For each app, group by media_source and sum fraud
+                for app in fraud_data.get('apps', []):
+                    app_name = app.get('app_name', '')
+                    app_id = app.get('app_id', '')
+                    source_map = {}
+                    for row in app.get('table', []):
+                        media_source = row.get('media_source', '')
+                        pa_fraud = int(row.get('blocked_installs_pa', 0))
+                        rt_fraud = int(row.get('blocked_installs_rt', 0))
+                        if pa_fraud > 0 or rt_fraud > 0:
+                            if media_source not in source_map:
+                                source_map[media_source] = {'media_source': media_source, 'pa_fraud': 0, 'rt_fraud': 0}
+                            source_map[media_source]['pa_fraud'] += pa_fraud
+                            source_map[media_source]['rt_fraud'] += rt_fraud
+                    # Top 5 sources for this app
+                    sources = list(source_map.values())
+                    sources.sort(key=lambda x: x['pa_fraud'] + x['rt_fraud'], reverse=True)
+                    top_sources = sources[:5]
+                    total_fraud = sum(s['pa_fraud'] + s['rt_fraud'] for s in top_sources)
                     top_bad_sources_by_app.append({
                         'app_id': app_id,
                         'app_name': app_name,
                         'sources': top_sources,
                         'total_fraud': total_fraud
                     })
-            top_bad_sources_by_app.sort(key=lambda x: x['total_fraud'], reverse=True)
-            top_bad_sources_by_app = top_bad_sources_by_app[:5]
-        
+                # Sort apps by total fraud, take top 5
+                top_bad_sources_by_app.sort(key=lambda x: x['total_fraud'], reverse=True)
+                top_bad_sources_by_app = top_bad_sources_by_app[:5]
         conn.close()
 
         return jsonify({
             'totals': {
-                'apps': len(get_active_apps().get('apps', [])),
                 'impressions': total_impressions,
                 'clicks': total_clicks,
                 'installs': total_installs
