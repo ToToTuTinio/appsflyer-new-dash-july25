@@ -25,7 +25,7 @@ from flask_limiter.util import get_remote_address
 from flask_sock import Sock
 import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from appsflyer_login import get_apps_with_installs
+from appsflyer_login import get_apps_with_installs, get_all_apps_with_status
 
 # Get the project root directory and load environment variables
 project_root = Path(__file__).parent.parent
@@ -176,23 +176,29 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Create apps table to store app information and status
-    c.execute('''CREATE TABLE IF NOT EXISTS apps (
-        app_id TEXT PRIMARY KEY,
-        app_name TEXT,
-        is_active BOOLEAN,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    
-    # Create app_event_selections table to store event selections
+    # Create app_event_selections table with new columns
     c.execute('''CREATE TABLE IF NOT EXISTS app_event_selections (
         app_id TEXT PRIMARY KEY,
+        is_active BOOLEAN DEFAULT 1,
         event1 TEXT,
         event2 TEXT,
-        is_custom_event1 BOOLEAN DEFAULT 0,
-        is_custom_event2 BOOLEAN DEFAULT 0,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (app_id) REFERENCES apps(app_id)
+        custom_event1 TEXT,
+        custom_event2 TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Create apps_cache table with new columns
+    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Create event_cache table
+    c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
+        app_id TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     
     # Create stats_cache table
@@ -209,15 +215,6 @@ def init_db():
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_shared BOOLEAN DEFAULT 1
-    )''')
-    
-    # Create event_cache table
-    c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
-        app_id TEXT PRIMARY KEY,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_shared BOOLEAN DEFAULT 1,
-        FOREIGN KEY (app_id) REFERENCES apps(app_id)
     )''')
     
     conn.commit()
@@ -266,53 +263,45 @@ def dashboard():
 
 def get_active_apps(max_retries=7, force_fetch=False):
     """
-    Fetch the list of apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
+    Fetch the list of active apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
     Only fetches new data if force_fetch is True or if there's no cache.
     """
     import pytz
     gmt2 = pytz.timezone('Europe/Berlin')
     now = datetime.datetime.now(gmt2)
-    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
-    # Check if we need to fetch new data
-    c.execute('SELECT MAX(last_updated) FROM apps')
-    last_update = c.fetchone()[0]
-    
-    if last_update:
-        last_update_dt = datetime.datetime.strptime(last_update, '%Y-%m-%d %H:%M:%S')
-        last_update_dt = gmt2.localize(last_update_dt)
-        if not force_fetch and (now - last_update_dt).total_seconds() < 86400:  # 24 hours
-            # Return cached data
-            c.execute('SELECT app_id, app_name, is_active FROM apps')
-            apps = [{"app_id": row[0], "app_name": row[1], "is_active": bool(row[2])} for row in c.fetchall()]
+    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.commit()
+    c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+    row = c.fetchone()
+    if row:
+        data, updated_at = row
+        updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+        updated_at_dt = gmt2.localize(updated_at_dt)
+        if not force_fetch and (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
+            result = json.loads(data)
+            result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
             conn.close()
-            return {
-                "count": len(apps),
-                "apps": apps,
-                "fetch_time": last_update
-            }
-    
-    # Fetch new data
-    if force_fetch or not last_update:
+            return result
+    # If no cache or cache is old or force_fetch is True, fetch new data
+    if force_fetch or not row:  # Only fetch if explicitly requested or no cache exists
         apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
         fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Update database with new app data
-        c.execute('DELETE FROM apps')  # Clear existing apps
-        for app in apps:
-            c.execute('INSERT OR REPLACE INTO apps (app_id, app_name, is_active, last_updated) VALUES (?, ?, ?, ?)',
-                     (app['app_id'], app['app_name'], app['is_active'], fetch_time))
-        
-        conn.commit()
-        conn.close()
-        
-        return {
+        result = {
             "count": len(apps),
             "apps": apps,
             "fetch_time": fetch_time
         }
+        c.execute('DELETE FROM apps_cache')  # Only keep one row
+        c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
+        conn.commit()
+        conn.close()
+        return result
     else:
         # Return empty result if cache is old but we're not forcing a fetch
         return {
@@ -830,38 +819,81 @@ def all_apps_stats():
 @app.route('/event-selections', methods=['GET'])
 @login_required
 def get_event_selections():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT app_id, event1, event2 FROM app_event_selections')
-    rows = c.fetchall()
-    conn.close()
-    selections = {app_id: [event1, event2] for app_id, event1, event2 in rows}
-    return jsonify(selections)
+    try:
+        app_id = request.args.get('app_id')
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''
+                SELECT app_id, is_active, event1, event2, custom_event1, custom_event2, updated_at
+                FROM app_event_selections
+                WHERE app_id = ?
+            ''', (app_id,))
+        else:
+            c.execute('''
+                SELECT app_id, is_active, event1, event2, custom_event1, custom_event2, updated_at
+                FROM app_event_selections
+            ''')
+        
+        rows = c.fetchall()
+        selections = [{
+            'app_id': row[0],
+            'is_active': bool(row[1]),
+            'event1': row[2],
+            'event2': row[3],
+            'custom_event1': row[4],
+            'custom_event2': row[5],
+            'updated_at': row[6]
+        } for row in rows]
+        
+        conn.close()
+        return jsonify(selections)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/event-selections', methods=['POST'])
 @login_required
 def save_event_selections():
-    data = request.get_json()
-    # data = {app_id: [event1, event2], ...}
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    for app_id, events in data.items():
-        event1, event2 = events if len(events) == 2 else (None, None)
-        c.execute('REPLACE INTO app_event_selections (app_id, event1, event2) VALUES (?, ?, ?)', (app_id, event1, event2))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
+    try:
+        data = request.get_json()
+        app_id = data.get('app_id')
+        is_active = data.get('is_active', True)
+        event1 = data.get('event1')
+        event2 = data.get('event2')
+        custom_event1 = data.get('custom_event1')
+        custom_event2 = data.get('custom_event2')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT OR REPLACE INTO app_event_selections 
+            (app_id, is_active, event1, event2, custom_event1, custom_event2, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (app_id, is_active, event1, event2, custom_event1, custom_event2))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/get_apps')
 @login_required
 def get_apps():
     try:
-        # Get force parameter from request
-        force = request.args.get('force', 'false').lower() == 'true'
-        result = get_active_apps(force_fetch=force)
+        force_fetch = request.args.get('force', 'false').lower() == 'true'
+        result = get_all_apps(force_fetch=force_fetch)
         return jsonify(result)
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return jsonify({
+            'error': str(e),
+            'count': 0,
+            'apps': [],
+            'fetch_time': 'Error occurred'
+        }), 500
 
 @app.route('/get_events')
 @login_required
@@ -1553,89 +1585,86 @@ def report_status(job_id):
     else:
         return jsonify({'status': 'processing'})
 
-@app.route('/save_event_selections', methods=['POST'])
-@login_required
-def save_event_selections():
+def get_all_apps(max_retries=7, force_fetch=False):
+    """
+    Fetch all apps from AppsFlyer and update cache.
+    Returns both active and inactive apps.
+    """
+    import pytz
+    gmt2 = pytz.timezone('Europe/Berlin')
+    now = datetime.datetime.now(gmt2)
+    
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Check cache first
+    c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+    row = c.fetchone()
+    
+    if row and not force_fetch:
+        data, updated_at = row
+        updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+        updated_at_dt = gmt2.localize(updated_at_dt)
+        
+        if (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
+            result = json.loads(data)
+            result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+            conn.close()
+            return result
+    
+    # Fetch new data
     try:
-        data = request.get_json()
-        app_id = data.get('app_id')
-        event1 = data.get('event1')
-        event2 = data.get('event2')
-        is_custom_event1 = data.get('is_custom_event1', False)
-        is_custom_event2 = data.get('is_custom_event2', False)
+        apps = get_all_apps_with_status(EMAIL, PASSWORD, max_retries=max_retries)
         
-        if not app_id:
-            return jsonify({"error": "app_id is required"}), 400
-            
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
+        # Get existing event selections
+        c.execute('SELECT app_id, is_active, event1, event2, custom_event1, custom_event2 FROM app_event_selections')
+        existing_selections = {row[0]: {
+            'is_active': row[1],
+            'event1': row[2],
+            'event2': row[3],
+            'custom_event1': row[4],
+            'custom_event2': row[5]
+        } for row in c.fetchall()}
         
-        # Update or insert event selections
-        c.execute('''INSERT OR REPLACE INTO app_event_selections 
-                    (app_id, event1, event2, is_custom_event1, is_custom_event2, last_updated)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''',
-                 (app_id, event1, event2, is_custom_event1, is_custom_event2))
+        # Merge with existing selections
+        for app in apps:
+            app_id = app['app_id']
+            if app_id in existing_selections:
+                app.update(existing_selections[app_id])
+            else:
+                # Default values for new apps
+                app.update({
+                    'is_active': True,
+                    'event1': None,
+                    'event2': None,
+                    'custom_event1': None,
+                    'custom_event2': None
+                })
         
+        fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        result = {
+            "count": len(apps),
+            "apps": apps,
+            "fetch_time": fetch_time
+        }
+        
+        # Update cache
+        c.execute('DELETE FROM apps_cache')
+        c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', 
+                 (json.dumps(result), fetch_time))
         conn.commit()
-        conn.close()
         
-        return jsonify({"status": "success"})
+        return result
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/get_event_selections/<app_id>')
-@login_required
-def get_event_selections(app_id):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
-        c.execute('''SELECT event1, event2, is_custom_event1, is_custom_event2 
-                    FROM app_event_selections WHERE app_id = ?''', (app_id,))
-        row = c.fetchone()
-        
+        print(f"Error fetching apps: {str(e)}")
+        return {
+            "count": 0,
+            "apps": [],
+            "fetch_time": f"Error: {str(e)}"
+        }
+    finally:
         conn.close()
-        
-        if row:
-            return jsonify({
-                "event1": row[0],
-                "event2": row[1],
-                "is_custom_event1": bool(row[2]),
-                "is_custom_event2": bool(row[3])
-            })
-        else:
-            return jsonify({
-                "event1": None,
-                "event2": None,
-                "is_custom_event1": False,
-                "is_custom_event2": False
-            })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/update_app_status', methods=['POST'])
-@login_required
-def update_app_status():
-    try:
-        data = request.get_json()
-        app_id = data.get('app_id')
-        is_active = data.get('is_active')
-        
-        if not app_id or is_active is None:
-            return jsonify({"error": "app_id and is_active are required"}), 400
-            
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
-        # Update app status
-        c.execute('UPDATE apps SET is_active = ? WHERE app_id = ?', (is_active, app_id))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
