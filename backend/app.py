@@ -178,17 +178,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS app_event_selections (
         app_id TEXT PRIMARY KEY,
         event1 TEXT,
-        event2 TEXT,
-        is_active BOOLEAN DEFAULT 1,
-        custom_event1 TEXT,
-        custom_event2 TEXT,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS app_cache (
-        app_id TEXT PRIMARY KEY,
-        app_name TEXT,
-        is_active BOOLEAN DEFAULT 1,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        event2 TEXT
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS stats_cache (
         range TEXT PRIMARY KEY,
@@ -204,6 +194,12 @@ def init_db():
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS event_cache (
         app_id TEXT PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_shared BOOLEAN DEFAULT 1
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
+        id INTEGER PRIMARY KEY,
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_shared BOOLEAN DEFAULT 1
@@ -253,167 +249,53 @@ def dashboard():
     return render_template('dashboard.html')
 
 def get_active_apps(max_retries=7, force_fetch=False):
-    """Get all apps from AppsFlyer, including both active and inactive ones"""
-    try:
-        # Check cache first if not forcing fetch
-        if not force_fetch:
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute('SELECT app_id, app_name, is_active FROM app_cache')
-            cached_apps = c.fetchall()
+    """
+    Fetch the list of active apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
+    Only fetches new data if force_fetch is True or if there's no cache.
+    """
+    import pytz
+    gmt2 = pytz.timezone('Europe/Berlin')
+    now = datetime.datetime.now(gmt2)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.commit()
+    c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+    row = c.fetchone()
+    if row:
+        data, updated_at = row
+        updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+        updated_at_dt = gmt2.localize(updated_at_dt)
+        if not force_fetch and (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
+            result = json.loads(data)
+            result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
             conn.close()
-            
-            if cached_apps:
-                return {
-                    'apps': [{'id': app[0], 'name': app[1], 'is_active': bool(app[2])} for app in cached_apps]
-                }
-
-        # Initialize Chrome options
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        
-        driver = webdriver.Chrome(options=chrome_options)
-        
-        try:
-            # Login to AppsFlyer
-            driver.get('https://hq.appsflyer.com/login')
-            time.sleep(2)
-            
-            # Enter credentials
-            email_field = driver.find_element(By.NAME, 'email')
-            password_field = driver.find_element(By.NAME, 'password')
-            
-            email_field.send_keys(EMAIL)
-            password_field.send_keys(PASSWORD)
-            password_field.send_keys(Keys.RETURN)
-            
-            # Wait for login to complete and redirect to dashboard
-            WebDriverWait(driver, 20).until(
-                EC.url_contains('hq.appsflyer.com')
-            )
-            
-            # Navigate to Apps page
-            driver.get('https://hq.appsflyer.com/apps')
-            time.sleep(5)  # Wait for page to load
-            
-            # Find all app cards using the data-qa-id attribute
-            app_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
-            
-            apps = []
-            for element in app_elements:
-                app_id = element.text.strip()
-                # Get the parent card element to check if it's active
-                card = element.find_element(By.XPATH, './ancestor::div[contains(@class, "MuiCard-root")]')
-                is_active = 'inactive' not in card.get_attribute('class').lower()
-                
-                # Get app name from the card
-                try:
-                    app_name_element = card.find_element(By.CSS_SELECTOR, '[data-qa-id="card-app-name"]')
-                    app_name = app_name_element.text.strip()
-                except:
-                    app_name = app_id
-                
-                apps.append({
-                    'id': app_id,
-                    'name': app_name,
-                    'is_active': is_active
-                })
-            
-            # Update cache
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.executemany('''
-                INSERT OR REPLACE INTO app_cache (app_id, app_name, is_active, last_updated)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ''', [(app['id'], app['name'], app['is_active']) for app in apps])
-            conn.commit()
-            conn.close()
-            
-            return {'apps': apps}
-            
-        finally:
-            driver.quit()
-            
-    except Exception as e:
-        print(f"Error fetching apps: {str(e)}")
-        if max_retries > 0:
-            time.sleep(30)
-            return get_active_apps(max_retries - 1, force_fetch)
-        raise
-
-@app.route('/get_apps')
-@login_required
-def get_apps():
-    """Get all apps with their event configurations"""
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
-        # Get all apps from cache
-        c.execute('SELECT app_id, app_name, is_active FROM app_cache')
-        apps = c.fetchall()
-        
-        # Get event configurations for each app
-        c.execute('SELECT app_id, event1, event2, custom_event1, custom_event2 FROM app_event_selections')
-        event_configs = {row[0]: row[1:] for row in c.fetchall()}
-        
-        # Get available events for each app
-        c.execute('SELECT app_id, data FROM event_cache')
-        available_events = {row[0]: json.loads(row[1]) for row in c.fetchall()}
-        
-        result = []
-        for app_id, app_name, is_active in apps:
-            app_data = {
-                'id': app_id,
-                'name': app_name,
-                'is_active': bool(is_active),
-                'events': available_events.get(app_id, []),
-                'selected_events': {
-                    'event1': event_configs.get(app_id, [None, None, None, None])[0],
-                    'event2': event_configs.get(app_id, [None, None, None, None])[1],
-                    'custom_event1': event_configs.get(app_id, [None, None, None, None])[2],
-                    'custom_event2': event_configs.get(app_id, [None, None, None, None])[3]
-                }
-            }
-            result.append(app_data)
-        
-        conn.close()
-        return jsonify({'apps': result})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/save-app-config', methods=['POST'])
-@login_required
-def save_app_config():
-    """Save app configuration including event selections"""
-    try:
-        data = request.json
-        app_id = data.get('app_id')
-        event1 = data.get('event1')
-        event2 = data.get('event2')
-        custom_event1 = data.get('custom_event1')
-        custom_event2 = data.get('custom_event2')
-        is_active = data.get('is_active', True)
-        
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
-        c.execute('''
-            INSERT OR REPLACE INTO app_event_selections 
-            (app_id, event1, event2, custom_event1, custom_event2, is_active, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ''', (app_id, event1, event2, custom_event1, custom_event2, is_active))
-        
+            return result
+    # If no cache or cache is old or force_fetch is True, fetch new data
+    if force_fetch or not row:  # Only fetch if explicitly requested or no cache exists
+        apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
+        fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        result = {
+            "count": len(apps),
+            "apps": apps,
+            "fetch_time": fetch_time
+        }
+        c.execute('DELETE FROM apps_cache')  # Only keep one row
+        c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
         conn.commit()
         conn.close()
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return result
+    else:
+        # Return empty result if cache is old but we're not forcing a fetch
+        return {
+            "count": 0,
+            "apps": [],
+            "fetch_time": "Cache expired. Please click 'Get Apps' to fetch new data."
+        }
 
 @app.route('/active-apps')
 @login_required
@@ -945,6 +827,17 @@ def save_event_selections():
     conn.commit()
     conn.close()
     return jsonify({'status': 'ok'})
+
+@app.route('/get_apps')
+@login_required
+def get_apps():
+    try:
+        # Get force parameter from request
+        force = request.args.get('force', 'false').lower() == 'true'
+        result = get_active_apps(force_fetch=force)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route('/get_events')
 @login_required
