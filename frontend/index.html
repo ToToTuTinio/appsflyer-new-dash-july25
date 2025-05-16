@@ -109,18 +109,21 @@
         </main>
     </div>
 
+    <!-- Apps Page Content -->
     <div id="appsPage" class="hidden">
         <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div class="px-4 py-6 sm:px-0">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900">Apps</h2>
-                    <button id="getAppsBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    <h2 class="text-2xl font-bold text-gray-900">Apps Management</h2>
+                    <button id="getAppsBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                         Get Apps
                     </button>
                 </div>
                 
-                <div id="appsList" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    <!-- Apps will be loaded here -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                    <ul id="appsList" class="divide-y divide-gray-200">
+                        <!-- Apps will be loaded here -->
+                    </ul>
                 </div>
             </div>
         </div>
@@ -602,201 +605,189 @@
                 });
         });
 
-        async function loadApps() {
+        // Apps Page Functions
+        function loadAppsPage() {
+            const appsPage = document.getElementById('appsPage');
+            appsPage.classList.remove('hidden');
+            
+            // Load apps data
+            fetchApps();
+        }
+
+        async function fetchApps() {
             showLoading();
             try {
                 const response = await fetch('/get_apps');
-                const data = await response.json();
-                
-                if (data.error) {
-                    showError(data.error);
-                    return;
+                if (response.ok) {
+                    const data = await response.json();
+                    renderApps(data.apps);
+                } else {
+                    showError('Error loading apps');
                 }
-                
-                const appsList = document.getElementById('appsList');
-                appsList.innerHTML = '';
-                
-                data.apps.forEach(app => {
-                    const appCard = document.createElement('div');
-                    appCard.className = 'bg-white shadow rounded-lg p-6';
-                    appCard.innerHTML = `
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 class="text-lg font-medium text-gray-900">${app.app_name}</h3>
-                                <p class="text-sm text-gray-500">${app.app_id}</p>
-                            </div>
-                            <div class="flex items-center">
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" class="sr-only peer" 
-                                           ${app.is_active ? 'checked' : ''} 
-                                           onchange="updateAppStatus('${app.app_id}', this.checked)">
-                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 
-                                              peer-focus:ring-blue-300 rounded-full peer 
-                                              peer-checked:after:translate-x-full peer-checked:after:border-white 
-                                              after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
-                                              after:bg-white after:border-gray-300 after:border after:rounded-full 
-                                              after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
-                                    </div>
-                                    <span class="ml-3 text-sm font-medium text-gray-900">Active</span>
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Event 1</label>
-                                <div class="mt-1 flex rounded-md shadow-sm">
-                                    <select class="event-select block w-full rounded-md border-gray-300 shadow-sm 
-                                                 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                            onchange="updateEventSelection('${app.app_id}', 'event1', this.value)">
-                                        <option value="">Select Event</option>
-                                        <option value="custom">Custom Event</option>
-                                    </select>
-                                    <input type="text" class="custom-event-input hidden block w-full rounded-md 
-                                                           border-gray-300 shadow-sm focus:border-blue-500 
-                                                           focus:ring-blue-500 sm:text-sm"
-                                           placeholder="Enter custom event name"
-                                           onchange="updateCustomEvent('${app.app_id}', 'event1', this.value)">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Event 2</label>
-                                <div class="mt-1 flex rounded-md shadow-sm">
-                                    <select class="event-select block w-full rounded-md border-gray-300 shadow-sm 
-                                                 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                            onchange="updateEventSelection('${app.app_id}', 'event2', this.value)">
-                                        <option value="">Select Event</option>
-                                        <option value="custom">Custom Event</option>
-                                    </select>
-                                    <input type="text" class="custom-event-input hidden block w-full rounded-md 
-                                                           border-gray-300 shadow-sm focus:border-blue-500 
-                                                           focus:ring-blue-500 sm:text-sm"
-                                           placeholder="Enter custom event name"
-                                           onchange="updateCustomEvent('${app.app_id}', 'event2', this.value)">
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    appsList.appendChild(appCard);
-                    
-                    // Load events for this app
-                    loadEventsForApp(app.app_id);
-                });
-                
             } catch (error) {
-                showError('Failed to load apps: ' + error.message);
+                showError('Error loading apps');
             } finally {
                 hideLoading();
             }
         }
 
-        async function loadEventsForApp(appId) {
-            try {
-                const response = await fetch(`/app-events/${appId}`);
-                const data = await response.json();
+        function renderApps(apps) {
+            const appsList = document.getElementById('appsList');
+            appsList.innerHTML = apps.map(app => `
+                <li class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <input type="checkbox" 
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                       ${app.is_active ? 'checked' : ''}
+                                       onchange="updateAppStatus('${app.id}', this.checked)">
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">${app.name}</h3>
+                                <p class="text-sm text-gray-500">${app.id}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex flex-col space-y-2">
+                                <select class="event-select" data-app-id="${app.id}" data-event="1">
+                                    <option value="">Select Event 1</option>
+                                    ${app.events.map(event => `
+                                        <option value="${event}" ${app.selected_events.event1 === event ? 'selected' : ''}>
+                                            ${event}
+                                        </option>
+                                    `).join('')}
+                                    <option value="custom" ${app.selected_events.custom_event1 ? 'selected' : ''}>Custom Event</option>
+                                </select>
+                                ${app.selected_events.custom_event1 ? `
+                                    <input type="text" 
+                                           class="custom-event-input" 
+                                           data-app-id="${app.id}" 
+                                           data-event="1"
+                                           value="${app.selected_events.custom_event1}"
+                                           placeholder="Custom Event 1">
+                                ` : ''}
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <select class="event-select" data-app-id="${app.id}" data-event="2">
+                                    <option value="">Select Event 2</option>
+                                    ${app.events.map(event => `
+                                        <option value="${event}" ${app.selected_events.event2 === event ? 'selected' : ''}>
+                                            ${event}
+                                        </option>
+                                    `).join('')}
+                                    <option value="custom" ${app.selected_events.custom_event2 ? 'selected' : ''}>Custom Event</option>
+                                </select>
+                                ${app.selected_events.custom_event2 ? `
+                                    <input type="text" 
+                                           class="custom-event-input" 
+                                           data-app-id="${app.id}" 
+                                           data-event="2"
+                                           value="${app.selected_events.custom_event2}"
+                                           placeholder="Custom Event 2">
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            `).join('');
+            
+            // Add event listeners
+            document.querySelectorAll('.event-select').forEach(select => {
+                select.addEventListener('change', handleEventSelection);
+            });
+            
+            document.querySelectorAll('.custom-event-input').forEach(input => {
+                input.addEventListener('change', handleCustomEventInput);
+            });
+        }
+
+        async function handleEventSelection(event) {
+            const select = event.target;
+            const appId = select.dataset.appId;
+            const eventNum = select.dataset.event;
+            const value = select.value;
+            
+            if (value === 'custom') {
+                // Show custom event input
+                const customInput = document.createElement('input');
+                customInput.type = 'text';
+                customInput.className = 'custom-event-input';
+                customInput.dataset.appId = appId;
+                customInput.dataset.event = eventNum;
+                customInput.placeholder = `Custom Event ${eventNum}`;
+                customInput.addEventListener('change', handleCustomEventInput);
                 
-                if (data.error) {
-                    console.error(`Error loading events for ${appId}:`, data.error);
-                    return;
+                select.parentNode.appendChild(customInput);
+            } else {
+                // Remove custom event input if it exists
+                const customInput = select.parentNode.querySelector('.custom-event-input');
+                if (customInput) {
+                    customInput.remove();
                 }
                 
-                // Update event select options
-                const eventSelects = document.querySelectorAll(`[data-app-id="${appId}"] .event-select`);
-                eventSelects.forEach(select => {
-                    const currentValue = select.value;
-                    select.innerHTML = '<option value="">Select Event</option><option value="custom">Custom Event</option>';
-                    data.events.forEach(event => {
-                        const option = document.createElement('option');
-                        option.value = event;
-                        option.textContent = event;
-                        select.appendChild(option);
-                    });
-                    select.value = currentValue;
+                // Save the selection
+                await saveAppConfig(appId, {
+                    [`event${eventNum}`]: value,
+                    [`custom_event${eventNum}`]: null
                 });
-                
-            } catch (error) {
-                console.error(`Error loading events for ${appId}:`, error);
             }
+        }
+
+        async function handleCustomEventInput(event) {
+            const input = event.target;
+            const appId = input.dataset.appId;
+            const eventNum = input.dataset.event;
+            const value = input.value;
+            
+            await saveAppConfig(appId, {
+                [`event${eventNum}`]: 'custom',
+                [`custom_event${eventNum}`]: value
+            });
         }
 
         async function updateAppStatus(appId, isActive) {
-            try {
-                const response = await fetch('/event-selections', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        app_id: appId,
-                        is_active: isActive
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to update app status');
-                }
-                
-            } catch (error) {
-                showError('Failed to update app status: ' + error.message);
-            }
+            await saveAppConfig(appId, { is_active: isActive });
         }
 
-        async function updateEventSelection(appId, eventType, value) {
+        async function saveAppConfig(appId, config) {
             try {
-                const response = await fetch('/event-selections', {
+                const response = await fetch('/save-app-config', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         app_id: appId,
-                        [eventType]: value
+                        ...config
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Failed to update event selection');
+                    throw new Error('Failed to save configuration');
                 }
-                
-                // Show/hide custom event input
-                const customInput = document.querySelector(`[data-app-id="${appId}"] .custom-event-input`);
-                if (value === 'custom') {
-                    customInput.classList.remove('hidden');
-                } else {
-                    customInput.classList.add('hidden');
-                }
-                
             } catch (error) {
-                showError('Failed to update event selection: ' + error.message);
-            }
-        }
-
-        async function updateCustomEvent(appId, eventType, value) {
-            try {
-                const response = await fetch('/event-selections', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        app_id: appId,
-                        [`custom_${eventType}`]: value
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to update custom event');
-                }
-                
-            } catch (error) {
-                showError('Failed to update custom event: ' + error.message);
+                showError('Error saving configuration');
             }
         }
 
         // Add event listener for Get Apps button
-        document.getElementById('getAppsBtn').addEventListener('click', loadApps);
+        document.getElementById('getAppsBtn').addEventListener('click', async () => {
+            showLoading();
+            try {
+                const response = await fetch('/get_apps?force=true');
+                if (response.ok) {
+                    const data = await response.json();
+                    renderApps(data.apps);
+                } else {
+                    showError('Error fetching apps');
+                }
+            } catch (error) {
+                showError('Error fetching apps');
+            } finally {
+                hideLoading();
+            }
+        });
     </script>
 </body>
 </html>
