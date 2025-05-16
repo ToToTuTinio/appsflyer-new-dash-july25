@@ -2,7 +2,7 @@
 
 # Start the server in the background and redirect output to gunicorn.out
 cd backend
-source venv/bin/activate
+source ../venv/bin/activate
 
 # Set environment variables for logging
 export FLASK_ENV=development
