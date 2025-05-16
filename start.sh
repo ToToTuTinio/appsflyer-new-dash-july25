@@ -13,20 +13,14 @@ export PYTHONUNBUFFERED=1
 gunicorn -w 4 -b 0.0.0.0:5000 app:app \
     --timeout 3600 \
     --log-level debug \
-    --access-logfile - \
-    --error-logfile - \
-    --capture-output \
-    --enable-stdio-inheritance \
-    --log-format '%(asctime)s [%(levelname)s] %(message)s' \
-    --date-format '%Y-%m-%d %H:%M:%S' \
     >> ../gunicorn.out 2>&1 &
 
 # Store the background process ID
 SERVER_PID=$!
 
-# Function to handle script termination
+# Function to clean up on exit
 cleanup() {
-    echo "Shutting down server..."
+    echo "Stopping server..."
     kill $SERVER_PID
     exit 0
 }
