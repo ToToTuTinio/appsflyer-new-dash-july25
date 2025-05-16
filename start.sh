@@ -17,8 +17,6 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app \
     --error-logfile - \
     --capture-output \
     --enable-stdio-inheritance \
-    --log-format="%(asctime)s [%(levelname)s] %(message)s" \
-    --date-format="%Y-%m-%d %H:%M:%S" \
     >> ../gunicorn.out 2>&1 &
 
 # Store the background process ID
