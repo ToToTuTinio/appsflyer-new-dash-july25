@@ -50,10 +50,16 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%
 redis_conn = Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379)
 task_queue = Queue(connection=redis_conn)
 
+def get_remote_address():
+    """Get the IP address of the client."""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0]
+    return request.remote_addr
+
 # Initialize rate limiter
 limiter = Limiter(
     app=app,
-    key_func=get_remote_sock_address,
+    key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
 

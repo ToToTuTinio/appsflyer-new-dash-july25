@@ -1,1 +1,7 @@
-./start.sh: line 13: gunicorn: command not found 
+[2025-05-16 10:31:40 +0000] [1339302] [INFO] Starting gunicorn 20.1.0
+[2025-05-16 10:31:40 +0000] [1339302] [INFO] Listening at: http://0.0.0.0:5000 (1339302)
+[2025-05-16 10:31:40 +0000] [1339302] [INFO] Using worker: sync
+[2025-05-16 10:31:40 +0000] [1339304] [INFO] Booting worker with pid: 1339304
+[2025-05-16 10:31:40 +0000] [1339305] [INFO] Booting worker with pid: 1339305
+[2025-05-16 10:31:40 +0000] [1339306] [INFO] Booting worker with pid: 1339306
+[2025-05-16 10:31:40 +0000] [1339307] [INFO] Booting worker with pid: 1339307 
