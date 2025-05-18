@@ -1,13 +1,5 @@
 #!/bin/bash
 
-# Check if Redis is already running
-if ! pgrep redis-server > /dev/null; then
-    echo "Starting Redis server..."
-    redis-server --daemonize yes
-else
-    echo "Redis server is already running"
-fi
-
 # Start the server in the background and redirect output to gunicorn.out
 cd backend
 source ../venv/bin/activate
@@ -32,16 +24,10 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app \
 # Store the background process ID
 SERVER_PID=$!
 
-# Start RQ worker in the background
-python worker.py >> ../worker.out 2>&1 &
-WORKER_PID=$!
-
 # Function to handle script termination
 cleanup() {
-    echo "Shutting down server and worker..."
+    echo "Shutting down server..."
     kill $SERVER_PID
-    kill $WORKER_PID
-    redis-cli shutdown
     exit 0
 }
 
@@ -49,8 +35,8 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Show logs in real-time with timestamps
-echo "Server and worker started. Showing logs (Press Ctrl+C to stop)..."
+echo "Server started. Showing logs (Press Ctrl+C to stop)..."
 echo "----------------------------------------"
-tail -f ../gunicorn.out ../worker.out | while read line; do
+tail -f ../gunicorn.out | while read line; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
 done 
