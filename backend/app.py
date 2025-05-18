@@ -1526,11 +1526,43 @@ def update_app_status():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
-        c.execute('INSERT OR REPLACE INTO app_event_selections (app_id, is_active) VALUES (?, ?)', 
-                 (app_id, 1 if is_active else 0))
+        # First check if there's an existing record
+        c.execute('SELECT event1, event2 FROM app_event_selections WHERE app_id = ?', (app_id,))
+        existing = c.fetchone()
+        
+        if existing:
+            # Update existing record
+            event1, event2 = existing
+            c.execute('''UPDATE app_event_selections 
+                        SET is_active = ? 
+                        WHERE app_id = ?''', 
+                     (1 if is_active else 0, app_id))
+        else:
+            # Insert new record
+            c.execute('''INSERT INTO app_event_selections 
+                        (app_id, event1, event2, is_active) 
+                        VALUES (?, NULL, NULL, ?)''', 
+                     (app_id, 1 if is_active else 0))
+        
         conn.commit()
+        
+        # Update apps cache to reflect the new status
+        c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+        cache_row = c.fetchone()
+        if cache_row:
+            cached_data = json.loads(cache_row[0])
+            for app in cached_data.get('apps', []):
+                if app['app_id'] == app_id:
+                    app['is_active'] = is_active
+            
+            # Update the cache with the modified data
+            c.execute('UPDATE apps_cache SET data = ? WHERE data = ?', 
+                     (json.dumps(cached_data), cache_row[0]))
+            conn.commit()
+        
         return jsonify({'success': True})
     except Exception as e:
+        print(f"Error updating app status: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()

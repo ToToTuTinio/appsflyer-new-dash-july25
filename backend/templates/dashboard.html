@@ -1425,12 +1425,56 @@
                     event1Input.value = savedSelection[0] || '';
                     event2Input.value = savedSelection[1] || '';
                 }
+
+                // Add status change handler
+                const statusDropdown = tr.querySelector('.status-dropdown');
+                statusDropdown.addEventListener('change', function() {
+                    const isActive = this.value === 'active';
+                    const appId = this.dataset.appId;
+                    
+                    // Update the app's status in memory
+                    const appToUpdate = window.fetchedApps.find(a => a.app_id === appId);
+                    if (appToUpdate) {
+                        appToUpdate.is_active = isActive;
+                    }
+                    
+                    // Send status update to server
+                    fetch('/update-app-status', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            app_id: appId,
+                            is_active: isActive
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            console.error('Failed to update app status:', data.message);
+                            // Revert the change in memory if the server update failed
+                            if (appToUpdate) {
+                                appToUpdate.is_active = !isActive;
+                                statusDropdown.value = isActive ? 'not_active' : 'active';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating app status:', error);
+                        // Revert the change in memory if the server update failed
+                        if (appToUpdate) {
+                            appToUpdate.is_active = !isActive;
+                            statusDropdown.value = isActive ? 'not_active' : 'active';
+                        }
+                    });
+                });
                 
                 // Save button handler
                 tr.querySelector('.event-save-btn').onclick = function() {
                     const event1 = event1Input.value;
                     const event2 = event2Input.value;
-                    const status = tr.querySelector('.status-dropdown').value;
+                    const status = statusDropdown.value;
                     const button = this;
                     const originalText = button.textContent;
                     
