@@ -18,8 +18,6 @@ import sqlite3
 import sys
 import json
 import pytz
-from rq import Queue
-from redis import Redis
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,10 +41,6 @@ if env_path.exists():
 app = Flask(__name__)
 CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%$^&*()_+')
-
-# Initialize Redis connection
-redis_conn = Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379)
-task_queue = Queue(connection=redis_conn)
 
 # Initialize rate limiter
 limiter = Limiter(
@@ -96,7 +90,8 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS app_event_selections (
         app_id TEXT PRIMARY KEY,
         event1 TEXT,
-        event2 TEXT
+        event2 TEXT,
+        is_active INTEGER DEFAULT 0
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS stats_cache (
         range TEXT PRIMARY KEY,
@@ -121,7 +116,20 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Add the new column if it doesn't exist
+def add_is_active_column():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute('ALTER TABLE app_event_selections ADD COLUMN is_active INTEGER DEFAULT 0')
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    conn.commit()
+    conn.close()
+
 init_db()
+add_is_active_column()
 
 def login_required(f):
     @wraps(f)
@@ -164,52 +172,69 @@ def dashboard():
 
 def get_active_apps(max_retries=7, force_fetch=False):
     """
-    Fetch the list of active apps from cache if less than 24 hours old, otherwise fetch from AppsFlyer and update cache.
-    Only fetches new data if force_fetch is True or if there's no cache.
+    Fetch the list of active apps from cache if less than 24 hours old and has non-active apps,
+    otherwise fetch from AppsFlyer and update cache.
     """
     import pytz
     gmt2 = pytz.timezone('Europe/Berlin')
     now = datetime.datetime.now(gmt2)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS apps_cache (
-        id INTEGER PRIMARY KEY,
-        data TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    conn.commit()
+    
+    # Get active status from database first
+    c.execute('SELECT app_id, is_active FROM app_event_selections')
+    active_status = dict(c.fetchall())
+    
     c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
     row = c.fetchone()
-    if row:
+    
+    if row and not force_fetch:
         data, updated_at = row
         updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
         updated_at_dt = gmt2.localize(updated_at_dt)
-        if not force_fetch and (now - updated_at_dt).total_seconds() < 86400:  # 24 hours
-            result = json.loads(data)
-            result['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
-            conn.close()
-            return result
-    # If no cache or cache is old or force_fetch is True, fetch new data
-    if force_fetch or not row:  # Only fetch if explicitly requested or no cache exists
-        apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
-        fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
-        result = {
-            "count": len(apps),
-            "apps": apps,
-            "fetch_time": fetch_time
-        }
-        c.execute('DELETE FROM apps_cache')  # Only keep one row
-        c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', (json.dumps(result), fetch_time))
-        conn.commit()
-        conn.close()
-        return result
-    else:
-        # Return empty result if cache is old but we're not forcing a fetch
-        return {
-            "count": 0,
-            "apps": [],
-            "fetch_time": "Cache expired. Please click 'Get Apps' to fetch new data."
-        }
+        cache_age = (now - updated_at_dt).total_seconds()
+        
+        # First check if cache is fresh enough
+        if cache_age < 86400:
+            cached_data = json.loads(data)
+            
+            # Update active status from database for all apps
+            for app in cached_data.get('apps', []):
+                app['is_active'] = bool(active_status.get(app['app_id'], 1))  # Default to active
+            
+            # Check if we have any non-active apps in the cached data
+            has_non_active = any(not app.get('is_active', True) for app in cached_data.get('apps', []))
+            
+            # Use cache only if we have some non-active apps
+            if has_non_active:
+                cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+                # Update cache with current active statuses
+                c.execute('DELETE FROM apps_cache')
+                c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)',
+                         (json.dumps(cached_data), cached_data['fetch_time']))
+                conn.commit()
+                conn.close()
+                return cached_data
+
+    # If no cache, cache is old, force_fetch is True, or we only have active apps, fetch new data
+    apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
+    
+    # Add active status to each app, defaulting to active (1) if not in database
+    for app in apps:
+        app['is_active'] = bool(active_status.get(app['app_id'], 1))  # Default to active
+    
+    fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+    result = {
+        "count": len(apps),
+        "apps": apps,
+        "fetch_time": fetch_time
+    }
+    c.execute('DELETE FROM apps_cache')  # Only keep one row
+    c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', 
+             (json.dumps(result), fetch_time))
+    conn.commit()
+    conn.close()
+    return result
 
 @app.route('/active-apps')
 @login_required
@@ -732,26 +757,54 @@ def get_event_selections():
 @login_required
 def save_event_selections():
     data = request.get_json()
-    # data = {app_id: [event1, event2], ...}
+    if not data:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    for app_id, events in data.items():
-        event1, event2 = events if len(events) == 2 else (None, None)
-        c.execute('REPLACE INTO app_event_selections (app_id, event1, event2) VALUES (?, ?, ?)', (app_id, event1, event2))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok'})
+    try:
+        # Check if it's a single update or bulk update
+        if isinstance(data, dict) and 'app_id' in data:
+            # Single update
+            app_id = data.get('app_id')
+            event1 = data.get('event1')
+            event2 = data.get('event2')
+            is_active = data.get('is_active', False)
+            
+            c.execute('''INSERT OR REPLACE INTO app_event_selections 
+                        (app_id, event1, event2, is_active) 
+                        VALUES (?, ?, ?, ?)''', 
+                     (app_id, event1, event2, 1 if is_active else 0))
+        else:
+            # Bulk update
+            for app_id, app_data in data.items():
+                event1 = app_data.get('event1')
+                event2 = app_data.get('event2')
+                is_active = app_data.get('is_active', False)
+                
+                c.execute('''INSERT OR REPLACE INTO app_event_selections 
+                            (app_id, event1, event2, is_active) 
+                            VALUES (?, ?, ?, ?)''', 
+                         (app_id, event1, event2, 1 if is_active else 0))
+        
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error saving event selections: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        conn.close()
 
 @app.route('/get_apps')
 @login_required
 def get_apps():
     try:
-        # Get force parameter from request
-        force = request.args.get('force', 'false').lower() == 'true'
-        result = get_active_apps(force_fetch=force)
+        result = get_active_apps()
+        # Add used_cache flag to indicate if we used cached data
+        result['used_cache'] = result.get('fetch_time') is not None
         return jsonify(result)
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/get_events')
 @login_required
@@ -1204,12 +1257,75 @@ def clear_apps_cache():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute('DELETE FROM apps_cache')
-        conn.commit()
-        conn.close()
-        return jsonify({'success': True})
+        
+        # Get current apps cache data
+        c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+        row = c.fetchone()
+        
+        # Get active status from app_event_selections
+        c.execute('SELECT app_id, is_active FROM app_event_selections')
+        active_status = dict(c.fetchall())
+        
+        active_app_ids = []
+        if row:
+            cached_data = json.loads(row[0])
+            # Keep only apps that are marked as active in app_event_selections
+            active_apps = [
+                app for app in cached_data.get('apps', []) 
+                if active_status.get(app['app_id'], 0) == 1
+            ]
+            active_app_ids = [app['app_id'] for app in active_apps]
+            
+            if active_apps:  # Only update cache if we have active apps
+                # Update apps cache with only active apps
+                new_cache_data = {
+                    "count": len(active_apps),
+                    "apps": active_apps,
+                    "fetch_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                # Update the apps cache
+                c.execute('DELETE FROM apps_cache')
+                c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)',
+                         (json.dumps(new_cache_data), new_cache_data['fetch_time']))
+            else:
+                # If no active apps, clear the entire cache
+                c.execute('DELETE FROM apps_cache')
+            
+            # Clear events cache for non-active apps only
+            # First, get all app IDs from events cache
+            c.execute('SELECT app_id FROM event_cache')
+            cached_event_apps = c.fetchall()
+            
+            # Remove events for non-active apps
+            for (app_id,) in cached_event_apps:
+                if app_id not in active_app_ids:
+                    c.execute('DELETE FROM event_cache WHERE app_id = ?', (app_id,))
+            
+            conn.commit()
+            
+            return jsonify({
+                "success": True,
+                "message": "Successfully cleared cache for non-active apps",
+                "active_apps_count": len(active_apps),
+                "events_preserved": len(active_app_ids)
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "message": "No apps cache to clear",
+                "active_apps_count": 0,
+                "events_preserved": 0
+            })
+            
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"Error clearing apps cache: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+    finally:
+        conn.close()
 
 @app.route('/clear-stats-cache', methods=['POST'])
 def clear_stats_cache():
@@ -1395,6 +1511,38 @@ def report_status(job_id):
         })
     else:
         return jsonify({'status': 'processing'})
+
+# Add this new route to handle app status updates
+@app.route('/update-app-status', methods=['POST'])
+@login_required
+def update_app_status():
+    data = request.get_json()
+    app_id = data.get('app_id')
+    is_active = data.get('is_active')
+    
+    if not app_id:
+        return jsonify({'success': False, 'message': 'App ID is required'}), 400
+        
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute('INSERT OR REPLACE INTO app_event_selections (app_id, is_active) VALUES (?, ?)', 
+                 (app_id, 1 if is_active else 0))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
+
+# Modify the get_active_apps function to include the active status
+def get_active_app_ids():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT app_id FROM app_event_selections WHERE is_active = 1')
+    active_apps = [row[0] for row in c.fetchall()]
+    conn.close()
+    return active_apps
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

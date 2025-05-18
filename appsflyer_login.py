@@ -4,23 +4,51 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 import os
 from dotenv import load_dotenv
 import time
 from selenium.webdriver.common.keys import Keys
+import subprocess
+import sys
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
 
 def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--disable-notifications")
-    
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    return driver
+    try:
+        chrome_options = Options()
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--disable-notifications")
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        
+        # Use absolute path to ChromeDriver
+        chromedriver_path = str(Path.home() / "bin" / "chromedriver")
+        
+        print(f"Attempting to use ChromeDriver at: {chromedriver_path}")
+        
+        if not os.path.exists(chromedriver_path):
+            raise FileNotFoundError(f"ChromeDriver not found at {chromedriver_path}. Please make sure it is installed.")
+        
+        if not os.access(chromedriver_path, os.X_OK):
+            print(f"ChromeDriver at {chromedriver_path} is not executable. Attempting to fix permissions...")
+            os.chmod(chromedriver_path, 0o755)
+        
+        print(f"Creating Chrome service with ChromeDriver at: {chromedriver_path}")
+        service = Service(executable_path=chromedriver_path)
+        
+        print("Initializing Chrome WebDriver...")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        print("Chrome WebDriver initialized successfully!")
+        
+        return driver
+    except Exception as e:
+        print(f"Error in setup_driver: {str(e)}")
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"PATH environment variable: {os.environ.get('PATH', '')}")
+        raise
 
 def login_to_appsflyer():
     driver = setup_driver()
@@ -325,8 +353,9 @@ def get_all_apps_with_status(email, password, max_retries=7):
 
 if __name__ == "__main__":
     login_to_appsflyer()
-
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    
+    # Test the driver setup
+    driver = setup_driver()
     driver.get("https://www.google.com")
     print(driver.title)
     driver.quit() 
