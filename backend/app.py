@@ -203,12 +203,17 @@ def get_active_apps(max_retries=7, force_fetch=False):
                 # If app exists in database, use its status, otherwise default to active (True)
                 app['is_active'] = bool(active_status.get(app['app_id'], 1))
             
-            # Always use cache if it's fresh enough
-            cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
-            conn.close()
-            return cached_data
+            # Check if we have any non-active apps
+            has_non_active = any(not app.get('is_active', True) for app in cached_data.get('apps', []))
+            
+            # Use cache only if we have some non-active apps and cache is fresh
+            if has_non_active:
+                cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+                cached_data['used_cache'] = True
+                conn.close()
+                return cached_data
 
-    # If no cache or cache is old, fetch new data
+    # If no cache, cache is old, all apps are active, or force_fetch is True, fetch new data
     apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
     
     # Add active status to each app, defaulting to active (True) if not in database
@@ -219,7 +224,8 @@ def get_active_apps(max_retries=7, force_fetch=False):
     result = {
         "count": len(apps),
         "apps": apps,
-        "fetch_time": fetch_time
+        "fetch_time": fetch_time,
+        "used_cache": False
     }
     
     # Update cache

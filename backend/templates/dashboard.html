@@ -600,12 +600,21 @@
                     document.getElementById('app-count').textContent = data.count;
                     document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
 
-                    // Show a toast message indicating if we used cache or fetched new data
+                    // Show a toast message indicating data source
                     const toast = document.createElement('div');
                     toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                    toast.textContent = data.used_cache ? 
-                        'Using cached data' : 
-                        'Fetched fresh data from AppsFlyer';
+                    
+                    // Check if all apps are active
+                    const allAppsActive = window.fetchedApps.every(app => app.is_active);
+                    
+                    if (data.used_cache) {
+                        toast.textContent = 'Using cached data (contains inactive apps)';
+                    } else {
+                        toast.textContent = allAppsActive ? 
+                            'Fetched fresh data from AppsFlyer (all apps are active)' : 
+                            'Fetched fresh data from AppsFlyer';
+                    }
+                    
                     document.body.appendChild(toast);
                     setTimeout(() => toast.remove(), 3000);
                 })
