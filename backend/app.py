@@ -200,28 +200,20 @@ def get_active_apps(max_retries=7, force_fetch=False):
             
             # Update active status from database for all apps
             for app in cached_data.get('apps', []):
-                app['is_active'] = bool(active_status.get(app['app_id'], 1))  # Default to active
+                # If app exists in database, use its status, otherwise default to active (True)
+                app['is_active'] = bool(active_status.get(app['app_id'], 1))
             
-            # Check if we have any non-active apps in the cached data
-            has_non_active = any(not app.get('is_active', True) for app in cached_data.get('apps', []))
-            
-            # Use cache only if we have some non-active apps
-            if has_non_active:
-                cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
-                # Update cache with current active statuses
-                c.execute('DELETE FROM apps_cache')
-                c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)',
-                         (json.dumps(cached_data), cached_data['fetch_time']))
-                conn.commit()
-                conn.close()
-                return cached_data
+            # Always use cache if it's fresh enough
+            cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+            conn.close()
+            return cached_data
 
-    # If no cache, cache is old, force_fetch is True, or we only have active apps, fetch new data
+    # If no cache or cache is old, fetch new data
     apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
     
-    # Add active status to each app, defaulting to active (1) if not in database
+    # Add active status to each app, defaulting to active (True) if not in database
     for app in apps:
-        app['is_active'] = bool(active_status.get(app['app_id'], 1))  # Default to active
+        app['is_active'] = bool(active_status.get(app['app_id'], 1))
     
     fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
     result = {
@@ -229,6 +221,8 @@ def get_active_apps(max_retries=7, force_fetch=False):
         "apps": apps,
         "fetch_time": fetch_time
     }
+    
+    # Update cache
     c.execute('DELETE FROM apps_cache')  # Only keep one row
     c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', 
              (json.dumps(result), fetch_time))
