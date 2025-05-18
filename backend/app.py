@@ -20,6 +20,14 @@ import json
 import pytz
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from redis import Redis
+from rq import Queue
+
+# Initialize Redis connection
+redis_conn = Redis(host='localhost', port=6379, db=0)
+# Initialize RQ queue
+task_queue = Queue(connection=redis_conn)
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
 
@@ -1472,9 +1480,190 @@ def get_stats_for_range(range_key):
 
 def process_report_async(apps, period, selected_events):
     """Background task to process report data"""
-    # Move the report processing logic here
-    # This will run in a separate worker process
-    pass
+    try:
+        print(f"[REPORT] Starting async report processing for period: {period}")
+        print(f"[REPORT] Processing {len(apps)} apps")
+        
+        start_date, end_date = get_period_dates(period)
+        stats_list = []
+        
+        for app in apps:
+            app_id = app['app_id']
+            app_name = app['app_name']
+            print(f"[REPORT] Processing app: {app_name} (App ID: {app_id})...")
+            
+            # Use the aggregate daily report endpoint for main stats
+            url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
+            params = {"from": start_date, "to": end_date}
+            
+            try:
+                print(f"[REPORT] Calling daily_report API for {app_id}...")
+                resp = make_api_request(url, params)
+                if resp == 'timeout':
+                    print(f"[REPORT] Timeout detected for {app_id}")
+                    continue
+                
+                daily_stats = {}
+                if resp and resp.status_code == 200:
+                    print(f"[REPORT] Got daily_report for {app_id}")
+                    rows = resp.text.strip().split("\n")
+                    if len(rows) < 2:  # Only header or empty
+                        print(f"[REPORT] No data returned for {app_id}")
+                        continue
+                        
+                    header = rows[0].split(",")
+                    data_rows = [row.split(",") for row in rows[1:]]
+                    
+                    # Find column indices
+                    def find_col(*names):
+                        for name in names:
+                            for col in header:
+                                if col.lower().replace('_','').replace(' ','') == name.lower().replace('_','').replace(' ',''):
+                                    return header.index(col)
+                        return None
+                        
+                    impressions_idx = find_col('impressions', 'Impressions')
+                    clicks_idx = find_col('clicks', 'Clicks')
+                    installs_idx = find_col('installs', 'Installs')
+                    date_idx = find_col('date', 'Date')
+                    
+                    if None in [impressions_idx, clicks_idx, installs_idx, date_idx]:
+                        print(f"[REPORT] Could not find all required columns for {app_id}")
+                        continue
+                        
+                    # Process each row
+                    for row in data_rows:
+                        if len(row) <= max(impressions_idx, clicks_idx, installs_idx, date_idx):
+                            continue
+                            
+                        date = row[date_idx]
+                        if date not in daily_stats:
+                            daily_stats[date] = {
+                                "impressions": 0,
+                                "clicks": 0,
+                                "installs": 0,
+                                "blocked_installs_rt": 0,
+                                "blocked_installs_pa": 0
+                            }
+                            
+                        try:
+                            daily_stats[date]["impressions"] += int(row[impressions_idx] or 0)
+                            daily_stats[date]["clicks"] += int(row[clicks_idx] or 0)
+                            daily_stats[date]["installs"] += int(row[installs_idx] or 0)
+                        except (ValueError, TypeError):
+                            print(f"[REPORT] Error parsing numbers in row for {app_id}: {row}")
+                            continue
+                            
+                    # Process additional data (blocked installs, events)
+                    # Add blocked installs data
+                    blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
+                    blocked_rt_resp = make_api_request(blocked_rt_url, params)
+                    if blocked_rt_resp and blocked_rt_resp.status_code == 200:
+                        rows = blocked_rt_resp.text.strip().split("\n")
+                        if len(rows) > 1:
+                            header = rows[0].split(",")
+                            date_idx = header.index("Install Time") if "Install Time" in header else None
+                            for row in rows[1:]:
+                                cols = row.split(",")
+                                if date_idx is not None and len(cols) > date_idx:
+                                    install_date = cols[date_idx].split(" ")[0]
+                                    if install_date in daily_stats:
+                                        daily_stats[install_date]["blocked_installs_rt"] += 1
+                                        
+                    # Add event data if selected
+                    event_data = {}
+                    selected = selected_events.get(app_id, [])
+                    if selected:
+                        events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
+                        events_resp = make_api_request(events_url, params)
+                        if events_resp and events_resp.status_code == 200:
+                            rows = events_resp.text.strip().split("\n")
+                            if len(rows) > 1:
+                                header = rows[0].split(",")
+                                event_name_idx = header.index("Event Name") if "Event Name" in header else None
+                                event_time_idx = header.index("Event Time") if "Event Time" in header else None
+                                
+                                for row in rows[1:]:
+                                    cols = row.split(",")
+                                    if event_name_idx is not None and event_time_idx is not None and len(cols) > max(event_name_idx, event_time_idx):
+                                        event_name = cols[event_name_idx]
+                                        event_date = cols[event_time_idx].split(" ")[0]
+                                        if event_name in selected:
+                                            event_data.setdefault(event_name, {})
+                                            event_data[event_name].setdefault(event_date, 0)
+                                            event_data[event_name][event_date] += 1
+                                            
+                    # Prepare daily stats for frontend
+                    all_dates = sorted(daily_stats.keys())
+                    table = []
+                    for date in all_dates:
+                        row = {
+                            "date": date,
+                            "impressions": daily_stats[date]["impressions"],
+                            "clicks": daily_stats[date]["clicks"],
+                            "installs": daily_stats[date]["installs"],
+                            "blocked_installs_rt": daily_stats[date]["blocked_installs_rt"],
+                            "blocked_installs_pa": daily_stats[date]["blocked_installs_pa"]
+                        }
+                        
+                        # Add calculated rates
+                        row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
+                        row["click_to_install"] = round(row["installs"] / row["clicks"], 2) if row["clicks"] > 0 else 0
+                        row["blocked_rt_rate"] = round(row["blocked_installs_rt"] / row["installs"], 2) if row["installs"] > 0 else 0
+                        row["blocked_pa_rate"] = round(row["blocked_installs_pa"] / row["installs"], 2) if row["installs"] > 0 else 0
+                        
+                        # Add event counts
+                        if selected:
+                            for event in selected:
+                                row[event] = event_data.get(event, {}).get(date, 0)
+                                
+                        table.append(row)
+                        
+                    stats_list.append({
+                        'app_id': app_id,
+                        'app_name': app_name,
+                        'table': table,
+                        'selected_events': selected,
+                        'traffic': sum(r['impressions'] + r['clicks'] for r in table)
+                    })
+                    
+            except Exception as e:
+                print(f"[REPORT] Error processing app {app_id}: {str(e)}")
+                continue
+                
+        # Save to cache
+        if stats_list:
+            app_ids = '-'.join(sorted([app['app_id'] for app in apps]))
+            event1 = ''
+            event2 = ''
+            if apps and selected_events:
+                first_app_id = apps[0]['app_id']
+                events = selected_events.get(first_app_id, [])
+                if len(events) > 0:
+                    event1 = events[0] or ''
+                if len(events) > 1:
+                    event2 = events[1] or ''
+            cache_key = f"{period}:{event1}:{event2}:{app_ids}"
+            
+            result = {
+                'apps': stats_list,
+                'updated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                     (cache_key, json.dumps(result)))
+            conn.commit()
+            conn.close()
+            
+            return result
+            
+    except Exception as e:
+        print(f"[REPORT] Error in process_report_async: {str(e)}")
+        raise
+        
+    return {'apps': [], 'error': 'Failed to process report'}
 
 @app.route('/start-report', methods=['POST'])
 @login_required
