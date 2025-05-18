@@ -9,25 +9,34 @@ export FLASK_ENV=development
 export FLASK_DEBUG=1
 export PYTHONUNBUFFERED=1
 
-# Start gunicorn with detailed logging
-gunicorn -w 4 -b 0.0.0.0:5000 app:app \
+# Clear previous log file
+echo "" > ../gunicorn.out
+
+# Start gunicorn with basic configuration
+gunicorn app:app \
+    -w 4 \
+    -b 0.0.0.0:5000 \
     --timeout 3600 \
     --log-level debug \
-    --access-logfile - \
-    --error-logfile - \
+    --error-logfile ../gunicorn.out \
+    --access-logfile ../gunicorn.out \
     --capture-output \
-    --enable-stdio-inheritance \
-    --logger-class gunicorn.glogging.Logger \
-    --access-logformat "%(asctime)s [%(levelname)s] %(message)s" \
     >> ../gunicorn.out 2>&1 &
 
 # Store the background process ID
 SERVER_PID=$!
 
+# Wait a moment to check if the server started successfully
+sleep 2
+if ! ps -p $SERVER_PID > /dev/null; then
+    echo "Failed to start server. Check gunicorn.out for details."
+    exit 1
+fi
+
 # Function to handle script termination
 cleanup() {
     echo "Shutting down server..."
-    kill $SERVER_PID
+    kill $SERVER_PID 2>/dev/null
     exit 0
 }
 
