@@ -19,7 +19,7 @@ gunicorn app:app \
     --timeout 3600 \
     --log-level debug \
     --error-logfile ../gunicorn.out \
-    --access-logfile ../gunicorn.out \
+    --access-logfile /dev/null \
     --capture-output \
     >> ../gunicorn.out 2>&1 &
 
@@ -43,9 +43,13 @@ cleanup() {
 # Set up trap to catch termination signal
 trap cleanup SIGINT SIGTERM
 
-# Show logs in real-time with timestamps
-echo "Server started. Showing logs (Press Ctrl+C to stop)..."
+# Show logs in real-time with timestamps, filtering out HTTP access logs
+echo "Server started. Showing important logs (Press Ctrl+C to stop)..."
 echo "----------------------------------------"
-tail -f ../gunicorn.out | while read line; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
+tail -f ../gunicorn.out | grep -v "GET\|POST\|PUT\|DELETE\|HEAD\|OPTIONS" | while read line; do
+    # Skip lines containing common HTTP status codes
+    if ! echo "$line" | grep -q "200\|301\|302\|304\|400\|401\|403\|404\|500\|502\|503\|504"; then
+        # Add timestamp and print the line
+        echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
+    fi
 done 
