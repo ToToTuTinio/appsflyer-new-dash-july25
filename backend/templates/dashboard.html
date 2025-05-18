@@ -752,18 +752,54 @@
             }
         });
         function runStatsReport(range) {
+            if (!window.fetchedApps || !window.fetchedApps.length) {
+                alert('No apps loaded. Please click Get Apps first.');
+                return;
+            }
+
             setFetchButtonsDisabled(true);
             const loadingElem = document.getElementById('stats-loading');
-            if (loadingElem) loadingElem.style.display = '';
+            const errorElem = document.getElementById('stats-error');
             
-            let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+            if (loadingElem) {
+                loadingElem.style.display = '';
+                loadingElem.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <div class="loading-spinner mb-2"></div>
+                        <div>Generating report...</div>
+                        <div class="text-sm text-gray-500" id="stats-timer">0s</div>
+                    </div>
+                `;
+            }
+            if (errorElem) errorElem.style.display = 'none';
+            
+            let timer = 0;
+            const timerInterval = setInterval(() => {
+                timer++;
+                const timerElem = document.getElementById('stats-timer');
+                if (timerElem) timerElem.textContent = `${timer}s`;
+            }, 1000);
+            
+            // Get event selections from localStorage
+            let eventSelections = {};
+            try {
+                const selections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                // Only include selections for active apps
+                window.fetchedApps.forEach(app => {
+                    if (app.is_active && selections[app.app_id]) {
+                        eventSelections[app.app_id] = selections[app.app_id];
+                    }
+                });
+            } catch (e) {
+                console.error('Error parsing event selections:', e);
+            }
             
             // Start the report generation
             fetch('/start-report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    apps: window.fetchedApps,
+                    apps: window.fetchedApps.filter(app => app.is_active),
                     period: periodMap[range],
                     selected_events: eventSelections
                 })
@@ -772,49 +808,76 @@
             .then(data => {
                 if (data.status === 'processing') {
                     // Start polling for status
-                    pollReportStatus(data.job_id, range);
+                    pollReportStatus(data.job_id, range, timerInterval);
+                } else {
+                    clearInterval(timerInterval);
+                    setFetchButtonsDisabled(false);
+                    if (loadingElem) loadingElem.style.display = 'none';
+                    if (errorElem) {
+                        errorElem.textContent = data.error || "Error starting report generation. Please try again.";
+                        errorElem.style.display = '';
+                    }
                 }
             })
             .catch(error => {
+                clearInterval(timerInterval);
                 setFetchButtonsDisabled(false);
                 if (loadingElem) loadingElem.style.display = 'none';
-                const errorElem = document.getElementById('stats-error');
                 if (errorElem) {
                     errorElem.textContent = "Error starting report generation. Please try again.";
                     errorElem.style.display = '';
                 }
+                console.error('Error starting report:', error);
             });
         }
 
-        function pollReportStatus(jobId, range) {
+        function pollReportStatus(jobId, range, timerInterval) {
             const loadingElem = document.getElementById('stats-loading');
             const errorElem = document.getElementById('stats-error');
+            const dataElem = document.getElementById(`stats-data-${range}`);
             
             fetch(`/report-status/${jobId}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.status === 'completed') {
-                        // Report is ready
+                        clearInterval(timerInterval);
                         setFetchButtonsDisabled(false);
                         if (loadingElem) loadingElem.style.display = 'none';
-                        saveStatsData(data.result, range);
-                        renderStatsAppsForRange(range, data.result.apps || []);
-                        fetchOverviewData();
-                        fetchTopPerformingApps();
+                        if (errorElem) errorElem.style.display = 'none';
+                        
+                        // Cache the data
+                        localStorage.setItem(`stats_${range}`, JSON.stringify(data.result));
+                        
+                        // Render the data
+                        if (data.result && data.result.apps) {
+                            renderStatsAppsForRange(range, data.result.apps);
+                        } else {
+                            if (dataElem) dataElem.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                        }
                     } else if (data.status === 'failed') {
-                        // Report generation failed
+                        clearInterval(timerInterval);
                         setFetchButtonsDisabled(false);
                         if (loadingElem) loadingElem.style.display = 'none';
                         if (errorElem) {
-                            errorElem.textContent = "Error generating report. Please try again.";
+                            errorElem.textContent = data.error || "Error generating report. Please try again.";
                             errorElem.style.display = '';
                         }
-                    } else if (data.status === 'processing') {
-                        // Still processing, poll again after 5 seconds
-                        setTimeout(() => pollReportStatus(jobId, range), 5000);
+                    } else if (data.status === 'not_found') {
+                        clearInterval(timerInterval);
+                        setFetchButtonsDisabled(false);
+                        if (loadingElem) loadingElem.style.display = 'none';
+                        if (errorElem) {
+                            errorElem.textContent = "Report job not found. Please try again.";
+                            errorElem.style.display = '';
+                        }
+                    } else {
+                        // Still processing, continue polling after 5 seconds
+                        setTimeout(() => pollReportStatus(jobId, range, timerInterval), 5000);
                     }
                 })
                 .catch(error => {
+                    console.error('Error polling report status:', error);
+                    clearInterval(timerInterval);
                     setFetchButtonsDisabled(false);
                     if (loadingElem) loadingElem.style.display = 'none';
                     if (errorElem) {
