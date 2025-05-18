@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# Start Redis if not running
-redis-server --daemonize yes
+# Check if Redis is already running
+if ! pgrep redis-server > /dev/null; then
+    echo "Starting Redis server..."
+    redis-server --daemonize yes
+else
+    echo "Redis server is already running"
+fi
 
 # Start the server in the background and redirect output to gunicorn.out
 cd backend
