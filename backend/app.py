@@ -1521,6 +1521,14 @@ def process_report_async(apps, period, selected_events):
                                 if col.lower().replace('_','').replace(' ','') == name.lower().replace('_','').replace(' ',''):
                                     return header.index(col)
                         return None
+
+                    def safe_int(val):
+                        try:
+                            if val in ['', 'N/A', 'None', 'null']:
+                                return 0
+                            return int(float(val))
+                        except (ValueError, TypeError):
+                            return 0
                         
                     impressions_idx = find_col('impressions', 'Impressions')
                     clicks_idx = find_col('clicks', 'Clicks')
@@ -1546,87 +1554,83 @@ def process_report_async(apps, period, selected_events):
                                 "blocked_installs_pa": 0
                             }
                             
-                        try:
-                            daily_stats[date]["impressions"] += int(row[impressions_idx] or 0)
-                            daily_stats[date]["clicks"] += int(row[clicks_idx] or 0)
-                            daily_stats[date]["installs"] += int(row[installs_idx] or 0)
-                        except (ValueError, TypeError):
-                            print(f"[REPORT] Error parsing numbers in row for {app_id}: {row}")
-                            continue
-                            
-                    # Process additional data (blocked installs, events)
-                    # Add blocked installs data
-                    blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
-                    blocked_rt_resp = make_api_request(blocked_rt_url, params)
-                    if blocked_rt_resp and blocked_rt_resp.status_code == 200:
-                        rows = blocked_rt_resp.text.strip().split("\n")
+                        daily_stats[date]["impressions"] += safe_int(row[impressions_idx])
+                        daily_stats[date]["clicks"] += safe_int(row[clicks_idx])
+                        daily_stats[date]["installs"] += safe_int(row[installs_idx])
+
+                # Process additional data (blocked installs, events)
+                # Add blocked installs data
+                blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
+                blocked_rt_resp = make_api_request(blocked_rt_url, params)
+                if blocked_rt_resp and blocked_rt_resp.status_code == 200:
+                    rows = blocked_rt_resp.text.strip().split("\n")
+                    if len(rows) > 1:
+                        header = rows[0].split(",")
+                        date_idx = header.index("Install Time") if "Install Time" in header else None
+                        for row in rows[1:]:
+                            cols = row.split(",")
+                            if date_idx is not None and len(cols) > date_idx:
+                                install_date = cols[date_idx].split(" ")[0]
+                                if install_date in daily_stats:
+                                    daily_stats[install_date]["blocked_installs_rt"] += 1
+                                    
+                # Add event data if selected
+                event_data = {}
+                selected = selected_events.get(app_id, [])
+                if selected:
+                    events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
+                    events_resp = make_api_request(events_url, params)
+                    if events_resp and events_resp.status_code == 200:
+                        rows = events_resp.text.strip().split("\n")
                         if len(rows) > 1:
                             header = rows[0].split(",")
-                            date_idx = header.index("Install Time") if "Install Time" in header else None
+                            event_name_idx = header.index("Event Name") if "Event Name" in header else None
+                            event_time_idx = header.index("Event Time") if "Event Time" in header else None
+                            
                             for row in rows[1:]:
                                 cols = row.split(",")
-                                if date_idx is not None and len(cols) > date_idx:
-                                    install_date = cols[date_idx].split(" ")[0]
-                                    if install_date in daily_stats:
-                                        daily_stats[install_date]["blocked_installs_rt"] += 1
+                                if event_name_idx is not None and event_time_idx is not None and len(cols) > max(event_name_idx, event_time_idx):
+                                    event_name = cols[event_name_idx]
+                                    event_date = cols[event_time_idx].split(" ")[0]
+                                    if event_name in selected:
+                                        event_data.setdefault(event_name, {})
+                                        event_data[event_name].setdefault(event_date, 0)
+                                        event_data[event_name][event_date] += 1
                                         
-                    # Add event data if selected
-                    event_data = {}
-                    selected = selected_events.get(app_id, [])
-                    if selected:
-                        events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
-                        events_resp = make_api_request(events_url, params)
-                        if events_resp and events_resp.status_code == 200:
-                            rows = events_resp.text.strip().split("\n")
-                            if len(rows) > 1:
-                                header = rows[0].split(",")
-                                event_name_idx = header.index("Event Name") if "Event Name" in header else None
-                                event_time_idx = header.index("Event Time") if "Event Time" in header else None
-                                
-                                for row in rows[1:]:
-                                    cols = row.split(",")
-                                    if event_name_idx is not None and event_time_idx is not None and len(cols) > max(event_name_idx, event_time_idx):
-                                        event_name = cols[event_name_idx]
-                                        event_date = cols[event_time_idx].split(" ")[0]
-                                        if event_name in selected:
-                                            event_data.setdefault(event_name, {})
-                                            event_data[event_name].setdefault(event_date, 0)
-                                            event_data[event_name][event_date] += 1
-                                            
-                    # Prepare daily stats for frontend
-                    all_dates = sorted(daily_stats.keys())
-                    table = []
-                    for date in all_dates:
-                        row = {
-                            "date": date,
-                            "impressions": daily_stats[date]["impressions"],
-                            "clicks": daily_stats[date]["clicks"],
-                            "installs": daily_stats[date]["installs"],
-                            "blocked_installs_rt": daily_stats[date]["blocked_installs_rt"],
-                            "blocked_installs_pa": daily_stats[date]["blocked_installs_pa"]
-                        }
-                        
-                        # Add calculated rates
-                        row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
-                        row["click_to_install"] = round(row["installs"] / row["clicks"], 2) if row["clicks"] > 0 else 0
-                        row["blocked_rt_rate"] = round(row["blocked_installs_rt"] / row["installs"], 2) if row["installs"] > 0 else 0
-                        row["blocked_pa_rate"] = round(row["blocked_installs_pa"] / row["installs"], 2) if row["installs"] > 0 else 0
-                        
-                        # Add event counts
-                        if selected:
-                            for event in selected:
-                                row[event] = event_data.get(event, {}).get(date, 0)
-                                
-                        table.append(row)
-                        
-                    stats_list.append({
-                        'app_id': app_id,
-                        'app_name': app_name,
-                        'table': table,
-                        'selected_events': selected,
-                        'traffic': sum(r['impressions'] + r['clicks'] for r in table)
-                    })
+                # Prepare daily stats for frontend
+                all_dates = sorted(daily_stats.keys())
+                table = []
+                for date in all_dates:
+                    row = {
+                        "date": date,
+                        "impressions": daily_stats[date]["impressions"],
+                        "clicks": daily_stats[date]["clicks"],
+                        "installs": daily_stats[date]["installs"],
+                        "blocked_installs_rt": daily_stats[date]["blocked_installs_rt"],
+                        "blocked_installs_pa": daily_stats[date]["blocked_installs_pa"]
+                    }
                     
+                    # Add calculated rates
+                    row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
+                    row["click_to_install"] = round(row["installs"] / row["clicks"], 2) if row["clicks"] > 0 else 0
+                    row["blocked_rt_rate"] = round(row["blocked_installs_rt"] / row["installs"], 2) if row["installs"] > 0 else 0
+                    row["blocked_pa_rate"] = round(row["blocked_installs_pa"] / row["installs"], 2) if row["installs"] > 0 else 0
+                    
+                    # Add event counts
+                    if selected:
+                        for event in selected:
+                            row[event] = event_data.get(event, {}).get(date, 0)
+                            
+                    table.append(row)
+                    
+                stats_list.append({
+                    'app_id': app_id,
+                    'app_name': app_name,
+                    'table': table,
+                    'selected_events': selected,
+                    'traffic': sum(r['impressions'] + r['clicks'] for r in table)
+                })
+                
             except Exception as e:
                 print(f"[REPORT] Error processing app {app_id}: {str(e)}")
                 continue
