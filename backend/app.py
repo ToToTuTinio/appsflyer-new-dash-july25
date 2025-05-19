@@ -1718,11 +1718,12 @@ def start_report():
     period = data.get('period')
     selected_events = data.get('selected_events', [])
 
-    # Run synchronously (not as a background job)
-    result = process_report_async(apps, period, selected_events)
+    # Create a background job
+    job = task_queue.enqueue(process_report_async, apps, period, selected_events)
+    
     return jsonify({
-        'status': 'completed',
-        'result': result
+        'status': 'processing',
+        'job_id': job.id
     })
 
 @app.route('/report-status/<job_id>')
