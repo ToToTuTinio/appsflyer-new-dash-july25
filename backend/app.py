@@ -57,12 +57,6 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
-# Import auto_report_service after app initialization
-from auto_report_service import start_report_service
-
-# Start the automatic report service
-report_service_thread = start_report_service(app)
-
 # --- GLOBAL JSON ERROR HANDLER ---
 from werkzeug.exceptions import HTTPException
 
@@ -1775,4 +1769,4 @@ def get_active_app_ids():
     return active_apps
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)
