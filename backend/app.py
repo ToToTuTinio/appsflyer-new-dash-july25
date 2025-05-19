@@ -22,6 +22,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
+from auto_report_service import auto_report_service
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
@@ -1767,6 +1768,32 @@ def get_active_app_ids():
     active_apps = [row[0] for row in c.fetchall()]
     conn.close()
     return active_apps
+
+@app.route('/start-auto-reports', methods=['POST'])
+@login_required
+def start_auto_reports():
+    auto_report_service.start()
+    return jsonify({'status': 'started'})
+
+@app.route('/stop-auto-reports', methods=['POST'])
+@login_required
+def stop_auto_reports():
+    auto_report_service.stop()
+    return jsonify({'status': 'stopped'})
+
+@app.route('/run-reports-now', methods=['POST'])
+@login_required
+def run_reports_now():
+    auto_report_service.run_now()
+    return jsonify({'status': 'running'})
+
+@app.route('/auto-reports-status', methods=['GET'])
+@login_required
+def get_auto_reports_status():
+    return jsonify({
+        'is_running': auto_report_service.is_running,
+        'last_run': auto_report_service.last_run.isoformat() if auto_report_service.last_run else None
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

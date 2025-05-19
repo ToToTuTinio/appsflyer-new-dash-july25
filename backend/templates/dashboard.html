@@ -140,6 +140,10 @@
         .fraud-badge-rt { background: #fef9c3; color: #ca8a04; font-weight: bold; border-radius: 9999px; padding: 0.25em 0.9em; font-size: 1rem; display: inline-block; }
         .fraud-table tr:nth-child(even) { background: #f9fafb; }
         .fraud-table tr:hover { background: #e0e7ff22; }
+        /* Hide all RUN REPORT buttons */
+        [id^="run-report-"], [id^="run-fraud-"], [id^="run-fraud-source-"] {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -247,7 +251,8 @@
                 </div>
                 <!-- Clear Backend Data Button (moved to bottom, smaller) -->
                 <div class="flex justify-center mt-8 mb-2">
-                    <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Backend Data</button>
+                    <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition mr-2">Clear Backend Data</button>
+                    <button id="get-stats-btn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-semibold transition">Get Stats</button>
                 </div>
             </div>
         </div>
@@ -3341,6 +3346,34 @@
                 button.textContent = originalText;
             });
         }
+
+        // Add Get Stats button functionality
+        document.getElementById('get-stats-btn').addEventListener('click', function() {
+            fetch('/run-reports-now', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'running') {
+                    alert('Report generation started. This will take approximately 4 hours to complete.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error starting report generation');
+            });
+        });
+
+        // Start auto report service when page loads
+        fetch('/start-auto-reports', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
     </script>
 </body>
 </html> 
