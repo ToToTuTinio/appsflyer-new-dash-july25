@@ -1711,6 +1711,16 @@
         window.switchFraudSubTab = function(subtab) {
             origSwitchFraudSubTab(subtab);
             if (subtab === 'analytics') activateDefaultFraudAnalyticsTab();
+            if (subtab === 'source') {
+                // Only render from cache, do NOT fetch on tab switch
+                const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', '30d'];
+                fraudSourceRanges.forEach(range => {
+                    if (fraudSourceDataCache[range]) {
+                        renderFraudSource(fraudSourceDataCache[range], range);
+                    }
+                });
+            }
+            currentFraudSubTab = subtab;
         };
         document.querySelectorAll('.fraud-range-tab').forEach(btn => {
             btn.onclick = function() {
