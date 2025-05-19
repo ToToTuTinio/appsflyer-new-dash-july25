@@ -22,11 +22,15 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
+from auto_report_service import start_report_service
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
 # Initialize RQ queue
 task_queue = Queue(connection=redis_conn)
+
+# Start the automatic report service
+report_service_thread = start_report_service()
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
@@ -1769,4 +1773,4 @@ def get_active_app_ids():
     return active_apps
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
