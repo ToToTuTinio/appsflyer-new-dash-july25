@@ -3,7 +3,7 @@ import time
 import threading
 from datetime import datetime
 import logging
-from app import app, generate_stats_report, generate_fraud_report
+from flask import current_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +18,8 @@ def run_reports_sequentially():
         
         # Run Stats Report
         logger.info("Generating Stats Report...")
-        with app.app_context():
+        with current_app.app_context():
+            from app import generate_stats_report
             generate_stats_report()
         logger.info("Stats Report completed")
         
@@ -27,7 +28,8 @@ def run_reports_sequentially():
         
         # Run Fraud Report
         logger.info("Generating Fraud Report...")
-        with app.app_context():
+        with current_app.app_context():
+            from app import generate_fraud_report
             generate_fraud_report()
         logger.info("Fraud Report completed")
         

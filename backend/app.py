@@ -22,15 +22,11 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
-from auto_report_service import start_report_service
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
 # Initialize RQ queue
 task_queue = Queue(connection=redis_conn)
-
-# Start the automatic report service
-report_service_thread = start_report_service()
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
@@ -60,6 +56,12 @@ limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
+
+# Import auto_report_service after app initialization
+from auto_report_service import start_report_service
+
+# Start the automatic report service
+report_service_thread = start_report_service()
 
 # --- GLOBAL JSON ERROR HANDLER ---
 from werkzeug.exceptions import HTTPException
