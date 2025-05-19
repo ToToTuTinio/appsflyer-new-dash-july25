@@ -837,77 +837,68 @@
                 return;
             }
             container.innerHTML = '';
+
             apps.forEach(app => {
                 const section = document.createElement('div');
                 section.className = 'app-card';
-                section.innerHTML = `<div class="text-center mb-6">
-                    <h2 class="text-2xl font-extrabold text-indigo-900 mb-2">${app.app_name}</h2>
-                    <p class="text-sm font-mono text-indigo-600 tracking-wide">App ID: ${app.app_id}</p>
-                </div>`;
-                if (app.table && app.table.length) {
-                    const dates = app.table.map(row => row.date);
-                    let event1 = app.selected_events && app.selected_events[0] ? app.selected_events[0] : null;
-                    let event2 = app.selected_events && app.selected_events[1] ? app.selected_events[1] : null;
-                    // Detect error events (e.g., truncated error message or containing 'maximum nu')
-                    const isErrorEvent = ev => !ev || ev.toLowerCase().includes('maximum nu') || ev.toLowerCase().includes('subscription') || ev.toLowerCase().includes('error') || ev.toLowerCase().includes('failed') || ev.toLowerCase().includes('doesn\'t include');
-                    if (isErrorEvent(event1)) event1 = null;
-                    if (isErrorEvent(event2)) event2 = null;
-                    let metrics = [
-                        { key: 'impressions', label: 'Impressions', isNumber: true },
-                        { key: 'clicks', label: 'Clicks', isNumber: true },
-                        { key: 'installs', label: 'Installs', isNumber: true },
-                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', isNumber: true },
-                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', isNumber: true },
-                    ];
-                    if (event1) metrics.push({ key: event1, label: event1, isNumber: true });
-                    if (event2) metrics.push({ key: event2, label: event2, isNumber: true });
-                    metrics.push(
-                        { key: 'imp_to_click', label: '% imp to click', percent: true },
-                        { key: 'click_to_install', label: 'Conversion Rate', percent: true, decimals: 2 }
-                    );
-                    if (event1) metrics.push({ key: 'install_to_' + event1, label: `% install to ${event1}`, percent: true });
-                    if (event1 && event2) metrics.push({ key: event1 + '_to_' + event2, label: `% ${event1} to ${event2}`, percent: true });
-                    metrics.push(
-                        { key: 'blocked_rt_rate', label: '% blocked installs (RT)', percent: true },
-                        { key: 'blocked_pa_rate', label: '% blocked installs (PA)', percent: true }
-                    );
-                    // Compute extra % columns if needed
-                    app.table.forEach(row => {
-                        if (event1 && row.installs > 0 && row[event1] !== undefined) {
-                            row['install_to_' + event1] = row[event1] / row.installs;
-                        }
-                        if (event1 && event2 && row[event1] > 0 && row[event2] !== undefined) {
-                            row[event1 + '_to_' + event2] = row[event2] / row[event1];
-                        }
-                    });
-                    // Table
-                    let table = '<div class="stats-table-container"><table class="stats-table"><thead><tr><th class="app-header sticky-metric-col">Metric</th>';
-                    dates.forEach(date => {
-                        table += `<th style="text-align:center;">${date}</th>`;
-                    });
-                    table += '</tr></thead><tbody>';
-                    metrics.forEach(m => {
-                        table += `<tr><td class="sticky-metric-col" style="text-align:left;font-weight:600;">${m.label}</td>`;
-                        app.table.forEach(row => {
-                            let val = row[m.key];
-                            let display = '';
-                            if (m.percent) display = (typeof val === 'number' ? (val * 100).toFixed(m.decimals || 2) + '%' : '-');
-                            else if (m.isNumber) display = (val !== undefined ? Number(val).toLocaleString() : '-');
-                            else display = (val !== undefined ? val : '-');
-                            table += `<td style='text-align:center;'>${display}</td>`;
-                        });
-                        table += '</tr>';
-                    });
-                    table += '</tbody></table></div>';
-                    // Modern multi-metric trend graph below table
-                    let safeName = app.app_name.replace(/\W/g, "");
-                    let mainId = `trend-main-${app.app_id}-${safeName}`;
-                    let eventsId = `trend-events-${app.app_id}-${safeName}`;
-                    let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
-                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Impressions & Clicks</div><canvas id='${mainId}'></canvas></div>`;
-                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Installs & Events</div><canvas id='${eventsId}'></canvas></div>`;
-                    table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#a21caf;margin-bottom:0.5rem;'>Fraud: Blocked Installs</div><canvas id='${fraudId}'></canvas></div>`;
-                    section.innerHTML += table;
+                section.innerHTML = `
+                    <div style="font-weight:700;font-size:1.4rem;color:#3730a3;margin-bottom:1.2rem;">${app.app_name}</div>
+                    <div class="stats-table-container">
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th class="app-header">Metric</th>
+                                    ${app.table.map(row => `<th>${row.date}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="sticky-metric-col" style="text-align:left;font-weight:600;">Impressions</td>
+                                    ${app.table.map(row => `<td style='text-align:center;'>${row.impressions.toLocaleString()}</td>`).join('')}
+                                </tr>
+                                <tr>
+                                    <td class="sticky-metric-col" style="text-align:left;font-weight:600;">Clicks</td>
+                                    ${app.table.map(row => `<td style='text-align:center;'>${row.clicks.toLocaleString()}</td>`).join('')}
+                                </tr>
+                                <tr>
+                                    <td class="sticky-metric-col" style="text-align:left;font-weight:600;">Installs</td>
+                                    ${app.table.map(row => `<td style='text-align:center;'>${row.installs.toLocaleString()}</td>`).join('')}
+                                </tr>
+                                ${app.selected_events && app.selected_events[0] ? `
+                                <tr>
+                                    <td class="sticky-metric-col" style="text-align:left;font-weight:600;">${app.selected_events[0]}</td>
+                                    ${app.table.map(row => `<td style='text-align:center;'>${(row[app.selected_events[0]] || 0).toLocaleString()}</td>`).join('')}
+                                </tr>
+                                ` : ''}
+                                ${app.selected_events && app.selected_events[1] ? `
+                                <tr>
+                                    <td class="sticky-metric-col" style="text-align:left;font-weight:600;">${app.selected_events[1]}</td>
+                                    ${app.table.map(row => `<td style='text-align:center;'>${(row[app.selected_events[1]] || 0).toLocaleString()}</td>`).join('')}
+                                </tr>
+                                ` : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                if (app.table && app.table.length > 0) {
+                    // Create graph containers
+                    const safeName = app.app_name.replace(/\W/g, "");
+                    const mainId = `trend-main-${app.app_id}-${safeName}-${range}`;
+                    const eventsId = `trend-events-${app.app_id}-${safeName}-${range}`;
+                    
+                    section.innerHTML += `
+                        <div class='trend-graph'>
+                            <div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Impressions & Clicks</div>
+                            <canvas id='${mainId}'></canvas>
+                        </div>
+                        <div class='trend-graph'>
+                            <div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Installs & Events</div>
+                            <canvas id='${eventsId}'></canvas>
+                        </div>
+                    `;
+
+                    // Render graphs with a delay to ensure DOM is ready
                     setTimeout(() => {
                         // 1. Impressions & Clicks
                         renderChartWithRetry(mainId, (ctxMain) => {
@@ -917,108 +908,89 @@
                             window._chartInstances[mainId] = new Chart(ctxMain, {
                                 type: 'line',
                                 data: {
-                                    labels: app.table.map(r=>r.date),
+                                    labels: app.table.map(r => r.date),
                                     datasets: [
                                         {
                                             label: 'Impressions',
-                                            data: app.table.map(r=>r.impressions),
+                                            data: app.table.map(r => r.impressions),
                                             borderColor: '#6366f1',
                                             backgroundColor: 'rgba(99,102,241,0.08)',
-                                            fill: false,
+                                            fill: true,
                                             tension: 0.18
                                         },
                                         {
                                             label: 'Clicks',
-                                            data: app.table.map(r=>r.clicks),
-                                            borderColor: '#10b981',
-                                            backgroundColor: 'rgba(16,185,129,0.08)',
-                                            fill: false,
+                                            data: app.table.map(r => r.clicks),
+                                            borderColor: '#f59e42',
+                                            backgroundColor: 'rgba(245,158,66,0.08)',
+                                            fill: true,
                                             tension: 0.18
                                         }
                                     ]
                                 },
                                 options: {
                                     plugins: { legend: { display: true, position: 'bottom' } },
-                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    scales: { 
+                                        x: { display: true, title: { display: true, text: 'Date' } }, 
+                                        y: { beginAtZero: true, title: { display: true, text: 'Count' } } 
+                                    },
                                     elements: { point: { radius: 2 } },
                                     responsive: true,
                                     maintainAspectRatio: false
                                 }
                             });
                         });
+
                         // 2. Installs & Events
                         renderChartWithRetry(eventsId, (ctxEvents) => {
-                            const datasets = [
-                                {
-                                    label: 'Installs',
-                                    data: app.table.map(r=>r.installs),
-                                    borderColor: '#f59e42',
-                                    backgroundColor: 'rgba(245,158,66,0.08)',
-                                    fill: false,
-                                    tension: 0.18
-                                }
-                            ];
-                            if (app.selected_events) {
-                                app.selected_events.forEach((event, i) => {
-                                    datasets.push({
-                                        label: event,
-                                        data: app.table.map(r=>r[event]||0),
-                                        borderColor: i === 0 ? '#3b82f6' : '#a21caf',
-                                        backgroundColor: i === 0 ? 'rgba(59,130,246,0.08)' : 'rgba(162,28,175,0.08)',
-                                        fill: false,
-                                        tension: 0.18
-                                    });
-                                });
-                            }
                             if (window._chartInstances[eventsId]) {
                                 window._chartInstances[eventsId].destroy();
                             }
+                            const datasets = [
+                                {
+                                    label: 'Installs',
+                                    data: app.table.map(r => r.installs),
+                                    borderColor: '#14b8a6',
+                                    backgroundColor: 'rgba(20,184,166,0.08)',
+                                    fill: true,
+                                    tension: 0.18
+                                }
+                            ];
+                            
+                            if (app.selected_events && app.selected_events[0]) {
+                                datasets.push({
+                                    label: app.selected_events[0],
+                                    data: app.table.map(r => r[app.selected_events[0]] || 0),
+                                    borderColor: '#a21caf',
+                                    backgroundColor: 'rgba(162,28,175,0.08)',
+                                    fill: true,
+                                    tension: 0.18
+                                });
+                            }
+                            
+                            if (app.selected_events && app.selected_events[1]) {
+                                datasets.push({
+                                    label: app.selected_events[1],
+                                    data: app.table.map(r => r[app.selected_events[1]] || 0),
+                                    borderColor: '#f97316',
+                                    backgroundColor: 'rgba(249,115,22,0.08)',
+                                    fill: true,
+                                    tension: 0.18
+                                });
+                            }
+
                             window._chartInstances[eventsId] = new Chart(ctxEvents, {
                                 type: 'line',
                                 data: {
-                                    labels: app.table.map(r=>r.date),
+                                    labels: app.table.map(r => r.date),
                                     datasets: datasets
                                 },
                                 options: {
                                     plugins: { legend: { display: true, position: 'bottom' } },
-                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
-                                    elements: { point: { radius: 2 } },
-                                    responsive: true,
-                                    maintainAspectRatio: false
-                                }
-                            });
-                        });
-                        // 3. Blocked Installs (Fraud)
-                        renderChartWithRetry(fraudId, (ctxFraud) => {
-                            if (window._chartInstances[fraudId]) {
-                                window._chartInstances[fraudId].destroy();
-                            }
-                            window._chartInstances[fraudId] = new Chart(ctxFraud, {
-                                type: 'line',
-                                data: {
-                                    labels: app.table.map(r=>r.date),
-                                    datasets: [
-                                        {
-                                            label: 'Blocked Installs (RT)',
-                                            data: app.table.map(r=>r.blocked_installs_rt),
-                                            borderColor: '#ef4444',
-                                            backgroundColor: 'rgba(239,68,68,0.08)',
-                                            fill: false,
-                                            tension: 0.18
-                                        },
-                                        {
-                                            label: 'Blocked Installs (PA)',
-                                            data: app.table.map(r=>r.blocked_installs_pa),
-                                            borderColor: '#6366f1',
-                                            backgroundColor: 'rgba(99,102,241,0.08)',
-                                            fill: false,
-                                            tension: 0.18
-                                        }
-                                    ]
-                                },
-                                options: {
-                                    plugins: { legend: { display: true, position: 'bottom' } },
-                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    scales: { 
+                                        x: { display: true, title: { display: true, text: 'Date' } }, 
+                                        y: { beginAtZero: true, title: { display: true, text: 'Count' } } 
+                                    },
                                     elements: { point: { radius: 2 } },
                                     responsive: true,
                                     maintainAspectRatio: false
