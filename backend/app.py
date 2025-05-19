@@ -61,7 +61,7 @@ limiter = Limiter(
 from auto_report_service import start_report_service
 
 # Start the automatic report service
-report_service_thread = start_report_service()
+report_service_thread = start_report_service(app)
 
 # --- GLOBAL JSON ERROR HANDLER ---
 from werkzeug.exceptions import HTTPException
