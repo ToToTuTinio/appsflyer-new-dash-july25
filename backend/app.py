@@ -22,13 +22,6 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
-from report_utils import process_report_async, get_fraud_data, get_active_app_ids
-from auto_report_service import auto_report_service
-import logging
-
-# Initialize logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
@@ -455,13 +448,13 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
     }
     for attempt in range(max_retries):
         try:
-            logger.info(f"Making request to {url} (attempt {attempt + 1}/{max_retries})")
+            print(f"[API] Making request to {url} (attempt {attempt + 1}/{max_retries})")
             resp = requests.get(url, headers=headers, params=params, timeout=90)
             if resp.status_code == 200:
                 return resp
-            logger.error(f"Request failed with status {resp.status_code}")
-            logger.error(f"Response headers: {dict(resp.headers)}")
-            logger.error(f"Response body: {resp.text}")
+            print(f"[API] Request failed with status {resp.status_code}")
+            print(f"[API] Response headers: {dict(resp.headers)}")
+            print(f"[API] Response body: {resp.text}")
             
             # Check for specific error messages that should skip retries
             error_text = resp.text.lower()
@@ -474,27 +467,27 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
             ]
             
             if any(msg in error_text for msg in skip_retry_messages):
-                logger.warning("Detected API limitation. Skipping retries for this request.")
+                print("[API] Detected API limitation. Skipping retries for this request.")
                 return None
                 
             if resp.status_code == 429:  # Rate limit
                 retry_after = int(resp.headers.get('Retry-After', retry_delay))
-                logger.warning(f"Rate limited. Waiting {retry_after} seconds...")
+                print(f"[API] Rate limited. Waiting {retry_after} seconds...")
                 time.sleep(retry_after)
                 continue
             if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
+                print(f"[API] Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
         except requests.exceptions.Timeout as e:
-            logger.error(f"Timeout error: {str(e)}")
+            print(f"[API] Timeout error: {str(e)}")
             return 'timeout'
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request error: {str(e)}")
+            print(f"[API] Request error: {str(e)}")
             if hasattr(e, 'response') and e.response is not None:
-                logger.error(f"Exception response headers: {dict(e.response.headers)}")
-                logger.error(f"Exception response body: {e.response.text}")
+                print(f"[API] Exception response headers: {dict(e.response.headers)}")
+                print(f"[API] Exception response body: {e.response.text}")
             if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
+                print(f"[API] Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
     return None
 
@@ -1485,6 +1478,197 @@ def get_stats_for_range(range_key):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def process_report_async(apps, period, selected_events):
+    """Background task to process report data"""
+    try:
+        print(f"[REPORT] Starting async report processing for period: {period}")
+        print(f"[REPORT] Processing {len(apps)} apps")
+        
+        start_date, end_date = get_period_dates(period)
+        stats_list = []
+        
+        for app in apps:
+            app_id = app['app_id']
+            app_name = app['app_name']
+            print(f"[REPORT] Processing app: {app_name} (App ID: {app_id})...")
+            
+            # Use the aggregate daily report endpoint for main stats
+            url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
+            params = {"from": start_date, "to": end_date}
+            
+            try:
+                print(f"[REPORT] Calling daily_report API for {app_id}...")
+                resp = make_api_request(url, params)
+                if resp == 'timeout':
+                    print(f"[REPORT] Timeout detected for {app_id}")
+                    continue
+                
+                daily_stats = {}
+                if resp and resp.status_code == 200:
+                    print(f"[REPORT] Got daily_report for {app_id}")
+                    rows = resp.text.strip().split("\n")
+                    if len(rows) < 2:  # Only header or empty
+                        print(f"[REPORT] No data returned for {app_id}")
+                        continue
+                        
+                    header = rows[0].split(",")
+                    data_rows = [row.split(",") for row in rows[1:]]
+                    
+                    # Find column indices
+                    def find_col(*names):
+                        for name in names:
+                            for col in header:
+                                if col.lower().replace('_','').replace(' ','') == name.lower().replace('_','').replace(' ',''):
+                                    return header.index(col)
+                        return None
+
+                    def safe_int(val):
+                        try:
+                            if val in ['', 'N/A', 'None', 'null']:
+                                return 0
+                            return int(float(val))
+                        except (ValueError, TypeError):
+                            return 0
+                        
+                    impressions_idx = find_col('impressions', 'Impressions')
+                    clicks_idx = find_col('clicks', 'Clicks')
+                    installs_idx = find_col('installs', 'Installs')
+                    date_idx = find_col('date', 'Date')
+                    
+                    if None in [impressions_idx, clicks_idx, installs_idx, date_idx]:
+                        print(f"[REPORT] Could not find all required columns for {app_id}")
+                        continue
+                        
+                    # Process each row
+                    for row in data_rows:
+                        if len(row) <= max(impressions_idx, clicks_idx, installs_idx, date_idx):
+                            continue
+                            
+                        date = row[date_idx]
+                        if date not in daily_stats:
+                            daily_stats[date] = {
+                                "impressions": 0,
+                                "clicks": 0,
+                                "installs": 0,
+                                "blocked_installs_rt": 0,
+                                "blocked_installs_pa": 0
+                            }
+                            
+                        daily_stats[date]["impressions"] += safe_int(row[impressions_idx])
+                        daily_stats[date]["clicks"] += safe_int(row[clicks_idx])
+                        daily_stats[date]["installs"] += safe_int(row[installs_idx])
+
+                # Process additional data (blocked installs, events)
+                # Add blocked installs data
+                blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
+                blocked_rt_resp = make_api_request(blocked_rt_url, params)
+                if blocked_rt_resp and blocked_rt_resp.status_code == 200:
+                    rows = blocked_rt_resp.text.strip().split("\n")
+                    if len(rows) > 1:
+                        header = rows[0].split(",")
+                        date_idx = header.index("Install Time") if "Install Time" in header else None
+                        for row in rows[1:]:
+                            cols = row.split(",")
+                            if date_idx is not None and len(cols) > date_idx:
+                                install_date = cols[date_idx].split(" ")[0]
+                                if install_date in daily_stats:
+                                    daily_stats[install_date]["blocked_installs_rt"] += 1
+                                    
+                # Add event data if selected
+                event_data = {}
+                selected = selected_events.get(app_id, [])
+                if selected:
+                    events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
+                    events_resp = make_api_request(events_url, params)
+                    if events_resp and events_resp.status_code == 200:
+                        rows = events_resp.text.strip().split("\n")
+                        if len(rows) > 1:
+                            header = rows[0].split(",")
+                            event_name_idx = header.index("Event Name") if "Event Name" in header else None
+                            event_time_idx = header.index("Event Time") if "Event Time" in header else None
+                            
+                            for row in rows[1:]:
+                                cols = row.split(",")
+                                if event_name_idx is not None and event_time_idx is not None and len(cols) > max(event_name_idx, event_time_idx):
+                                    event_name = cols[event_name_idx]
+                                    event_date = cols[event_time_idx].split(" ")[0]
+                                    if event_name in selected:
+                                        event_data.setdefault(event_name, {})
+                                        event_data[event_name].setdefault(event_date, 0)
+                                        event_data[event_name][event_date] += 1
+                                        
+                # Prepare daily stats for frontend
+                all_dates = sorted(daily_stats.keys())
+                table = []
+                for date in all_dates:
+                    row = {
+                        "date": date,
+                        "impressions": daily_stats[date]["impressions"],
+                        "clicks": daily_stats[date]["clicks"],
+                        "installs": daily_stats[date]["installs"],
+                        "blocked_installs_rt": daily_stats[date]["blocked_installs_rt"],
+                        "blocked_installs_pa": daily_stats[date]["blocked_installs_pa"]
+                    }
+                    
+                    # Add calculated rates
+                    row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
+                    row["click_to_install"] = round(row["installs"] / row["clicks"], 2) if row["clicks"] > 0 else 0
+                    row["blocked_rt_rate"] = round(row["blocked_installs_rt"] / row["installs"], 2) if row["installs"] > 0 else 0
+                    row["blocked_pa_rate"] = round(row["blocked_installs_pa"] / row["installs"], 2) if row["installs"] > 0 else 0
+                    
+                    # Add event counts
+                    if selected:
+                        for event in selected:
+                            row[event] = event_data.get(event, {}).get(date, 0)
+                            
+                    table.append(row)
+                    
+                stats_list.append({
+                    'app_id': app_id,
+                    'app_name': app_name,
+                    'table': table,
+                    'selected_events': selected,
+                    'traffic': sum(r['impressions'] + r['clicks'] for r in table)
+                })
+                
+            except Exception as e:
+                print(f"[REPORT] Error processing app {app_id}: {str(e)}")
+                continue
+                
+        # Save to cache
+        if stats_list:
+            app_ids = '-'.join(sorted([app['app_id'] for app in apps]))
+            event1 = ''
+            event2 = ''
+            if apps and selected_events:
+                first_app_id = apps[0]['app_id']
+                events = selected_events.get(first_app_id, [])
+                if len(events) > 0:
+                    event1 = events[0] or ''
+                if len(events) > 1:
+                    event2 = events[1] or ''
+            cache_key = f"{period}:{event1}:{event2}:{app_ids}"
+            
+            result = {
+                'apps': stats_list,
+                'updated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                     (cache_key, json.dumps(result)))
+            conn.commit()
+            conn.close()
+            
+            return result
+            
+    except Exception as e:
+        print(f"[REPORT] Error in process_report_async: {str(e)}")
+        raise
+        
+    return {'apps': [], 'error': 'Failed to process report'}
+
 @app.route('/start-report', methods=['POST'])
 @login_required
 def start_report():
@@ -1575,98 +1759,14 @@ def update_app_status():
     finally:
         conn.close()
 
-@app.route('/start-auto-reports', methods=['POST'])
-@login_required
-def start_auto_reports():
-    auto_report_service.start()
-    return jsonify({'status': 'started'})
-
-@app.route('/stop-auto-reports', methods=['POST'])
-@login_required
-def stop_auto_reports():
-    auto_report_service.stop()
-    return jsonify({'status': 'stopped'})
-
-@app.route('/run-reports-now', methods=['POST'])
-@login_required
-def run_reports_now():
-    auto_report_service.run_now()
-    return jsonify({'status': 'running'})
-
-@app.route('/auto-reports-status', methods=['GET'])
-@login_required
-def get_auto_reports_status():
-    return jsonify({
-        'is_running': auto_report_service.is_running,
-        'last_run': auto_report_service.last_run.isoformat() if auto_report_service.last_run else None
-    })
-
-def process_report_task(apps, period, selected_events):
-    """Process report task that will be executed by RQ worker"""
-    try:
-        # Get active apps if none provided
-        if not apps:
-            apps = get_active_app_ids()
-        
-        # Get date range based on period
-        end_date = datetime.datetime.now(pytz.UTC).strftime('%Y-%m-%d')
-        if period == 'last10':
-            start_date = (datetime.datetime.now(pytz.UTC) - datetime.timedelta(days=10)).strftime('%Y-%m-%d')
-        elif period == 'mtd':
-            start_date = datetime.datetime.now(pytz.UTC).replace(day=1).strftime('%Y-%m-%d')
-        elif period == 'lastmonth':
-            last_month = datetime.datetime.now(pytz.UTC).replace(day=1) - datetime.timedelta(days=1)
-            start_date = last_month.replace(day=1).strftime('%Y-%m-%d')
-            end_date = last_month.strftime('%Y-%m-%d')
-        elif period == 'last30':
-            start_date = (datetime.datetime.now(pytz.UTC) - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
-        else:
-            raise ValueError(f"Invalid period: {period}")
-
-        # Process stats for each app
-        stats_list = []
-        for app in apps:
-            app_id = app['app_id'] if isinstance(app, dict) else app
-            app_name = app['app_name'] if isinstance(app, dict) else "Unknown"
-            logger.info(f"Processing stats for app: {app_name} (App ID: {app_id})")
-            
-            # Use the aggregate daily report endpoint for main stats
-            url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
-            params = {"from": start_date, "to": end_date}
-            
-            try:
-                resp = make_api_request(url, params)
-                if resp == 'timeout':
-                    logger.error(f"Timeout detected for {app_id}")
-                    continue
-                
-                if resp and resp.status_code == 200:
-                    rows = resp.text.strip().split("\n")
-                    if len(rows) < 2:  # Only header or empty
-                        logger.warning(f"No data returned for {app_id}")
-                        continue
-                    
-                    header = rows[0].split(",")
-                    data_rows = [row.split(",") for row in rows[1:]]
-                    
-                    # Process the data and add to stats_list
-                    # ... (rest of the stats processing logic)
-                    
-            except Exception as e:
-                logger.error(f"Error processing stats for {app_id}: {str(e)}")
-                continue
-
-        return {
-            'status': 'completed',
-            'apps': stats_list,
-            'period': period,
-            'start_date': start_date,
-            'end_date': end_date
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in process_report_task: {str(e)}")
-        raise
+# Modify the get_active_apps function to include the active status
+def get_active_app_ids():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT app_id FROM app_event_selections WHERE is_active = 1')
+    active_apps = [row[0] for row in c.fetchall()]
+    conn.close()
+    return active_apps
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
