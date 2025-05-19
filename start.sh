@@ -6,19 +6,27 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Function to install ChromeDriver
 install_chromedriver() {
     echo "Installing ChromeDriver..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y chromium-chromedriver
-    elif command -v yum &> /dev/null; then
-        sudo yum install -y chromium-chromedriver
-    else
-        echo "Package manager not found. Please install ChromeDriver manually."
-        return 1
-    fi
+    
+    # Create a directory for ChromeDriver if it doesn't exist
+    sudo mkdir -p /opt/chromedriver
+    
+    # Download and install ChromeDriver
+    CHROME_DRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+    wget -q "https://chromedriver.storage.googleapis.com/${CHROME_DRIVER_VERSION}/chromedriver_linux64.zip"
+    unzip -q chromedriver_linux64.zip
+    sudo mv chromedriver /opt/chromedriver/
+    sudo chmod +x /opt/chromedriver/chromedriver
+    rm chromedriver_linux64.zip
+    
+    # Create symlink to make it available in PATH
+    sudo ln -sf /opt/chromedriver/chromedriver /usr/local/bin/chromedriver
+    sudo ln -sf /opt/chromedriver/chromedriver /usr/bin/chromedriver
+    
+    echo "ChromeDriver installed successfully"
 }
 
 # Check and install ChromeDriver if needed
-if [ ! -f /usr/local/bin/chromedriver ] && [ ! -f /usr/bin/chromedriver ]; then
+if ! command -v chromedriver &> /dev/null; then
     install_chromedriver
 fi
 
@@ -32,13 +40,13 @@ After=network.target
 Type=simple
 User=$USER
 WorkingDirectory=$PROJECT_DIR
-Environment="PATH=$PROJECT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=$PROJECT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin:/opt/chromedriver"
 Environment="FLASK_ENV=development"
 Environment="FLASK_DEBUG=1"
 Environment="PYTHONUNBUFFERED=1"
 Environment="HOME=/home/$USER"
 Environment="DISPLAY=:0"
-Environment="CHROME_DRIVER_PATH=/usr/bin/chromedriver"
+Environment="CHROME_DRIVER_PATH=/opt/chromedriver/chromedriver"
 ExecStart=$PROJECT_DIR/venv/bin/gunicorn app:app -w 4 -b 0.0.0.0:5000 --timeout 3600 --log-level debug --capture-output
 Restart=always
 RestartSec=10
