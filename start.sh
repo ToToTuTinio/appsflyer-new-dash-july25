@@ -13,10 +13,14 @@ After=network.target
 Type=simple
 User=$USER
 WorkingDirectory=$PROJECT_DIR
-Environment="PATH=$PROJECT_DIR/venv/bin"
+Environment="PATH=$PROJECT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="FLASK_ENV=development"
 Environment="FLASK_DEBUG=1"
 Environment="PYTHONUNBUFFERED=1"
+Environment="HOME=/home/$USER"
+Environment="DISPLAY=:0"
+Environment="CHROME_DRIVER_PATH=/usr/local/bin/chromedriver"
+ExecStartPre=/bin/bash -c 'if [ ! -f /usr/local/bin/chromedriver ]; then echo "ChromeDriver not found. Installing..."; sudo apt-get update && sudo apt-get install -y chromium-chromedriver; fi'
 ExecStart=$PROJECT_DIR/venv/bin/gunicorn app:app -w 4 -b 0.0.0.0:5000 --timeout 3600 --log-level debug --capture-output
 Restart=always
 RestartSec=10
@@ -33,6 +37,9 @@ sudo systemctl daemon-reload
 
 # Enable service to start on boot
 sudo systemctl enable appsflyer-dashboard
+
+# Stop existing service if running
+sudo systemctl stop appsflyer-dashboard
 
 # Start the service
 sudo systemctl start appsflyer-dashboard
