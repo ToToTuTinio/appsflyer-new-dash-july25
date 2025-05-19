@@ -1601,5 +1601,72 @@ def get_auto_reports_status():
         'last_run': auto_report_service.last_run.isoformat() if auto_report_service.last_run else None
     })
 
+def process_report_task(apps, period, selected_events):
+    """Process report task that will be executed by RQ worker"""
+    try:
+        # Get active apps if none provided
+        if not apps:
+            apps = get_active_app_ids()
+        
+        # Get date range based on period
+        end_date = datetime.now(pytz.UTC).strftime('%Y-%m-%d')
+        if period == 'last10':
+            start_date = (datetime.now(pytz.UTC) - datetime.timedelta(days=10)).strftime('%Y-%m-%d')
+        elif period == 'mtd':
+            start_date = datetime.now(pytz.UTC).replace(day=1).strftime('%Y-%m-%d')
+        elif period == 'lastmonth':
+            last_month = datetime.now(pytz.UTC).replace(day=1) - datetime.timedelta(days=1)
+            start_date = last_month.replace(day=1).strftime('%Y-%m-%d')
+            end_date = last_month.strftime('%Y-%m-%d')
+        elif period == 'last30':
+            start_date = (datetime.now(pytz.UTC) - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+        else:
+            raise ValueError(f"Invalid period: {period}")
+
+        # Process stats for each app
+        stats_list = []
+        for app in apps:
+            app_id = app['app_id'] if isinstance(app, dict) else app
+            app_name = app['app_name'] if isinstance(app, dict) else "Unknown"
+            logger.info(f"Processing stats for app: {app_name} (App ID: {app_id})")
+            
+            # Use the aggregate daily report endpoint for main stats
+            url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
+            params = {"from": start_date, "to": end_date}
+            
+            try:
+                resp = make_api_request(url, params)
+                if resp == 'timeout':
+                    logger.error(f"Timeout detected for {app_id}")
+                    continue
+                
+                if resp and resp.status_code == 200:
+                    rows = resp.text.strip().split("\n")
+                    if len(rows) < 2:  # Only header or empty
+                        logger.warning(f"No data returned for {app_id}")
+                        continue
+                    
+                    header = rows[0].split(",")
+                    data_rows = [row.split(",") for row in rows[1:]]
+                    
+                    # Process the data and add to stats_list
+                    # ... (rest of the stats processing logic)
+                    
+            except Exception as e:
+                logger.error(f"Error processing stats for {app_id}: {str(e)}")
+                continue
+
+        return {
+            'status': 'completed',
+            'apps': stats_list,
+            'period': period,
+            'start_date': start_date,
+            'end_date': end_date
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in process_report_task: {str(e)}")
+        raise
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

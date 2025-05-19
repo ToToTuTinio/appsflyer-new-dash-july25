@@ -26,9 +26,7 @@ def process_report_async(apps, period, selected_events):
     
     job = task_queue.enqueue(
         'app.process_report_task',
-        apps,
-        period,
-        selected_events,
+        args=(apps, period, selected_events),
         job_timeout='1h'
     )
     logger.info(f"Report generation job enqueued with ID: {job.id}")
