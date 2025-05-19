@@ -12,12 +12,14 @@ export PYTHONUNBUFFERED=1
 # Clear previous log file
 echo "" > ../gunicorn.out
 
-# Start gunicorn with nohup to keep it running after SSH disconnects
-nohup gunicorn app:app \
+# Start gunicorn with basic configuration
+gunicorn app:app \
     -w 4 \
     -b 0.0.0.0:5000 \
     --timeout 3600 \
     --log-level debug \
+   # --error-logfile ../gunicorn.out \
+   # --access-logfile ../gunicorn.out \
     --capture-output \
     >> ../gunicorn.out 2>&1 &
 
@@ -31,12 +33,19 @@ if ! ps -p $SERVER_PID > /dev/null; then
     exit 1
 fi
 
-echo "Server started with PID: $SERVER_PID"
-echo "Logs are being written to gunicorn.out"
+# Function to handle script termination
+cleanup() {
+    echo "Shutting down server..."
+    kill $SERVER_PID 2>/dev/null
+    exit 0
+}
+
+# Set up trap to catch termination signal
+trap cleanup SIGINT SIGTERM
 
 # Show logs in real-time with timestamps, filtering but keeping important requests
+echo "Server started. Showing important logs (Press Ctrl+C to stop)..."
 echo "----------------------------------------"
-echo "Showing important logs (Press Ctrl+C to stop)..."
 tail -f ../gunicorn.out | while read line; do
     # Keep important page navigation and API calls
     if echo "$line" | grep -q "GET /api/\|GET /dashboard\|GET /stats\|GET /fraud\|POST /get_stats\|POST /get_fraud\|POST /start-report\|GET /report-status\|POST /event-selections\|GET /active-apps\|POST /clear-apps-cache\|DEBUG in app:\|ERROR in app:\|WARNING in app:"; then
