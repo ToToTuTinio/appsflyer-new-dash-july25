@@ -12,14 +12,12 @@ export PYTHONUNBUFFERED=1
 # Clear previous log file
 echo "" > ../gunicorn.out
 
-# Start gunicorn with basic configuration
-gunicorn app:app \
+# Start gunicorn with nohup to keep it running after terminal closure
+nohup gunicorn app:app \
     -w 4 \
     -b 0.0.0.0:5000 \
     --timeout 3600 \
     --log-level debug \
-   # --error-logfile ../gunicorn.out \
-   # --access-logfile ../gunicorn.out \
     --capture-output \
     >> ../gunicorn.out 2>&1 &
 
@@ -33,10 +31,14 @@ if ! ps -p $SERVER_PID > /dev/null; then
     exit 1
 fi
 
+# Save the PID to a file for later use
+echo $SERVER_PID > ../server.pid
+
 # Function to handle script termination
 cleanup() {
     echo "Shutting down server..."
     kill $SERVER_PID 2>/dev/null
+    rm -f ../server.pid
     exit 0
 }
 
