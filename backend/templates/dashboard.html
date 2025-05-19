@@ -961,7 +961,14 @@
                                         x: {
                                             display: true,
                                             title: { display: true, text: 'Date' },
-                                            ticks: { maxRotation: 45, minRotation: 45 }
+                                            ticks: {
+                                                maxRotation: 45,
+                                                minRotation: 45,
+                                                callback: function(value, index, values) {
+                                                    if (index === 0 || index === values.length - 1) return this.getLabelForValue(value);
+                                                    return '';
+                                                }
+                                            }
                                         },
                                         y: {
                                             beginAtZero: true,
@@ -1025,7 +1032,14 @@
                                         x: {
                                             display: true,
                                             title: { display: true, text: 'Date' },
-                                            ticks: { maxRotation: 45, minRotation: 45 }
+                                            ticks: {
+                                                maxRotation: 45,
+                                                minRotation: 45,
+                                                callback: function(value, index, values) {
+                                                    if (index === 0 || index === values.length - 1) return this.getLabelForValue(value);
+                                                    return '';
+                                                }
+                                            }
                                         },
                                         y: {
                                             beginAtZero: true,
@@ -1082,7 +1096,14 @@
                                         x: {
                                             display: true,
                                             title: { display: true, text: 'Date' },
-                                            ticks: { maxRotation: 45, minRotation: 45 }
+                                            ticks: {
+                                                maxRotation: 45,
+                                                minRotation: 45,
+                                                callback: function(value, index, values) {
+                                                    if (index === 0 || index === values.length - 1) return this.getLabelForValue(value);
+                                                    return '';
+                                                }
+                                            }
                                         },
                                         y: {
                                             beginAtZero: true,
@@ -2088,8 +2109,14 @@
                                         scales: {
                                             x: {
                                                 display: true,
-                                                ticks: { maxRotation: 45, minRotation: 45, font: { size: 12 } },
-                                                grid: { display: false }
+                                                ticks: {
+                                                    maxRotation: 45,
+                                                    minRotation: 45,
+                                                    callback: function(value, index, values) {
+                                                        if (index === 0 || index === values.length - 1) return this.getLabelForValue(value);
+                                                        return '';
+                                                    }
+                                                }
                                             },
                                             y: {
                                                 beginAtZero: true,
@@ -2332,9 +2359,14 @@
                                          scales: {
                                              x: {
                                                  display: true,
-                                                 ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
-                                                 grid: { display: false },
-                                                 title: { display: false }
+                                                 ticks: {
+                                                     maxRotation: 45,
+                                                     minRotation: 45,
+                                                     callback: function(value, index, values) {
+                                                         if (index === 0 || index === values.length - 1) return this.getLabelForValue(value);
+                                                         return '';
+                                                     }
+                                                 }
                                              },
                                              y: {
                                                  beginAtZero: true,
