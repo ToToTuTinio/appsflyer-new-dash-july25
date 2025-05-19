@@ -828,164 +828,114 @@
         // Update renderStatsAppsForRange to target the correct data div
         function renderStatsAppsForRange(range, apps) {
             const container = document.getElementById(`stats-data-${range}`);
+            if (!container) {
+                console.warn('Stats container not found for range:', range);
+                return;
+            }
+            if (!apps || !apps.length) {
+                container.innerHTML = '<div class="text-gray-500">No data available for this range.</div>';
+                return;
+            }
             container.innerHTML = '';
-            
-            apps.forEach((app, idx) => {
-                const appSection = document.createElement('div');
-                appSection.className = 'app-card';
-                
-                // App header
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'text-center mb-6';
-                titleDiv.innerHTML = `
+            apps.forEach(app => {
+                const section = document.createElement('div');
+                section.className = 'app-card mb-12 p-6 bg-white rounded-2xl shadow-xl border border-gray-100';
+                section.innerHTML = `<div class="text-center mb-6">
                     <h2 class="text-2xl font-extrabold text-indigo-900 mb-2">${app.app_name}</h2>
                     <p class="text-sm font-mono text-indigo-600 tracking-wide">App ID: ${app.app_id}</p>
-                `;
-                appSection.appendChild(titleDiv);
+                </div>`;
 
-                if (app.table && app.table.length) {
-                    const dates = app.table.map(row => row.date);
-                    let event1 = app.selected_events && app.selected_events[0] ? app.selected_events[0] : null;
-                    let event2 = app.selected_events && app.selected_events[1] ? app.selected_events[1] : null;
-                    
-                    // Detect error events
-                    const isErrorEvent = ev => !ev || ev.toLowerCase().includes('maximum nu') || ev.toLowerCase().includes('subscription') || ev.toLowerCase().includes('error') || ev.toLowerCase().includes('failed') || ev.toLowerCase().includes('doesn\'t include');
-                    if (isErrorEvent(event1)) event1 = null;
-                    if (isErrorEvent(event2)) event2 = null;
-
-                    // Create metrics grid
+                if (app.table && app.table.length > 0) {
+                    // Create a grid container for the metrics
                     const metricsGrid = document.createElement('div');
                     metricsGrid.className = 'grid grid-cols-2 md:grid-cols-3 gap-3 mb-6';
                     
                     const metrics = [
-                        { key: 'impressions', label: 'Impressions', color: '#4F46E5' },
-                        { key: 'clicks', label: 'Clicks', color: '#10B981' },
-                        { key: 'installs', label: 'Installs', color: '#F59E0B' },
-                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#EF4444' },
-                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366F1' }
+                        { key: 'impressions', label: 'Impressions', color: '#3b82f6' },
+                        { key: 'clicks', label: 'Clicks', color: '#f59e42' },
+                        { key: 'installs', label: 'Installs', color: '#10b981' },
+                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444' },
+                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#6366f1' }
                     ];
-
-                    // Add custom events if they exist
-                    if (event1) metrics.push({ key: event1, label: event1, color: '#8B5CF6' });
-                    if (event2) metrics.push({ key: event2, label: event2, color: '#EC4899' });
-
-                    // Add conversion metrics
-                    metrics.push(
-                        { key: 'imp_to_click', label: '% imp to click', color: '#14B8A6', percent: true },
-                        { key: 'click_to_install', label: 'Conversion Rate', color: '#F97316', percent: true }
-                    );
 
                     metrics.forEach((metric, midx) => {
                         const graphContainer = document.createElement('div');
-                        graphContainer.className = 'bg-white p-3 rounded-lg shadow border border-gray-200 flex flex-col items-center';
-                        graphContainer.style.minWidth = '160px';
-                        graphContainer.style.maxWidth = '220px';
+                        graphContainer.className = 'bg-white p-2 rounded-lg shadow border border-gray-200 flex flex-col items-center justify-center';
+                        graphContainer.style.minWidth = '182px';
+                        graphContainer.style.maxWidth = '286px';
                         graphContainer.style.margin = '0 auto';
-
+                        
                         const graphTitle = document.createElement('div');
-                        graphTitle.className = 'text-xs font-medium text-gray-700 mb-1 text-center';
+                        graphTitle.className = 'text-sm font-semibold text-gray-700 mb-1 text-center';
                         graphTitle.textContent = metric.label;
                         graphContainer.appendChild(graphTitle);
-
+                        
                         const canvas = document.createElement('canvas');
-                        canvas.id = `statsChart_${range}_${idx}_${midx}`;
-                        canvas.height = 156;
-                        canvas.width = 260;
+                        canvas.style.width = '100%';
+                        canvas.style.height = '120px';
                         graphContainer.appendChild(canvas);
-
+                        
                         metricsGrid.appendChild(graphContainer);
 
-                        // Render chart with retry
+                        // Render the chart
                         setTimeout(() => {
-                            const ctx = document.getElementById(`statsChart_${range}_${idx}_${midx}`);
-                            if (ctx && window.Chart) {
-                                new Chart(ctx, {
-                                    type: 'line',
-                                    data: {
-                                        labels: dates,
-                                        datasets: [{
-                                            label: metric.label,
-                                            data: app.table.map(row => {
-                                                let val = row[metric.key];
-                                                if (metric.percent && typeof val === 'number') {
-                                                    return (val * 100).toFixed(2);
-                                                }
-                                                return val;
-                                            }),
-                                            borderColor: metric.color,
-                                            backgroundColor: metric.color + '20',
-                                            borderWidth: 2,
-                                            fill: true,
-                                            tension: 0.4
-                                        }]
-                                    },
-                                    options: {
-                                        plugins: {
-                                            legend: {
-                                                display: false
-                                            },
-                                            tooltip: {
-                                                mode: 'index',
-                                                intersect: false,
-                                                callbacks: {
-                                                    label: function(context) {
-                                                        let value = context.parsed.y;
-                                                        if (metric.percent) {
-                                                            return `${context.dataset.label}: ${value}%`;
-                                                        }
-                                                        return `${context.dataset.label}: ${value}`;
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        scales: {
-                                            x: {
-                                                display: true,
-                                                ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
-                                                grid: { display: false }
-                                            },
-                                            y: {
-                                                beginAtZero: true,
-                                                display: true,
-                                                grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
-                                                ticks: { font: { size: 9 }, precision: 0 }
-                                            }
-                                        },
-                                        elements: { point: { radius: 1.5 } },
-                                        responsive: false,
-                                        maintainAspectRatio: false
-                                    }
-                                });
+                            const ctx = canvas.getContext('2d');
+                            if (window._chartInstances[canvas.id]) {
+                                window._chartInstances[canvas.id].destroy();
                             }
-                        }, 100);
+                            window._chartInstances[canvas.id] = new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: app.table.map(r => r.date),
+                                    datasets: [{
+                                        label: metric.label,
+                                        data: app.table.map(r => r[metric.key] || 0),
+                                        borderColor: metric.color,
+                                        backgroundColor: metric.color + '20',
+                                        fill: false,
+                                        tension: 0.18
+                                    }]
+                                },
+                                options: {
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            mode: 'index',
+                                            intersect: false,
+                                            callbacks: {
+                                                label: function(context) {
+                                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} (${context.label})`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
+                                            grid: { display: false },
+                                            title: { display: false }
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            display: true,
+                                            grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
+                                            ticks: { font: { size: 9 }, precision: 0 }
+                                        }
+                                    },
+                                    elements: { point: { radius: 1.5 } },
+                                    responsive: true,
+                                    maintainAspectRatio: false
+                                }
+                            });
+                        }, 0);
                     });
 
-                    appSection.appendChild(metricsGrid);
-
-                    // Add the data table
-                    let table = '<div class="stats-table-container mt-6"><table class="stats-table"><thead><tr><th class="app-header sticky-metric-col">Metric</th>';
-                    dates.forEach(date => {
-                        table += `<th style="text-align:center;">${date}</th>`;
-                    });
-                    table += '</tr></thead><tbody>';
-                    metrics.forEach(m => {
-                        table += `<tr><td class="sticky-metric-col" style="text-align:left;font-weight:600;">${m.label}</td>`;
-                        app.table.forEach(row => {
-                            let val = row[m.key];
-                            let display = '';
-                            if (m.percent) display = (typeof val === 'number' ? (val * 100).toFixed(2) + '%' : '-');
-                            else if (m.isNumber) display = (val !== undefined ? Number(val).toLocaleString() : '-');
-                            else display = (val !== undefined ? val : '-');
-                            table += `<td style='text-align:center;'>${display}</td>`;
-                        });
-                        table += '</tr>';
-                    });
-                    table += '</tbody></table></div>';
-                    appSection.innerHTML += table;
+                    section.appendChild(metricsGrid);
                 } else {
-                    appSection.innerHTML += '<div class="text-gray-400">No data available.</div>';
+                    section.innerHTML += '<div class="text-gray-400">No data available.</div>';
                 }
-                container.appendChild(appSection);
+                container.appendChild(section);
             });
         }
 
@@ -1922,7 +1872,7 @@
                         graphContainer.appendChild(graphTitle);
                         
                         const canvas = document.createElement('canvas');
-                        canvas.id = `trend-main-${app.app_id}-${metric.key}-${range}`;
+                        canvas.id = `fraudTrendChart${range}-${idx}-${midx}`;
                         canvas.height = 156; // 120 * 1.3
                         canvas.width = 260;  // 200 * 1.3
                         graphContainer.appendChild(canvas);
@@ -1939,31 +1889,52 @@
                         const summedData = sortedDates.map(date => dateSums[date]);
                         // Render individual chart
                         setTimeout(() => {
-                            const ctx = document.getElementById(`trend-main-${app.app_id}-${metric.key}-${range}`);
+                            const ctx = document.getElementById(`fraudTrendChart${range}-${idx}-${midx}`);
                             if (ctx && window.Chart) {
-                                if (window._chartInstances[`trend-main-${app.app_id}-${metric.key}-${range}`]) {
-                                    window._chartInstances[`trend-main-${app.app_id}-${metric.key}-${range}`].destroy();
+                                if (window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`]) {
+                                    window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`].destroy();
                                 }
-                                window._chartInstances[`trend-main-${app.app_id}-${metric.key}-${range}`] = new Chart(ctx, {
+                                window._chartInstances[`fraudTrendChart${range}-${idx}-${midx}`] = new Chart(ctx, {
                                     type: 'line',
                                     data: {
-                                        labels: app.table.map(r=>r.date),
-                                        datasets: [
-                                            {
-                                                label: metric.label,
-                                                data: app.table.map(r=>r[metric.key]),
-                                                borderColor: metric.color,
-                                                backgroundColor: metric.bg,
-                                                fill: false,
-                                                tension: 0.18
-                                            }
-                                        ]
+                                        labels: sortedDates,
+                                        datasets: [{
+                                            label: metric.label,
+                                            data: summedData,
+                                            borderColor: metric.color,
+                                            backgroundColor: `${metric.color}20`,
+                                            fill: false,
+                                            tension: 0.18
+                                        }]
                                     },
                                     options: {
-                                        plugins: { legend: { display: true, position: 'bottom' } },
-                                        scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
-                                        elements: { point: { radius: 2 } },
-                                        responsive: true,
+                                        plugins: {
+                                            legend: { display: false },
+                                            tooltip: {
+                                                mode: 'index',
+                                                intersect: false,
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        return `${context.dataset.label}: ${context.parsed.y}`;
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        scales: {
+                                            x: {
+                                                display: true,
+                                                ticks: { maxRotation: 45, minRotation: 45, font: { size: 12 } },
+                                                grid: { display: false }
+                                            },
+                                            y: {
+                                                beginAtZero: true,
+                                                display: true,
+                                                grid: { display: true, color: '#e5e7eb', lineWidth: 0.5 },
+                                                ticks: { font: { size: 12 }, precision: 0 }
+                                            }
+                                        },
+                                        elements: { point: { radius: 2.2 } },
+                                        responsive: false,
                                         maintainAspectRatio: false
                                     }
                                 });
