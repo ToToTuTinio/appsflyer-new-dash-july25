@@ -1,58 +1,32 @@
 #!/bin/bash
 
-# Start the server in the background and redirect output to gunicorn.out
-cd backend
-source ../venv/bin/activate
-
-# Set environment variables for logging
-export FLASK_ENV=development
-export FLASK_DEBUG=1
-export PYTHONUNBUFFERED=1
-
-# Clear previous log file
-echo "" > ../gunicorn.out
-
-# Start gunicorn with basic configuration
-gunicorn app:app \
-    -w 4 \
-    -b 0.0.0.0:5000 \
-    --timeout 3600 \
-    --log-level debug \
-   # --error-logfile ../gunicorn.out \
-   # --access-logfile ../gunicorn.out \
-    --capture-output \
-    >> ../gunicorn.out 2>&1 &
-
-# Store the background process ID
-SERVER_PID=$!
-
-# Wait a moment to check if the server started successfully
-sleep 2
-if ! ps -p $SERVER_PID > /dev/null; then
-    echo "Failed to start server. Check gunicorn.out for details."
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+    echo "Please run as root (sudo)"
     exit 1
 fi
 
-# Function to handle script termination
-cleanup() {
-    echo "Shutting down server..."
-    kill $SERVER_PID 2>/dev/null
-    exit 0
-}
+# Create log directory if it doesn't exist
+mkdir -p /var/log/appsflyer-dashboard
 
-# Set up trap to catch termination signal
-trap cleanup SIGINT SIGTERM
+# Set proper permissions
+chown -R www-data:www-data /var/log/appsflyer-dashboard
 
-# Show logs in real-time with timestamps, filtering but keeping important requests
-echo "Server started. Showing important logs (Press Ctrl+C to stop)..."
-echo "----------------------------------------"
-tail -f ../gunicorn.out | while read line; do
-    # Keep important page navigation and API calls
-    if echo "$line" | grep -q "GET /api/\|GET /dashboard\|GET /stats\|GET /fraud\|POST /get_stats\|POST /get_fraud\|POST /start-report\|GET /report-status\|POST /event-selections\|GET /active-apps\|POST /clear-apps-cache\|DEBUG in app:\|ERROR in app:\|WARNING in app:"; then
-        # Add timestamp and print the line
-        echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
-    # Keep non-HTTP request logs (usually application logs)
-    elif ! echo "$line" | grep -q "GET\|POST\|PUT\|DELETE\|HEAD\|OPTIONS\|200\|301\|302\|304\|400\|401\|403\|404\|500\|502\|503\|504"; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
-    fi
-done 
+# Copy service file to systemd directory
+cp appsflyer-dashboard.service /etc/systemd/system/
+
+# Reload systemd to recognize new service
+systemctl daemon-reload
+
+# Enable service to start on boot
+systemctl enable appsflyer-dashboard
+
+# Start the service
+systemctl start appsflyer-dashboard
+
+# Check service status
+echo "Checking service status..."
+systemctl status appsflyer-dashboard
+
+echo "Service has been installed and started. You can check logs with:"
+echo "journalctl -u appsflyer-dashboard -f" 

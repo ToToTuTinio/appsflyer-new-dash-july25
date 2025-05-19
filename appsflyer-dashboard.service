@@ -1,0 +1,19 @@
+[Unit]
+Description=AppsFlyer Dashboard Service
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/appsflyer-dash-2025
+Environment="PATH=/var/www/appsflyer-dash-2025/venv/bin"
+Environment="FLASK_ENV=production"
+Environment="FLASK_DEBUG=0"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/var/www/appsflyer-dash-2025/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:5000 --timeout 3600 --log-level info --access-logfile /var/log/appsflyer-dashboard/access.log --error-logfile /var/log/appsflyer-dashboard/error.log app:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 
