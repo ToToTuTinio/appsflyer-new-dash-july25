@@ -3,6 +3,25 @@
 # Get the absolute path of the project directory
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Function to install ChromeDriver
+install_chromedriver() {
+    echo "Installing ChromeDriver..."
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y chromium-chromedriver
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y chromium-chromedriver
+    else
+        echo "Package manager not found. Please install ChromeDriver manually."
+        return 1
+    fi
+}
+
+# Check and install ChromeDriver if needed
+if [ ! -f /usr/local/bin/chromedriver ] && [ ! -f /usr/bin/chromedriver ]; then
+    install_chromedriver
+fi
+
 # Create systemd service file
 cat > appsflyer-dashboard.service << EOL
 [Unit]
@@ -19,8 +38,7 @@ Environment="FLASK_DEBUG=1"
 Environment="PYTHONUNBUFFERED=1"
 Environment="HOME=/home/$USER"
 Environment="DISPLAY=:0"
-Environment="CHROME_DRIVER_PATH=/usr/local/bin/chromedriver"
-ExecStartPre=/bin/bash -c 'if [ ! -f /usr/local/bin/chromedriver ]; then echo "ChromeDriver not found. Installing..."; sudo apt-get update && sudo apt-get install -y chromium-chromedriver; fi'
+Environment="CHROME_DRIVER_PATH=/usr/bin/chromedriver"
 ExecStart=$PROJECT_DIR/venv/bin/gunicorn app:app -w 4 -b 0.0.0.0:5000 --timeout 3600 --log-level debug --capture-output
 Restart=always
 RestartSec=10
