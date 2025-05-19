@@ -2936,57 +2936,65 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                // Show loading state
-                document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">Loading apps data...</td></tr>';
-                document.getElementById('app-count').textContent = 'Loading...';
-                
-                // Fetch fresh data from backend
-                fetch('/api/apps-page')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            document.getElementById('apps-list').innerHTML = `<tr><td colspan="6" class="text-center text-red-400 py-4">Error: ${data.error}</td></tr>`;
-                            document.getElementById('app-count').textContent = 'Error';
-                            return;
+                fetch('/api/apps-page').then(() => {
+                    const cached = localStorage.getItem('fetchedApps');
+                    console.log('Cached fetchedApps:', cached);
+                    if (cached) {
+                        try {
+                            const apps = JSON.parse(cached);
+                            console.log('Parsed apps:', apps);
+                            if (Array.isArray(apps) && apps.length > 0) {
+                                window.fetchedApps = apps;
+                                renderAppsList(apps);
+                                document.getElementById('app-count').textContent = apps.length;
+                            } else {
+                                document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                                document.getElementById('app-count').textContent = '0';
+                            }
+                        } catch (e) {
+                            console.error('Error parsing cached apps:', e);
+                            document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                            document.getElementById('app-count').textContent = '0';
                         }
-                        
-                        // Update global apps data
-                        window.fetchedApps = data.apps;
-                        
-                        // Update localStorage with fresh data
-                        localStorage.setItem('fetchedApps', JSON.stringify(data.apps));
-                        
-                        // Render the apps list
-                        renderAppsList(data.apps);
-                        
-                        // Update UI elements
-                        document.getElementById('app-count').textContent = data.count;
-                        document.getElementById('apps-last-updated').textContent = data.fetch_time ? 
-                            `(Last updated: ${data.fetch_time})` : '';
-                        
-                        // Show cache status toast
-                        const toast = document.createElement('div');
-                        toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                        toast.innerHTML = `
-                            <div class="font-medium">Cache Status</div>
-                            <div class="text-sm mt-1">
-                                • Fresh data fetched from AppsFlyer<br>
-                                • Total Apps: ${data.cache_status.total_apps}<br>
-                                • Active Apps: ${data.cache_status.active_apps}<br>
-                                • Last Updated: ${data.cache_status.last_updated}
-                            </div>
-                        `;
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 5000);
+                    } else {
+                        document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                        document.getElementById('app-count').textContent = '0';
+                    }
+                });
+            }
+            if (tabName === 'stats') {
+                // Visually activate the 'Last 10 Days' tab
+                document.querySelectorAll('.date-range-tab').forEach(btn => {
+                    btn.classList.remove('border-green-600','text-green-700','bg-white');
+                    btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
+                });
+                document.querySelector('.date-range-tab[data-range="10d"]').classList.remove('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
+                document.querySelector('.date-range-tab[data-range="10d"]').classList.add('border-green-600','text-green-700','bg-white');
+                document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
+                document.getElementById('stats-content-10d').style.display = '';
+                // Fetch and render the default range (10d)
+                fetch('/get_subpage_10d')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.apps && data.apps.length > 0) {
+                            renderStatsAppsForRange('10d', data.apps);
+                            document.getElementById('stats-error').style.display = 'none';
+                        } else {
+                            document.getElementById('stats-data-10d').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                            document.getElementById('stats-error').style.display = '';
+                        }
                     })
-                    .catch(error => {
-                        console.error('Error fetching apps:', error);
-                        document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-red-400 py-4">Error loading apps data. Please try again.</td></tr>';
-                        document.getElementById('app-count').textContent = 'Error';
+                    .catch(() => {
+                        document.getElementById('stats-data-10d').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
+                        document.getElementById('stats-error').style.display = '';
                     });
             }
-            if (tabName === 'stats') fetchAllAppsStats();
-            if (tabName === 'fraud') fetchAllFraudData();
+            if (tabName === 'fraud') {
+                // Instead of /api/fraud-page, fetch /get_fraud_subpage_10d for logging and default data
+                fetch('/get_fraud_subpage_10d').then(() => {
+                    // Fraud Analytics sub-page will handle showing the data
+                });
+            }
             if (tabName === 'profile') loadProfile();
         };
 
