@@ -815,29 +815,6 @@ def save_event_selections():
     finally:
         conn.close()
 
-@app.route('/get-event-selections', methods=['GET'])
-@login_required
-def get_event_selections():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    try:
-        c.execute('SELECT app_id, event1, event2, is_active FROM app_event_selections')
-        rows = c.fetchall()
-        selections = {}
-        for row in rows:
-            app_id, event1, event2, is_active = row
-            selections[app_id] = {
-                'event1': event1,
-                'event2': event2,
-                'is_active': bool(is_active)
-            }
-        return jsonify({"success": True, "selections": selections})
-    except Exception as e:
-        print(f"Error getting event selections: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        conn.close()
-
 @app.route('/get_apps')
 @login_required
 def get_apps():
