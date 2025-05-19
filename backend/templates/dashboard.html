@@ -2064,31 +2064,12 @@
                 document.getElementById('fraud-analytics-tab-btn').classList.remove('border-blue-500', 'text-blue-600');
                 document.getElementById('fraud-analytics-tab-btn').classList.add('border-transparent', 'text-gray-500');
                 document.getElementById('fraud-analytics-subtab').style.display = 'none';
-                
-                // Load cached data for all ranges when switching to Fraud Per Source tab
+                // Only render from cache, do NOT fetch on tab switch
                 const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', '30d'];
-                const fraudSourcePeriodMap = { '10d': 'last10', 'mtd': 'mtd', 'lastmonth': 'lastmonth', '30d': 'last30' };
-                
                 fraudSourceRanges.forEach(range => {
-                    fetch('/get_fraud', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            apps: window.fetchedApps || [],
-                            period: fraudSourcePeriodMap[range]
-                        })
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && data.apps) {
-                            fraudSourceDataCache[range] = data;
-                            renderFraudSource(data, range);
-                        }
-                    })
-                    .catch(error => {
-                        console.error(`Error loading fraud source data for ${range}:`, error);
-                        document.getElementById(`fraud-source-error-${range}`).style.display = '';
-                    });
+                    if (fraudSourceDataCache[range]) {
+                        renderFraudSource(fraudSourceDataCache[range], range);
+                    }
                 });
             }
             currentFraudSubTab = subtab;
