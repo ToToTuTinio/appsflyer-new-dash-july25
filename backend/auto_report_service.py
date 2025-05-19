@@ -55,15 +55,26 @@ class AutoReportService:
                 logger.info(f"Starting Stats report for period: {stats_period}")
                 job_id = process_report_async([], stats_period, {})
                 logger.info(f"Stats report job started with ID: {job_id}")
-                logger.info(f"Waiting 30 minutes before starting next report...")
-                time.sleep(1800)  # Wait 30 minutes
+                
+                # Wait for the stats report to complete
+                while True:
+                    job = task_queue.fetch_job(job_id)
+                    if job is None:
+                        logger.error(f"Stats report job {job_id} not found")
+                        break
+                    if job.is_finished:
+                        logger.info(f"Stats report for period {stats_period} completed")
+                        break
+                    if job.is_failed:
+                        logger.error(f"Stats report failed: {str(job.exc_info)}")
+                        break
+                    logger.info("Waiting for stats report to complete...")
+                    time.sleep(10)  # Check every 10 seconds
 
                 # Run Fraud Report
                 logger.info(f"Starting Fraud report for period: {fraud_period}")
                 get_fraud_data([], fraud_period)
                 logger.info(f"Fraud report generation completed for period: {fraud_period}")
-                logger.info(f"Waiting 30 minutes before starting next report...")
-                time.sleep(1800)  # Wait 30 minutes
 
             except Exception as e:
                 logger.error(f"Error running reports for period {stats_period}: {str(e)}")
