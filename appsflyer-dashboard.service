@@ -8,6 +8,7 @@ User=or
 Group=or
 WorkingDirectory=/home/or/appsflyer-dash-2025-live/backend
 Environment="PATH=/home/or/appsflyer-dash-2025-live/venv/bin"
+Environment="PYTHONPATH=/home/or/appsflyer-dash-2025-live/backend"
 Environment="FLASK_ENV=production"
 Environment="FLASK_DEBUG=0"
 Environment="PYTHONUNBUFFERED=1"
