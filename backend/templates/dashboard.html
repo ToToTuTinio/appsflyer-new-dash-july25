@@ -1467,153 +1467,118 @@
         function renderAppsList(apps) {
             const appsList = document.getElementById('apps-list');
             appsList.innerHTML = '';
-            let selections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
             
-            apps.forEach(app => {
-                const tr = document.createElement('tr');
-                tr.setAttribute('data-app-id', app.app_id);
-                tr.className = 'hover:bg-gray-50 transition';
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-sm">${app.app_id}</td>
-                    <td class="py-3 px-4">${app.app_name}</td>
-                    <td class="py-3 px-4">
-                        <div class="relative">
-                            <select class="status-dropdown block w-32 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}">
-                                <option value="active" ${app.is_active ? 'selected' : ''}>Active</option>
-                                <option value="not_active" ${!app.is_active ? 'selected' : ''}>Inactive</option>
-                            </select>
-                        </div>
-                    </td>
-                    <td class="py-3 px-4">
-                        <div class="relative">
-                            <input list="event1-list-${app.app_id}" class="event1-dropdown block w-48 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}" placeholder="Enter or select event">
-                            <datalist id="event1-list-${app.app_id}">
-                                <option>No Events Found.</option>
-                            </datalist>
-                        </div>
-                    </td>
-                    <td class="py-3 px-4">
-                        <div class="relative">
-                            <input list="event2-list-${app.app_id}" class="event2-dropdown block w-48 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}" placeholder="Enter or select event">
-                            <datalist id="event2-list-${app.app_id}">
-                                <option>No Events Found.</option>
-                            </datalist>
-                        </div>
-                    </td>
-                    <td class="py-3 px-4">
-                        <button class="event-save-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded" data-app-id="${app.app_id}">SAVE</button>
-                    </td>
-                `;
-                appsList.appendChild(tr);
-                
-                // Get saved selections for this app
-                const savedSelection = selections[app.app_id] || [];
-                const event1Input = tr.querySelector('.event1-dropdown');
-                const event2Input = tr.querySelector('.event2-dropdown');
-                
-                // Set saved values
-                if (savedSelection.length > 0) {
-                    event1Input.value = savedSelection[0] || '';
-                    event2Input.value = savedSelection[1] || '';
-                }
-
-                // Add status change handler
-                const statusDropdown = tr.querySelector('.status-dropdown');
-                statusDropdown.addEventListener('change', function() {
-                    const isActive = this.value === 'active';
-                    const appId = this.dataset.appId;
-                    
-                    // Update the app's status in memory
-                    const appToUpdate = window.fetchedApps.find(a => a.app_id === appId);
-                    if (appToUpdate) {
-                        appToUpdate.is_active = isActive;
+            // Fetch saved event selections from the database
+            fetch('/get-event-selections')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        console.error('Failed to fetch event selections:', data.error);
+                        return;
                     }
                     
-                    // Send status update to server
-                    fetch('/update-app-status', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            app_id: appId,
-                            is_active: isActive
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (!data.success) {
-                            console.error('Failed to update app status:', data.message);
-                            // Revert the change in memory if the server update failed
-                            if (appToUpdate) {
-                                appToUpdate.is_active = !isActive;
-                                statusDropdown.value = isActive ? 'not_active' : 'active';
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error updating app status:', error);
-                        // Revert the change in memory if the server update failed
-                        if (appToUpdate) {
-                            appToUpdate.is_active = !isActive;
-                            statusDropdown.value = isActive ? 'not_active' : 'active';
-                        }
+                    const selections = data.selections;
+                    
+                    apps.forEach(app => {
+                        const tr = document.createElement('tr');
+                        tr.setAttribute('data-app-id', app.app_id);
+                        tr.className = 'hover:bg-gray-50 transition';
+                        
+                        // Get saved selections for this app
+                        const savedSelection = selections[app.app_id] || { event1: null, event2: null, is_active: false };
+                        
+                        tr.innerHTML = `
+                            <td class="py-3 px-4 font-mono text-sm">${app.app_id}</td>
+                            <td class="py-3 px-4">${app.app_name}</td>
+                            <td class="py-3 px-4">
+                                <div class="relative">
+                                    <select class="status-dropdown block w-32 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}">
+                                        <option value="active" ${savedSelection.is_active ? 'selected' : ''}>Active</option>
+                                        <option value="not_active" ${!savedSelection.is_active ? 'selected' : ''}>Inactive</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="relative">
+                                    <input list="event1-list-${app.app_id}" class="event1-dropdown block w-48 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}" placeholder="Enter or select event" value="${savedSelection.event1 || ''}">
+                                    <datalist id="event1-list-${app.app_id}">
+                                        <option>No Events Found.</option>
+                                    </datalist>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="relative">
+                                    <input list="event2-list-${app.app_id}" class="event2-dropdown block w-48 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-800 text-base transition" data-app-id="${app.app_id}" placeholder="Enter or select event" value="${savedSelection.event2 || ''}">
+                                    <datalist id="event2-list-${app.app_id}">
+                                        <option>No Events Found.</option>
+                                    </datalist>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <button class="event-save-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded" data-app-id="${app.app_id}">SAVE</button>
+                            </td>
+                        `;
+                        appsList.appendChild(tr);
+                        
+                        // Add status change handler
+                        const statusDropdown = tr.querySelector('.status-dropdown');
+                        statusDropdown.addEventListener('change', function() {
+                            const appId = this.dataset.appId;
+                            const isActive = this.value === 'active';
+                            updateAppActiveStatus(appId, isActive);
+                        });
+                        
+                        // Save button handler
+                        tr.querySelector('.event-save-btn').onclick = function() {
+                            const event1 = tr.querySelector('.event1-dropdown').value;
+                            const event2 = tr.querySelector('.event2-dropdown').value;
+                            const status = statusDropdown.value;
+                            const button = this;
+                            const originalText = button.textContent;
+                            
+                            button.disabled = true;
+                            button.textContent = 'Saving...';
+                            
+                            fetch('/event-selections', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    app_id: app.app_id, 
+                                    event1: event1 || null, 
+                                    event2: event2 || null, 
+                                    is_active: status === 'active' 
+                                })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    button.textContent = 'Saved!';
+                                    setTimeout(() => {
+                                        button.disabled = false;
+                                        button.textContent = originalText;
+                                    }, 2000);
+                                } else {
+                                    button.textContent = 'Error!';
+                                    setTimeout(() => {
+                                        button.disabled = false;
+                                        button.textContent = originalText;
+                                    }, 2000);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error saving:', error);
+                                button.textContent = 'Error!';
+                                setTimeout(() => {
+                                    button.disabled = false;
+                                    button.textContent = originalText;
+                                }, 2000);
+                            });
+                        };
                     });
+                })
+                .catch(error => {
+                    console.error('Error fetching event selections:', error);
                 });
-                
-                // Save button handler
-                tr.querySelector('.event-save-btn').onclick = function() {
-                    const event1 = event1Input.value;
-                    const event2 = event2Input.value;
-                    const status = statusDropdown.value;
-                    const button = this;
-                    const originalText = button.textContent;
-                    
-                    button.disabled = true;
-                    button.textContent = 'Saving...';
-                    
-                    fetch('/event-selections', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            app_id: app.app_id, 
-                            event1: event1 || null, 
-                            event2: event2 || null, 
-                            is_active: status === 'active' 
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            button.textContent = 'Saved!';
-                            app.is_active = status === 'active';
-                            
-                            // Update localStorage
-                            selections[app.app_id] = [event1, event2];
-                            localStorage.setItem('eventSelections', JSON.stringify(selections));
-                            
-                            setTimeout(() => {
-                                button.disabled = false;
-                                button.textContent = originalText;
-                            }, 2000);
-                        } else {
-                            button.textContent = 'Error!';
-                            setTimeout(() => {
-                                button.disabled = false;
-                                button.textContent = originalText;
-                            }, 2000);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error saving:', error);
-                        button.textContent = 'Error!';
-                        setTimeout(() => {
-                            button.disabled = false;
-                            button.textContent = originalText;
-                        }, 2000);
-                    });
-                };
-            });
         }
         // GET EVENTS button handler
         document.getElementById('get-events-btn').onclick = function() {
