@@ -1361,7 +1361,29 @@ def clear_fraud_cache():
 
 @app.route('/api/apps-page')
 def apps_page():
-    return {'status': 'ok'}
+    import sqlite3
+    import json
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+        row = c.fetchone()
+        conn.close()
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            result['fetch_time'] = updated_at
+            result['used_cache'] = True
+            return jsonify(result)
+        else:
+            return jsonify({
+                'count': 0,
+                'apps': [],
+                'fetch_time': None,
+                'used_cache': True
+            })
+    except Exception as e:
+        return jsonify({'error': str(e), 'count': 0, 'apps': [], 'fetch_time': None, 'used_cache': True}), 500
 
 @app.route('/api/stats-page')
 def stats_page():
