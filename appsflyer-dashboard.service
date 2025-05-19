@@ -6,7 +6,7 @@ After=network.target redis.service
 Type=simple
 User=or
 Group=or
-WorkingDirectory=/home/or/appsflyer-dash-2025-live
+WorkingDirectory=/home/or/appsflyer-dash-2025-live/backend
 Environment="PATH=/home/or/appsflyer-dash-2025-live/venv/bin"
 Environment="FLASK_ENV=production"
 Environment="FLASK_DEBUG=0"
