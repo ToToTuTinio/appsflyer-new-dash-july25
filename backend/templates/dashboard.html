@@ -828,64 +828,68 @@
         // Update renderStatsAppsForRange to target the correct data div
         function renderStatsAppsForRange(range, apps) {
             const container = document.getElementById(`stats-data-${range}`);
-            if (!container) {
-                console.warn('Stats container not found for range:', range);
-                return;
-            }
-            if (!apps || !apps.length) {
-                container.innerHTML = '<div class="text-gray-500">No data available for this range.</div>';
-                return;
-            }
             container.innerHTML = '';
+            
+            if (!apps || apps.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                return;
+            }
+
             apps.forEach(app => {
                 const section = document.createElement('div');
                 section.className = 'app-card';
-                section.innerHTML = `<div class="text-center mb-6">
-                    <h2 class="text-2xl font-extrabold text-indigo-900 mb-2">${app.app_name}</h2>
-                    <p class="text-sm font-mono text-indigo-600 tracking-wide">App ID: ${app.app_id}</p>
-                </div>`;
-                if (app.table && app.table.length) {
-                    const dates = app.table.map(row => row.date);
-                    let event1 = app.selected_events && app.selected_events[0] ? app.selected_events[0] : null;
-                    let event2 = app.selected_events && app.selected_events[1] ? app.selected_events[1] : null;
-                    // Detect error events (e.g., truncated error message or containing 'maximum nu')
-                    const isErrorEvent = ev => !ev || ev.toLowerCase().includes('maximum nu') || ev.toLowerCase().includes('subscription') || ev.toLowerCase().includes('error') || ev.toLowerCase().includes('failed') || ev.toLowerCase().includes('doesn\'t include');
-                    if (isErrorEvent(event1)) event1 = null;
-                    if (isErrorEvent(event2)) event2 = null;
-                    let metrics = [
+                section.innerHTML = `<h2 class="text-xl font-bold mb-4">${app.app_name} (${app.app_id})</h2>`;
+                
+                if (app.table && app.table.length > 0) {
+                    const dates = app.table.map(r => r.date);
+                    const metrics = [
                         { key: 'impressions', label: 'Impressions', isNumber: true },
                         { key: 'clicks', label: 'Clicks', isNumber: true },
-                        { key: 'installs', label: 'Installs', isNumber: true },
-                        { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', isNumber: true },
-                        { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', isNumber: true },
+                        { key: 'installs', label: 'Installs', isNumber: true }
                     ];
-                    if (event1) metrics.push({ key: event1, label: event1, isNumber: true });
-                    if (event2) metrics.push({ key: event2, label: event2, isNumber: true });
+                    
+                    // Add event metrics if they exist
+                    if (app.selected_events) {
+                        app.selected_events.forEach(event => {
+                            metrics.push({ key: event, label: event, isNumber: true });
+                        });
+                    }
+                    
+                    // Add conversion metrics
                     metrics.push(
                         { key: 'imp_to_click', label: '% imp to click', percent: true },
                         { key: 'click_to_install', label: 'Conversion Rate', percent: true, decimals: 2 }
                     );
-                    if (event1) metrics.push({ key: 'install_to_' + event1, label: `% install to ${event1}`, percent: true });
-                    if (event1 && event2) metrics.push({ key: event1 + '_to_' + event2, label: `% ${event1} to ${event2}`, percent: true });
+                    
+                    if (app.selected_events && app.selected_events[0]) {
+                        metrics.push({ key: 'install_to_' + app.selected_events[0], label: `% install to ${app.selected_events[0]}`, percent: true });
+                    }
+                    if (app.selected_events && app.selected_events[0] && app.selected_events[1]) {
+                        metrics.push({ key: app.selected_events[0] + '_to_' + app.selected_events[1], label: `% ${app.selected_events[0]} to ${app.selected_events[1]}`, percent: true });
+                    }
+                    
                     metrics.push(
                         { key: 'blocked_rt_rate', label: '% blocked installs (RT)', percent: true },
                         { key: 'blocked_pa_rate', label: '% blocked installs (PA)', percent: true }
                     );
-                    // Compute extra % columns if needed
+
+                    // Compute extra % columns
                     app.table.forEach(row => {
-                        if (event1 && row.installs > 0 && row[event1] !== undefined) {
-                            row['install_to_' + event1] = row[event1] / row.installs;
+                        if (app.selected_events && app.selected_events[0] && row.installs > 0 && row[app.selected_events[0]] !== undefined) {
+                            row['install_to_' + app.selected_events[0]] = row[app.selected_events[0]] / row.installs;
                         }
-                        if (event1 && event2 && row[event1] > 0 && row[event2] !== undefined) {
-                            row[event1 + '_to_' + event2] = row[event2] / row[event1];
+                        if (app.selected_events && app.selected_events[0] && app.selected_events[1] && row[app.selected_events[0]] > 0 && row[app.selected_events[1]] !== undefined) {
+                            row[app.selected_events[0] + '_to_' + app.selected_events[1]] = row[app.selected_events[1]] / row[app.selected_events[0]];
                         }
                     });
+
                     // Table
                     let table = '<div class="stats-table-container"><table class="stats-table"><thead><tr><th class="app-header sticky-metric-col">Metric</th>';
                     dates.forEach(date => {
                         table += `<th style="text-align:center;">${date}</th>`;
                     });
                     table += '</tr></thead><tbody>';
+                    
                     metrics.forEach(m => {
                         table += `<tr><td class="sticky-metric-col" style="text-align:left;font-weight:600;">${m.label}</td>`;
                         app.table.forEach(row => {
@@ -899,29 +903,32 @@
                         table += '</tr>';
                     });
                     table += '</tbody></table></div>';
-                    // Modern multi-metric trend graph below table
+
+                    // Graphs
                     let safeName = app.app_name.replace(/\W/g, "");
-                    let mainId = `trend-main-${app.app_id}-${safeName}`;
-                    let eventsId = `trend-events-${app.app_id}-${safeName}`;
-                    let fraudId = `trend-fraud-${app.app_id}-${safeName}`;
+                    let mainId = `trend-main-${app.app_id}-${safeName}-${range}`;
+                    let eventsId = `trend-events-${app.app_id}-${safeName}-${range}`;
+                    let fraudId = `trend-fraud-${app.app_id}-${safeName}-${range}`;
+
                     table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Impressions & Clicks</div><canvas id='${mainId}'></canvas></div>`;
                     table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#6366f1;margin-bottom:0.5rem;'>Installs & Events</div><canvas id='${eventsId}'></canvas></div>`;
                     table += `<div class='trend-graph'><div style='font-weight:600;font-size:1.1rem;color:#a21caf;margin-bottom:0.5rem;'>Fraud: Blocked Installs</div><canvas id='${fraudId}'></canvas></div>`;
+                    
                     section.innerHTML += table;
+                    container.appendChild(section);
+
+                    // Initialize charts after a small delay to ensure DOM is ready
                     setTimeout(() => {
                         // 1. Impressions & Clicks
                         renderChartWithRetry(mainId, (ctxMain) => {
-                            if (window._chartInstances[mainId]) {
-                                window._chartInstances[mainId].destroy();
-                            }
-                            window._chartInstances[mainId] = new Chart(ctxMain, {
+                            new Chart(ctxMain, {
                                 type: 'line',
                                 data: {
-                                    labels: app.table.map(r=>r.date),
+                                    labels: dates,
                                     datasets: [
                                         {
                                             label: 'Impressions',
-                                            data: app.table.map(r=>r.impressions),
+                                            data: app.table.map(r => r.impressions),
                                             borderColor: '#6366f1',
                                             backgroundColor: 'rgba(99,102,241,0.08)',
                                             fill: false,
@@ -929,40 +936,64 @@
                                         },
                                         {
                                             label: 'Clicks',
-                                            data: app.table.map(r=>r.clicks),
-                                            borderColor: '#10b981',
-                                            backgroundColor: 'rgba(16,185,129,0.08)',
+                                            data: app.table.map(r => r.clicks),
+                                            borderColor: '#f59e42',
+                                            backgroundColor: 'rgba(245,158,66,0.08)',
                                             fill: false,
                                             tension: 0.18
                                         }
                                     ]
                                 },
                                 options: {
-                                    plugins: { legend: { display: true, position: 'bottom' } },
-                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    plugins: { 
+                                        legend: { display: true, position: 'bottom' },
+                                        tooltip: {
+                                            mode: 'index',
+                                            intersect: false,
+                                            callbacks: {
+                                                label: function(context) {
+                                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            title: { display: true, text: 'Date' },
+                                            ticks: { maxRotation: 45, minRotation: 45 }
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            title: { display: true, text: 'Count' },
+                                            ticks: { callback: value => value.toLocaleString() }
+                                        }
+                                    },
                                     elements: { point: { radius: 2 } },
                                     responsive: true,
                                     maintainAspectRatio: false
                                 }
                             });
                         });
+
                         // 2. Installs & Events
                         renderChartWithRetry(eventsId, (ctxEvents) => {
                             const datasets = [
                                 {
                                     label: 'Installs',
-                                    data: app.table.map(r=>r.installs),
+                                    data: app.table.map(r => r.installs),
                                     borderColor: '#f59e42',
                                     backgroundColor: 'rgba(245,158,66,0.08)',
                                     fill: false,
                                     tension: 0.18
                                 }
                             ];
+
                             if (app.selected_events) {
                                 app.selected_events.forEach((event, i) => {
                                     datasets.push({
                                         label: event,
-                                        data: app.table.map(r=>r[event]||0),
+                                        data: app.table.map(r => r[event] || 0),
                                         borderColor: i === 0 ? '#3b82f6' : '#a21caf',
                                         backgroundColor: i === 0 ? 'rgba(59,130,246,0.08)' : 'rgba(162,28,175,0.08)',
                                         fill: false,
@@ -970,37 +1001,55 @@
                                     });
                                 });
                             }
-                            if (window._chartInstances[eventsId]) {
-                                window._chartInstances[eventsId].destroy();
-                            }
-                            window._chartInstances[eventsId] = new Chart(ctxEvents, {
+
+                            new Chart(ctxEvents, {
                                 type: 'line',
                                 data: {
-                                    labels: app.table.map(r=>r.date),
+                                    labels: dates,
                                     datasets: datasets
                                 },
                                 options: {
-                                    plugins: { legend: { display: true, position: 'bottom' } },
-                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    plugins: {
+                                        legend: { display: true, position: 'bottom' },
+                                        tooltip: {
+                                            mode: 'index',
+                                            intersect: false,
+                                            callbacks: {
+                                                label: function(context) {
+                                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            title: { display: true, text: 'Date' },
+                                            ticks: { maxRotation: 45, minRotation: 45 }
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            title: { display: true, text: 'Count' },
+                                            ticks: { callback: value => value.toLocaleString() }
+                                        }
+                                    },
                                     elements: { point: { radius: 2 } },
                                     responsive: true,
                                     maintainAspectRatio: false
                                 }
                             });
                         });
-                        // 3. Blocked Installs (Fraud)
+
+                        // 3. Fraud: Blocked Installs
                         renderChartWithRetry(fraudId, (ctxFraud) => {
-                            if (window._chartInstances[fraudId]) {
-                                window._chartInstances[fraudId].destroy();
-                            }
-                            window._chartInstances[fraudId] = new Chart(ctxFraud, {
+                            new Chart(ctxFraud, {
                                 type: 'line',
                                 data: {
-                                    labels: app.table.map(r=>r.date),
+                                    labels: dates,
                                     datasets: [
                                         {
                                             label: 'Blocked Installs (RT)',
-                                            data: app.table.map(r=>r.blocked_installs_rt),
+                                            data: app.table.map(r => r.blocked_installs_rt),
                                             borderColor: '#ef4444',
                                             backgroundColor: 'rgba(239,68,68,0.08)',
                                             fill: false,
@@ -1008,7 +1057,7 @@
                                         },
                                         {
                                             label: 'Blocked Installs (PA)',
-                                            data: app.table.map(r=>r.blocked_installs_pa),
+                                            data: app.table.map(r => r.blocked_installs_pa),
                                             borderColor: '#6366f1',
                                             backgroundColor: 'rgba(99,102,241,0.08)',
                                             fill: false,
@@ -1017,8 +1066,30 @@
                                     ]
                                 },
                                 options: {
-                                    plugins: { legend: { display: true, position: 'bottom' } },
-                                    scales: { x: { display: true, title: { display: true, text: 'Date' } }, y: { beginAtZero: true, title: { display: true, text: 'Count' } } },
+                                    plugins: {
+                                        legend: { display: true, position: 'bottom' },
+                                        tooltip: {
+                                            mode: 'index',
+                                            intersect: false,
+                                            callbacks: {
+                                                label: function(context) {
+                                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            title: { display: true, text: 'Date' },
+                                            ticks: { maxRotation: 45, minRotation: 45 }
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            title: { display: true, text: 'Count' },
+                                            ticks: { callback: value => value.toLocaleString() }
+                                        }
+                                    },
                                     elements: { point: { radius: 2 } },
                                     responsive: true,
                                     maintainAspectRatio: false
