@@ -755,11 +755,23 @@ def all_apps_stats():
 def get_event_selections():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('SELECT app_id, event1, event2 FROM app_event_selections')
-    rows = c.fetchall()
-    conn.close()
-    selections = {app_id: [event1, event2] for app_id, event1, event2 in rows}
-    return jsonify(selections)
+    try:
+        c.execute('SELECT app_id, event1, event2, is_active FROM app_event_selections')
+        rows = c.fetchall()
+        selections = {}
+        for row in rows:
+            app_id, event1, event2, is_active = row
+            selections[app_id] = {
+                'event1': event1,
+                'event2': event2,
+                'is_active': bool(is_active)
+            }
+        return jsonify({"success": True, "selections": selections})
+    except Exception as e:
+        print(f"Error getting event selections: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        conn.close()
 
 @app.route('/event-selections', methods=['POST'])
 @login_required

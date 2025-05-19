@@ -1469,7 +1469,7 @@
             appsList.innerHTML = '';
             
             // Fetch saved event selections from the database
-            fetch('/get-event-selections')
+            fetch('/event-selections')
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) {
