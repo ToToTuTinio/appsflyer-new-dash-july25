@@ -1360,8 +1360,44 @@ def clear_fraud_cache():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/apps-page')
+@login_required
 def apps_page():
-    return {'status': 'ok'}
+    try:
+        # Force fetch fresh data from AppsFlyer
+        result = get_active_apps(force_fetch=True)
+        
+        # Get event selections for all apps
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT app_id, event1, event2 FROM app_event_selections')
+        event_selections = {row[0]: [row[1], row[2]] for row in c.fetchall()}
+        
+        # Add event selections to each app
+        for app in result['apps']:
+            app['selected_events'] = event_selections.get(app['app_id'], [None, None])
+        
+        # Add cache status
+        result['cache_status'] = {
+            'is_fresh': True,
+            'last_updated': result['fetch_time'],
+            'total_apps': len(result['apps']),
+            'active_apps': sum(1 for app in result['apps'] if app.get('is_active', True))
+        }
+        
+        conn.close()
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error in apps_page endpoint: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'count': 0,
+            'apps': [],
+            'fetch_time': None,
+            'cache_status': {
+                'is_fresh': False,
+                'error': str(e)
+            }
+        }), 500
 
 @app.route('/api/stats-page')
 def stats_page():
