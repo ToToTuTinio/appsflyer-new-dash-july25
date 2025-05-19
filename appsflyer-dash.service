@@ -1,0 +1,25 @@
+[Unit]
+Description=AppsFlyer Dashboard
+After=network.target
+
+[Service]
+User=or
+WorkingDirectory=/home/or/appsflyer-dash-2025-live
+Environment="PATH=/home/or/appsflyer-dash-2025-live/venv/bin"
+Environment="FLASK_ENV=production"
+Environment="FLASK_DEBUG=0"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/or/appsflyer-dash-2025-live/venv/bin/gunicorn \
+    -w 4 \
+    -b 0.0.0.0:5000 \
+    backend.app:app \
+    --timeout 3600 \
+    --log-level debug \
+    --error-logfile /home/or/appsflyer-dash-2025-live/gunicorn-error.log \
+    --access-logfile /home/or/appsflyer-dash-2025-live/gunicorn-access.log \
+    --capture-output
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 
