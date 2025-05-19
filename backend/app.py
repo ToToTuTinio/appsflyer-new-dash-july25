@@ -24,6 +24,11 @@ from redis import Redis
 from rq import Queue
 from report_utils import process_report_async, get_fraud_data, get_active_app_ids
 from auto_report_service import auto_report_service
+import logging
+
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
@@ -450,13 +455,13 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
     }
     for attempt in range(max_retries):
         try:
-            print(f"[API] Making request to {url} (attempt {attempt + 1}/{max_retries})")
+            logger.info(f"Making request to {url} (attempt {attempt + 1}/{max_retries})")
             resp = requests.get(url, headers=headers, params=params, timeout=90)
             if resp.status_code == 200:
                 return resp
-            print(f"[API] Request failed with status {resp.status_code}")
-            print(f"[API] Response headers: {dict(resp.headers)}")
-            print(f"[API] Response body: {resp.text}")
+            logger.error(f"Request failed with status {resp.status_code}")
+            logger.error(f"Response headers: {dict(resp.headers)}")
+            logger.error(f"Response body: {resp.text}")
             
             # Check for specific error messages that should skip retries
             error_text = resp.text.lower()
@@ -469,27 +474,27 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
             ]
             
             if any(msg in error_text for msg in skip_retry_messages):
-                print("[API] Detected API limitation. Skipping retries for this request.")
+                logger.warning("Detected API limitation. Skipping retries for this request.")
                 return None
                 
             if resp.status_code == 429:  # Rate limit
                 retry_after = int(resp.headers.get('Retry-After', retry_delay))
-                print(f"[API] Rate limited. Waiting {retry_after} seconds...")
+                logger.warning(f"Rate limited. Waiting {retry_after} seconds...")
                 time.sleep(retry_after)
                 continue
             if attempt < max_retries - 1:
-                print(f"[API] Retrying in {retry_delay} seconds...")
+                logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
         except requests.exceptions.Timeout as e:
-            print(f"[API] Timeout error: {str(e)}")
+            logger.error(f"Timeout error: {str(e)}")
             return 'timeout'
         except requests.exceptions.RequestException as e:
-            print(f"[API] Request error: {str(e)}")
+            logger.error(f"Request error: {str(e)}")
             if hasattr(e, 'response') and e.response is not None:
-                print(f"[API] Exception response headers: {dict(e.response.headers)}")
-                print(f"[API] Exception response body: {e.response.text}")
+                logger.error(f"Exception response headers: {dict(e.response.headers)}")
+                logger.error(f"Exception response body: {e.response.text}")
             if attempt < max_retries - 1:
-                print(f"[API] Retrying in {retry_delay} seconds...")
+                logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
     return None
 
