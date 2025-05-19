@@ -248,7 +248,6 @@
                 <!-- Clear Backend Data Button (moved to bottom, smaller) -->
                 <div class="flex justify-center mt-8 mb-2">
                     <button id="clear-backend-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Backend Data</button>
-                    <button id="get-all-stats-btn" class="ml-4 border border-green-600 text-green-700 px-3 py-1 rounded text-xs font-semibold hover:bg-green-50 transition">GET ALL STATS</button>
                 </div>
             </div>
         </div>
@@ -317,8 +316,8 @@
                 </div>
                 <!-- Sub-tab content containers -->
                 <div id="stats-content-10d" class="stats-range-content" style="display:none;">
+                    <button id="run-report-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                     <div id="stats-data-10d" class="space-y-10"></div>
-                    <div class="text-xs text-gray-500 mt-2 text-center" id="stats-last-updated-10d"></div>
                 </div>
                 <div id="stats-content-mtd" class="stats-range-content" style="display:none;">
                     <button id="run-report-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
@@ -364,20 +363,20 @@
                     </div>
                     <!-- Sub-tab content containers -->
                     <div id="fraud-content-10d" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                         <div id="fraud-data-10d"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-last-updated-10d"></div>
                     </div>
                     <div id="fraud-content-mtd" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                         <div id="fraud-data-mtd"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-last-updated-mtd"></div>
                     </div>
                     <div id="fraud-content-lastmonth" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-lastmonth-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                         <div id="fraud-data-lastmonth"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-last-updated-lastmonth"></div>
                     </div>
                     <div id="fraud-content-30d" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-30d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                         <div id="fraud-data-30d"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-last-updated-30d"></div>
                     </div>
                     <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                         Loading fraud data...
@@ -398,20 +397,48 @@
                     </div>
                     <!-- Sub-tab content containers -->
                     <div id="fraud-source-content-10d" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-10d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-10d" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-10d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
                         <div id="fraud-source-data-10d"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-source-last-updated-10d"></div>
                     </div>
                     <div id="fraud-source-content-mtd" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-mtd-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-mtd" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-mtd" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
                         <div id="fraud-source-data-mtd"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-source-last-updated-mtd"></div>
                     </div>
                     <div id="fraud-source-content-lastmonth" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-lastmonth-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-lastmonth" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-lastmonth" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
                         <div id="fraud-source-data-lastmonth"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-source-last-updated-lastmonth"></div>
                     </div>
                     <div id="fraud-source-content-30d" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-30d-btn" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-30d" class="text-center text-gray-500 mt-8" style="display:none;">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
+                            <div>Loading fraud data...</div>
+                        </div>
+                        <div id="fraud-source-error-30d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                            Error loading fraud data. Please try again.
+                        </div>
                         <div id="fraud-source-data-30d"></div>
-                        <div class="text-xs text-gray-500 mt-2 text-center" id="fraud-source-last-updated-30d"></div>
                     </div>
                     <div id="fraud-source-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                         Loading fraud per source data...
@@ -3323,39 +3350,6 @@
                 button.textContent = originalText;
             });
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // ... existing code ...
-            const getAllStatsBtn = document.getElementById('get-all-stats-btn');
-            if (getAllStatsBtn) {
-                getAllStatsBtn.onclick = function() {
-                    getAllStatsBtn.disabled = true;
-                    getAllStatsBtn.textContent = 'Refreshing...';
-                    fetch('/force-refresh-all-stats', { method: 'POST' })
-                        .then(r => r.json())
-                        .then(data => {
-                            getAllStatsBtn.textContent = 'GET ALL STATS';
-                            getAllStatsBtn.disabled = false;
-                            const toast = document.createElement('div');
-                            toast.className = 'fixed bottom-4 right-4 bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                            toast.textContent = data.success ? 'All stats and fraud data refreshed!' : ('Error: ' + (data.error || 'Unknown error'));
-                            document.body.appendChild(toast);
-                            setTimeout(() => toast.remove(), 4000);
-                            if (data.success) {
-                                // Optionally, refresh the UI
-                                fetchOverviewData();
-                                fetchAndUpdateStats();
-                                fetchAndUpdateFraud();
-                            }
-                        })
-                        .catch(() => {
-                            getAllStatsBtn.textContent = 'GET ALL STATS';
-                            getAllStatsBtn.disabled = false;
-                            alert('Network error. Please try again.');
-                        });
-                };
-            }
-        });
     </script>
 </body>
 </html> 
