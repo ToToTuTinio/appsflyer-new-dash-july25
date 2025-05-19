@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 import threading
-from report_utils import process_report_async, get_fraud_data
+from report_utils import process_report_async, get_fraud_data, task_queue
 import logging
 
 logging.basicConfig(level=logging.INFO)
