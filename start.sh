@@ -7,10 +7,10 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Create log directory if it doesn't exist
-mkdir -p /var/log/appsflyer-dashboard
+mkdir -p /home/or/appsflyer-dash-2025-live/logs
 
 # Set proper permissions
-chown -R www-data:www-data /var/log/appsflyer-dashboard
+chown -R or:or /home/or/appsflyer-dash-2025-live/logs
 
 # Copy service file to systemd directory
 cp appsflyer-dashboard.service /etc/systemd/system/
