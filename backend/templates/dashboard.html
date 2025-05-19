@@ -2936,8 +2936,31 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                // Always fetch fresh data from backend when switching to Apps tab
-                fetchApps();
+                fetch('/api/apps-page').then(() => {
+                    const cached = localStorage.getItem('fetchedApps');
+                    console.log('Cached fetchedApps:', cached);
+                    if (cached) {
+                        try {
+                            const apps = JSON.parse(cached);
+                            console.log('Parsed apps:', apps);
+                            if (Array.isArray(apps) && apps.length > 0) {
+                                window.fetchedApps = apps;
+                                renderAppsList(apps);
+                                document.getElementById('app-count').textContent = apps.length;
+                            } else {
+                                document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                                document.getElementById('app-count').textContent = '0';
+                            }
+                        } catch (e) {
+                            console.error('Error parsing cached apps:', e);
+                            document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                            document.getElementById('app-count').textContent = '0';
+                        }
+                    } else {
+                        document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                        document.getElementById('app-count').textContent = '0';
+                    }
+                });
             }
             if (tabName === 'stats') {
                 // Visually activate the 'Last 10 Days' tab
