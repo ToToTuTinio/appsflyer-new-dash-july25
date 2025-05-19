@@ -1609,17 +1609,17 @@ def process_report_task(apps, period, selected_events):
             apps = get_active_app_ids()
         
         # Get date range based on period
-        end_date = datetime.now(pytz.UTC).strftime('%Y-%m-%d')
+        end_date = datetime.datetime.now(pytz.UTC).strftime('%Y-%m-%d')
         if period == 'last10':
-            start_date = (datetime.now(pytz.UTC) - datetime.timedelta(days=10)).strftime('%Y-%m-%d')
+            start_date = (datetime.datetime.now(pytz.UTC) - datetime.timedelta(days=10)).strftime('%Y-%m-%d')
         elif period == 'mtd':
-            start_date = datetime.now(pytz.UTC).replace(day=1).strftime('%Y-%m-%d')
+            start_date = datetime.datetime.now(pytz.UTC).replace(day=1).strftime('%Y-%m-%d')
         elif period == 'lastmonth':
-            last_month = datetime.now(pytz.UTC).replace(day=1) - datetime.timedelta(days=1)
+            last_month = datetime.datetime.now(pytz.UTC).replace(day=1) - datetime.timedelta(days=1)
             start_date = last_month.replace(day=1).strftime('%Y-%m-%d')
             end_date = last_month.strftime('%Y-%m-%d')
         elif period == 'last30':
-            start_date = (datetime.now(pytz.UTC) - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+            start_date = (datetime.datetime.now(pytz.UTC) - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
         else:
             raise ValueError(f"Invalid period: {period}")
 
