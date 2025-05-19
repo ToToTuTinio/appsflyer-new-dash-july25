@@ -22,6 +22,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
+from refresh_all_stats import refresh_stats_and_fraud
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
@@ -1768,6 +1769,15 @@ def get_active_app_ids():
     active_apps = [row[0] for row in c.fetchall()]
     conn.close()
     return active_apps
+
+@app.route('/force-refresh-all-stats', methods=['POST'])
+@login_required
+def force_refresh_all_stats():
+    try:
+        refresh_stats_and_fraud()
+        return jsonify({'success': True, 'message': 'All stats and fraud data refreshed.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
