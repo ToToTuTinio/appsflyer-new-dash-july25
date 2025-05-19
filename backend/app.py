@@ -1677,8 +1677,8 @@ def start_report():
     period = data.get('period')
     selected_events = data.get('selected_events', [])
     
-    # Start background task with increased timeout
-    job = task_queue.enqueue(process_report_async, apps, period, selected_events, job_timeout=3600)
+    # Start background task
+    job = task_queue.enqueue(process_report_async, apps, period, selected_events)
     
     return jsonify({
         'status': 'processing',
