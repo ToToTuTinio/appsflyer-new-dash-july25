@@ -1,80 +1,58 @@
 #!/bin/bash
 
-# Get the absolute path of the project directory
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Start the server in the background and redirect output to gunicorn.out
+cd backend
+source ../venv/bin/activate
 
-# Function to install ChromeDriver
-install_chromedriver() {
-    echo "Installing ChromeDriver..."
-    
-    # Create a directory for ChromeDriver if it doesn't exist
-    sudo mkdir -p /opt/chromedriver
-    
-    # Download and install ChromeDriver
-    CHROME_DRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
-    wget -q "https://chromedriver.storage.googleapis.com/${CHROME_DRIVER_VERSION}/chromedriver_linux64.zip"
-    unzip -q chromedriver_linux64.zip
-    sudo mv chromedriver /opt/chromedriver/
-    sudo chmod +x /opt/chromedriver/chromedriver
-    rm chromedriver_linux64.zip
-    
-    # Create symlink to make it available in PATH
-    sudo ln -sf /opt/chromedriver/chromedriver /usr/local/bin/chromedriver
-    sudo ln -sf /opt/chromedriver/chromedriver /usr/bin/chromedriver
-    
-    echo "ChromeDriver installed successfully"
-}
+# Set environment variables for logging
+export FLASK_ENV=development
+export FLASK_DEBUG=1
+export PYTHONUNBUFFERED=1
 
-# Check and install ChromeDriver if needed
-if ! command -v chromedriver &> /dev/null; then
-    install_chromedriver
+# Clear previous log file
+echo "" > ../gunicorn.out
+
+# Start gunicorn with basic configuration
+gunicorn app:app \
+    -w 4 \
+    -b 0.0.0.0:5000 \
+    --timeout 3600 \
+    --log-level debug \
+   # --error-logfile ../gunicorn.out \
+   # --access-logfile ../gunicorn.out \
+    --capture-output \
+    >> ../gunicorn.out 2>&1 &
+
+# Store the background process ID
+SERVER_PID=$!
+
+# Wait a moment to check if the server started successfully
+sleep 2
+if ! ps -p $SERVER_PID > /dev/null; then
+    echo "Failed to start server. Check gunicorn.out for details."
+    exit 1
 fi
 
-# Create systemd service file
-cat > appsflyer-dashboard.service << EOL
-[Unit]
-Description=Appsflyer Dashboard Service
-After=network.target
+# Function to handle script termination
+cleanup() {
+    echo "Shutting down server..."
+    kill $SERVER_PID 2>/dev/null
+    exit 0
+}
 
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$PROJECT_DIR
-Environment="PATH=$PROJECT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin:/opt/chromedriver"
-Environment="FLASK_ENV=development"
-Environment="FLASK_DEBUG=1"
-Environment="PYTHONUNBUFFERED=1"
-Environment="HOME=/home/$USER"
-Environment="DISPLAY=:0"
-Environment="CHROME_DRIVER_PATH=/opt/chromedriver/chromedriver"
-ExecStart=$PROJECT_DIR/venv/bin/gunicorn app:app -w 4 -b 0.0.0.0:5000 --timeout 3600 --log-level debug --capture-output
-Restart=always
-RestartSec=10
+# Set up trap to catch termination signal
+trap cleanup SIGINT SIGTERM
 
-[Install]
-WantedBy=multi-user.target
-EOL
-
-# Move service file to systemd directory
-sudo mv appsflyer-dashboard.service /etc/systemd/system/
-
-# Reload systemd to recognize new service
-sudo systemctl daemon-reload
-
-# Enable service to start on boot
-sudo systemctl enable appsflyer-dashboard
-
-# Stop existing service if running
-sudo systemctl stop appsflyer-dashboard
-
-# Start the service
-sudo systemctl start appsflyer-dashboard
-
-# Show service status
-echo "Service status:"
-sudo systemctl status appsflyer-dashboard
-
-# Show logs
-echo "Showing logs (Press Ctrl+C to stop)..."
+# Show logs in real-time with timestamps, filtering but keeping important requests
+echo "Server started. Showing important logs (Press Ctrl+C to stop)..."
 echo "----------------------------------------"
-sudo journalctl -u appsflyer-dashboard -f 
+tail -f ../gunicorn.out | while read line; do
+    # Keep important page navigation and API calls
+    if echo "$line" | grep -q "GET /api/\|GET /dashboard\|GET /stats\|GET /fraud\|POST /get_stats\|POST /get_fraud\|POST /start-report\|GET /report-status\|POST /event-selections\|GET /active-apps\|POST /clear-apps-cache\|DEBUG in app:\|ERROR in app:\|WARNING in app:"; then
+        # Add timestamp and print the line
+        echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
+    # Keep non-HTTP request logs (usually application logs)
+    elif ! echo "$line" | grep -q "GET\|POST\|PUT\|DELETE\|HEAD\|OPTIONS\|200\|301\|302\|304\|400\|401\|403\|404\|500\|502\|503\|504"; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
+    fi
+done 
