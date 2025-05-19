@@ -1360,8 +1360,37 @@ def clear_fraud_cache():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/apps-page')
+@login_required
 def apps_page():
-    return {'status': 'ok'}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        # Get the most recent apps cache
+        c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+        row = c.fetchone()
+        conn.close()
+        
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            result['updated_at'] = updated_at
+            return jsonify(result)
+        else:
+            return jsonify({
+                'count': 0,
+                'apps': [],
+                'fetch_time': None,
+                'used_cache': False
+            })
+    except Exception as e:
+        print(f"Error in apps_page endpoint: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'count': 0,
+            'apps': [],
+            'fetch_time': None,
+            'used_cache': False
+        }), 500
 
 @app.route('/api/stats-page')
 def stats_page():

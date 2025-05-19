@@ -2936,31 +2936,34 @@
             origSwitchTab6(tabName);
             if (tabName === 'overview') fetchOverviewData();
             if (tabName === 'apps') {
-                fetch('/api/apps-page').then(() => {
-                    const cached = localStorage.getItem('fetchedApps');
-                    console.log('Cached fetchedApps:', cached);
-                    if (cached) {
-                        try {
-                            const apps = JSON.parse(cached);
-                            console.log('Parsed apps:', apps);
-                            if (Array.isArray(apps) && apps.length > 0) {
-                                window.fetchedApps = apps;
-                                renderAppsList(apps);
-                                document.getElementById('app-count').textContent = apps.length;
-                            } else {
-                                document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
-                                document.getElementById('app-count').textContent = '0';
+                fetch('/api/apps-page')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Error fetching apps:', data.error);
+                            document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">Error loading apps data. Please try again.</td></tr>';
+                            document.getElementById('app-count').textContent = '0';
+                            return;
+                        }
+                        
+                        if (data.apps && Array.isArray(data.apps)) {
+                            window.fetchedApps = data.apps;
+                            localStorage.setItem('fetchedApps', JSON.stringify(data.apps));
+                            renderAppsList(data.apps);
+                            document.getElementById('app-count').textContent = data.count || data.apps.length;
+                            if (data.updated_at) {
+                                document.getElementById('apps-last-updated').textContent = `(Last updated: ${data.updated_at})`;
                             }
-                        } catch (e) {
-                            console.error('Error parsing cached apps:', e);
-                            document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                        } else {
+                            document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No apps data available. Please click Get Apps to load data.</td></tr>';
                             document.getElementById('app-count').textContent = '0';
                         }
-                    } else {
-                        document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">No cached apps data available. Please click Get Apps to load data.</td></tr>';
+                    })
+                    .catch(error => {
+                        console.error('Error fetching apps:', error);
+                        document.getElementById('apps-list').innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-4">Error loading apps data. Please try again.</td></tr>';
                         document.getElementById('app-count').textContent = '0';
-                    }
-                });
+                    });
             }
             if (tabName === 'stats') {
                 // Visually activate the 'Last 10 Days' tab
