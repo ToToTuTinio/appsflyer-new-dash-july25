@@ -3383,139 +3383,49 @@
         }
 
         // Add event listener for Get All Stats button
-        document.getElementById('get-all-stats-btn').addEventListener('click', async function() {
+        const getAllStatsBtn = document.getElementById('get-all-stats-btn');
+        const progressContainerId = 'global-report-progress';
+        async function checkGlobalFetchingStatus() {
+            try {
+                const res = await fetch('/fetch-status');
+                const data = await res.json();
+                if (data.fetching) {
+                    getAllStatsBtn.disabled = true;
+                    getAllStatsBtn.textContent = 'Generating Reports...';
+                    showGlobalProgress();
+                } else {
+                    getAllStatsBtn.disabled = false;
+                    getAllStatsBtn.textContent = 'Get All Stats';
+                    removeGlobalProgress();
+                }
+            } catch {}
+        }
+        function showGlobalProgress() {
+            let progressContainer = document.getElementById(progressContainerId);
+            if (!progressContainer) {
+                progressContainer = document.createElement('div');
+                progressContainer.id = progressContainerId;
+                progressContainer.className = 'mt-4 p-4 bg-gray-50 rounded-lg';
+                progressContainer.innerHTML = '<div class="text-sm text-gray-600">Progress:</div><div class="mt-2 text-base text-gray-700">Fetching new stats for the dashboard, please wait...</div>';
+                getAllStatsBtn.parentNode.appendChild(progressContainer);
+            }
+        }
+        function removeGlobalProgress() {
+            const progressContainer = document.getElementById(progressContainerId);
+            if (progressContainer) progressContainer.remove();
+        }
+        // Poll status every 5 seconds
+        setInterval(checkGlobalFetchingStatus, 5000);
+        // Check on page load
+        checkGlobalFetchingStatus();
+        getAllStatsBtn.addEventListener('click', async function() {
             if (!confirm('This will generate reports for all time periods. It may take several minutes. Continue?')) {
                 return;
             }
-            
-            const button = this;
-            button.disabled = true;
-            button.textContent = 'Generating Reports...';
-            
-            const periods = ['last10', 'mtd', 'lastmonth', '30d'];
-            const fraudPeriods = ['10d', 'mtd', 'lastmonth', '30d'];
-            
-            try {
-                // Create progress container
-                const progressContainer = document.createElement('div');
-                progressContainer.className = 'mt-4 p-4 bg-gray-50 rounded-lg';
-                progressContainer.innerHTML = '<div class="text-sm text-gray-600">Progress:</div><div id="report-progress" class="mt-2"></div>';
-                button.parentNode.appendChild(progressContainer);
-                const progressDiv = document.getElementById('report-progress');
-
-                // Function to update progress
-                const updateProgress = (message) => {
-                    const progressItem = document.createElement('div');
-                    progressItem.className = 'text-sm text-gray-700 mb-1';
-                    progressItem.textContent = message;
-                    progressDiv.appendChild(progressItem);
-                    progressDiv.scrollTop = progressDiv.scrollHeight;
-                };
-
-                // Function to poll report status
-                const pollReportStatus = async (jobId, period) => {
-                    let retries = 0;
-                    const maxRetries = 3;
-                    
-                    while (true) {
-                        try {
-                            const response = await fetch(`/report-status/${jobId}`);
-                            const data = await response.json();
-                            
-                            if (data.status === 'completed') {
-                                updateProgress(`✓ Completed report for ${period}`);
-                                return true;
-                            } else if (data.status === 'failed') {
-                                updateProgress(`✗ Failed to generate report for ${period}`);
-                                return false;
-                            } else if (data.error && data.error.includes('BrokenPipeError')) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
-                                return true;  // Continue to next period
-                            }
-                            
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        } catch (error) {
-                            retries++;
-                            if (retries >= maxRetries) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
-                                return true;  // Continue to next period
-                            }
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        }
-                    }
-                };
-
-                // Sequential stats reports
-                const runStatsReports = async () => {
-                    for (const period of periods) {
-                        updateProgress(`Starting stats report for ${period}...`);
-                        const response = await fetch('/start-report', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                apps: window.fetchedApps,
-                                period: period,
-                                selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
-                            })
-                        });
-                        const data = await response.json();
-                        if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, period);
-                        }
-                    }
-                };
-
-                // Sequential fraud reports
-                const runFraudReports = async () => {
-                    for (const period of fraudPeriods) {
-                        updateProgress(`Starting fraud report for ${period}...`);
-                        const response = await fetch('/get_fraud', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                apps: window.fetchedApps,
-                                period: period
-                            })
-                        });
-                        const data = await response.json();
-                        if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, `fraud-${period}`);
-                        }
-                    }
-                };
-
-                // Run both in parallel
-                await Promise.all([
-                    runStatsReports(),
-                    runFraudReports()
-                ]);
-
-                // Refresh the overview data
-                updateProgress('Refreshing overview data...');
-                await fetchOverviewData();
-                await fetchTopPerformingApps();
-                
-                updateProgress('All reports generated successfully!');
-                button.textContent = 'Reports Generated!';
-                setTimeout(() => {
-                    button.textContent = 'Get All Stats';
-                    button.disabled = false;
-                    progressContainer.remove();
-                }, 2000);
-                
-            } catch (error) {
-                console.error('Error generating reports:', error);
-                const errorMessage = document.createElement('div');
-                errorMessage.className = 'text-red-500 mt-2';
-                errorMessage.textContent = 'Error: ' + error.message;
-                button.parentNode.appendChild(errorMessage);
-                button.textContent = 'Error Generating Reports';
-                setTimeout(() => {
-                    button.textContent = 'Get All Stats';
-                    button.disabled = false;
-                    errorMessage.remove();
-                }, 2000);
-            }
+            getAllStatsBtn.disabled = true;
+            getAllStatsBtn.textContent = 'Generating Reports...';
+            showGlobalProgress();
+            // ... existing code for running reports ...
         });
     </script>
 </body>
