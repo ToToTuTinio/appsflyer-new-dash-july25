@@ -14,11 +14,16 @@ echo "" > ../gunicorn.out
 
 # Start gunicorn with nohup to keep it running after terminal closure
 nohup gunicorn app:app \
-    -w 2 \
+    -w 4 \
     -b 0.0.0.0:5000 \
     --timeout 3600 \
+    --keep-alive 5 \
+    --graceful-timeout 3600 \
+    --worker-class sync \
+    --worker-connections 1000 \
     --log-level debug \
     --capture-output \
+    --preload \
     >> ../gunicorn.out 2>&1 &
 
 # Store the background process ID
