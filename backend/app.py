@@ -50,17 +50,11 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%$^&*()_+')
 
-# Initialize rate limiter with Redis storage
+# Initialize rate limiter
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    storage_uri="redis://localhost:6379/1",  # Use Redis DB 1 for rate limiting
-    default_limits=["10000 per hour", "5000 per minute"],
-    storage_options={
-        "socket_connect_timeout": 36000,
-        "socket_timeout": 36000,
-        "retry_on_timeout": True
-    }
+    default_limits=["200 per day", "50 per hour"]
 )
 
 # --- GLOBAL JSON ERROR HANDLER ---
@@ -1530,11 +1524,8 @@ def process_report_async(apps, period, selected_events):
     try:
         print(f"[REPORT] Starting async report processing for period: {period}")
         print(f"[REPORT] Processing {len(apps)} apps")
-        print(f"[REPORT] Selected events: {selected_events}")
         
         start_date, end_date = get_period_dates(period)
-        print(f"[REPORT] Date range: {start_date} to {end_date}")
-        
         stats_list = []
         
         for app in apps:
@@ -1562,9 +1553,7 @@ def process_report_async(apps, period, selected_events):
                         continue
                         
                     header = rows[0].split(",")
-                    print(f"[REPORT] Headers for {app_id}: {header}")
                     data_rows = [row.split(",") for row in rows[1:]]
-                    print(f"[REPORT] Processing {len(data_rows)} rows for {app_id}")
                     
                     # Find column indices
                     def find_col(*names):
@@ -1586,8 +1575,6 @@ def process_report_async(apps, period, selected_events):
                     clicks_idx = find_col('clicks', 'Clicks')
                     installs_idx = find_col('installs', 'Installs')
                     date_idx = find_col('date', 'Date')
-                    
-                    print(f"[REPORT] Column indices for {app_id}: impressions={impressions_idx}, clicks={clicks_idx}, installs={installs_idx}, date={date_idx}")
                     
                     if None in [impressions_idx, clicks_idx, installs_idx, date_idx]:
                         print(f"[REPORT] Could not find all required columns for {app_id}")
@@ -1611,11 +1598,9 @@ def process_report_async(apps, period, selected_events):
                         daily_stats[date]["impressions"] += safe_int(row[impressions_idx])
                         daily_stats[date]["clicks"] += safe_int(row[clicks_idx])
                         daily_stats[date]["installs"] += safe_int(row[installs_idx])
-                        print(f"[REPORT] Processed row for {app_id} on {date}: impressions={daily_stats[date]['impressions']}, clicks={daily_stats[date]['clicks']}, installs={daily_stats[date]['installs']}")
 
                 # Process additional data (blocked installs, events)
                 # Add blocked installs data
-                print(f"[REPORT] Fetching blocked installs for {app_id}...")
                 blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
                 blocked_rt_resp = make_api_request(blocked_rt_url, params)
                 if blocked_rt_resp and blocked_rt_resp.status_code == 200:
@@ -1634,7 +1619,6 @@ def process_report_async(apps, period, selected_events):
                 event_data = {}
                 selected = selected_events.get(app_id, [])
                 if selected:
-                    print(f"[REPORT] Fetching events for {app_id}: {selected}")
                     events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
                     events_resp = make_api_request(events_url, params)
                     if events_resp and events_resp.status_code == 200:
@@ -1687,7 +1671,6 @@ def process_report_async(apps, period, selected_events):
                     'selected_events': selected,
                     'traffic': sum(r['impressions'] + r['clicks'] for r in table)
                 })
-                print(f"[REPORT] Completed processing for {app_id}")
                 
             except Exception as e:
                 print(f"[REPORT] Error processing app {app_id}: {str(e)}")
@@ -1712,14 +1695,12 @@ def process_report_async(apps, period, selected_events):
                 'updated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            print(f"[REPORT] Saving to cache with key: {cache_key}")
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
                      (cache_key, json.dumps(result)))
             conn.commit()
             conn.close()
-            print("[REPORT] Successfully saved to cache")
             
             return result
             
@@ -1737,18 +1718,11 @@ def start_report():
     period = data.get('period')
     selected_events = data.get('selected_events', [])
 
-    # Create a background job with increased timeout
-    job = task_queue.enqueue(
-        process_report_async, 
-        apps, 
-        period, 
-        selected_events,
-        job_timeout=36000  # Increase timeout to 10 hours
-    )
-    
+    # Run synchronously (not as a background job)
+    result = process_report_async(apps, period, selected_events)
     return jsonify({
-        'status': 'processing',
-        'job_id': job.id
+        'status': 'completed',
+        'result': result
     })
 
 @app.route('/report-status/<job_id>')

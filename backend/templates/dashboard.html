@@ -3394,82 +3394,70 @@
             
             const periods = ['last10', 'mtd', 'lastmonth', '30d'];
             const fraudPeriods = ['10d', 'mtd', 'lastmonth', '30d'];
-            const jobs = [];
             
             try {
-                // First, start all stats reports
+                // First, generate all stats reports
                 for (const period of periods) {
-                    console.log(`Starting stats report for ${period}...`);
-                    const response = await fetch('/start-report', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            apps: window.fetchedApps,
-                            period: period,
-                            selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
+                    console.log(`Generating stats report for ${period}...`);
+                    await new Promise((resolve, reject) => {
+                        fetch('/start-report', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                apps: window.fetchedApps,
+                                period: period,
+                                selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
+                            })
                         })
-                    });
-                    const data = await response.json();
-                    if (data.status === 'processing') {
-                        jobs.push({ id: data.job_id, type: 'stats', period });
-                    }
-                }
-                
-                // Then, start all fraud reports
-                for (const period of fraudPeriods) {
-                    console.log(`Starting fraud report for ${period}...`);
-                    const response = await fetch('/get_fraud', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            apps: window.fetchedApps,
-                            period: period
-                        })
-                    });
-                    const data = await response.json();
-                    if (data.status === 'processing') {
-                        jobs.push({ id: data.job_id, type: 'fraud', period });
-                    }
-                }
-                
-                // Poll for job completion
-                const pollInterval = setInterval(async () => {
-                    if (jobs.length === 0) {
-                        clearInterval(pollInterval);
-                        // All jobs are complete
-                        fetchOverviewData();
-                        fetchTopPerformingApps();
-                        button.textContent = 'Reports Generated!';
-                        setTimeout(() => {
-                            button.textContent = 'Get All Stats';
-                            button.disabled = false;
-                        }, 2000);
-                        return;
-                    }
-                    
-                    // Check each job's status
-                    for (let i = jobs.length - 1; i >= 0; i--) {
-                        const job = jobs[i];
-                        try {
-                            const response = await fetch(`/report-status/${job.id}`);
-                            const data = await response.json();
-                            
+                        .then(r => r.json())
+                        .then(data => {
                             if (data.status === 'completed') {
-                                console.log(`${job.type} report completed for ${job.period}`);
-                                jobs.splice(i, 1);
-                            } else if (data.status === 'failed') {
-                                console.error(`${job.type} report failed for ${job.period}:`, data.error);
-                                jobs.splice(i, 1);
+                                resolve();
+                            } else {
+                                reject(new Error(`Failed to generate report for ${period}`));
                             }
-                        } catch (error) {
-                            console.error(`Error checking ${job.type} report status for ${job.period}:`, error);
-                        }
-                    }
-                }, 5000); // Poll every 5 seconds
+                        })
+                        .catch(reject);
+                    });
+                }
+                
+                // Then, generate all fraud reports
+                for (const period of fraudPeriods) {
+                    console.log(`Generating fraud report for ${period}...`);
+                    await new Promise((resolve, reject) => {
+                        fetch('/get_fraud', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                apps: window.fetchedApps,
+                                period: period
+                            })
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.status === 'completed') {
+                                resolve();
+                            } else {
+                                reject(new Error(`Failed to generate fraud report for ${period}`));
+                            }
+                        })
+                        .catch(reject);
+                    });
+                }
+                
+                // Refresh the overview data
+                fetchOverviewData();
+                fetchTopPerformingApps();
+                
+                button.textContent = 'Reports Generated!';
+                setTimeout(() => {
+                    button.textContent = 'Get All Stats';
+                    button.disabled = false;
+                }, 2000);
                 
             } catch (error) {
-                console.error('Error starting reports:', error);
-                button.textContent = 'Error Starting Reports';
+                console.error('Error generating reports:', error);
+                button.textContent = 'Error Generating Reports';
                 setTimeout(() => {
                     button.textContent = 'Get All Stats';
                     button.disabled = false;
