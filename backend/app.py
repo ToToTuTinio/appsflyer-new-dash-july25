@@ -54,7 +54,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=["10000 per day", "5000 per hour"]
 )
 
 # --- GLOBAL JSON ERROR HANDLER ---
