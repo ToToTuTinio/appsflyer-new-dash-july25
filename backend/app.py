@@ -353,7 +353,7 @@ def app_events(app_id):
     
     while retries < max_retries:
         try:
-            response = requests.get(url, headers=headers, params=params, timeout=90)
+            response = requests.get(url, headers=headers, params=params, timeout=600)
             response.raise_for_status()
             rows = response.text.strip().split("\n")
             if not rows:
@@ -449,7 +449,7 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
     for attempt in range(max_retries):
         try:
             print(f"[API] Making request to {url} (attempt {attempt + 1}/{max_retries})")
-            resp = requests.get(url, headers=headers, params=params, timeout=90)
+            resp = requests.get(url, headers=headers, params=params, timeout=600)
             if resp.status_code == 200:
                 return resp
             print(f"[API] Request failed with status {resp.status_code}")
@@ -1707,6 +1707,7 @@ def process_report_async(apps, period, selected_events):
             conn.commit()
             conn.close()
             
+            print(f"[REPORT] Finish async report for {period}")
             return result
             
     except BrokenPipeError as e:
