@@ -3416,38 +3416,28 @@
                 const pollReportStatus = async (jobId, period) => {
                     let retries = 0;
                     const maxRetries = 3;
-                    const timeoutMs = 60000; // 60 seconds
-
+                    
                     while (true) {
                         try {
-                            const fetchWithTimeout = (url, options, timeout = timeoutMs) => {
-                                return Promise.race([
-                                    fetch(url, options),
-                                    new Promise((_, reject) =>
-                                        setTimeout(() => reject(new Error('Timeout')), timeout)
-                                    )
-                                ]);
-                            };
-
-                            const response = await fetchWithTimeout(`/report-status/${jobId}`);
+                            const response = await fetch(`/report-status/${jobId}`);
                             const data = await response.json();
-
+                            
                             if (data.status === 'completed') {
                                 updateProgress(`✓ Completed report for ${period}`);
                                 return true;
                             } else if (data.status === 'failed') {
                                 updateProgress(`✗ Failed to generate report for ${period}`);
                                 return false;
-                            } else if (data.error) {
-                                updateProgress(`⚠ Error for ${period}: ${data.error}. Continuing to next period...`);
+                            } else if (data.error && data.error.includes('BrokenPipeError')) {
+                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
                                 return true;  // Continue to next period
                             }
-
+                            
                             await new Promise(resolve => setTimeout(resolve, 5000));
                         } catch (error) {
                             retries++;
-                            if (retries >= maxRetries || error.message === 'Timeout') {
-                                updateProgress(`⚠ Timeout or connection error for ${period}, continuing to next period...`);
+                            if (retries >= maxRetries) {
+                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
                                 return true;  // Continue to next period
                             }
                             await new Promise(resolve => setTimeout(resolve, 5000));
