@@ -1675,6 +1675,9 @@ def process_report_async(apps, period, selected_events):
             except Exception as e:
                 print(f"[REPORT] Error processing app {app_id}: {str(e)}")
                 continue
+            except BrokenPipeError as e:
+                print(f"[REPORT] BrokenPipeError (EPIPE) for app {app_id}: {str(e)}. Skipping to next app.")
+                continue
                 
         # Save to cache
         if stats_list:
