@@ -461,6 +461,7 @@ def make_api_request(url, params, max_retries=7, retry_delay=30):
             skip_retry_messages = [
                 "limit reached for daily-report",
                 "you've reached your maximum number of in-app event reports that can be downloaded today for this app",
+                "you've reached your maximum number of in-app event reports that can be downloaded today for this account",
                 "you've reached your maximum number of install reports that can be downloaded today for this app",
                 "you've reached your maximum number of install reports that can be downloaded today for this account",
                 "your current subscription package doesn't include raw data reports",
