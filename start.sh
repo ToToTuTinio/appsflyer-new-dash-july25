@@ -16,9 +16,9 @@ echo "" > ../gunicorn.out
 nohup gunicorn app:app \
     -w 4 \
     -b 0.0.0.0:5000 \
-    --timeout 10800 \
+    --timeout 36000 \
     --keep-alive 5 \
-    --graceful-timeout 10800 \
+    --graceful-timeout 36000\
     --worker-class sync \
     --worker-connections 1000 \
     --log-level debug \

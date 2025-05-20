@@ -3416,7 +3416,7 @@
                 const pollReportStatus = async (jobId, period) => {
                     let retries = 0;
                     const maxRetries = 3;
-                    const timeoutMs = 10800000; // 3 hours
+                    const timeoutMs = 60000; // 60 seconds
 
                     while (true) {
                         try {
