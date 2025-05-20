@@ -1717,31 +1717,20 @@ def process_report_async(apps, period, selected_events):
         raise
     return {'apps': [], 'error': 'Failed to process report'}
 
-# In-memory flag for stats fetching
-is_fetching_stats = False
-
-@app.route('/fetch-status')
-def fetch_status():
-    global is_fetching_stats
-    return jsonify({'fetching': is_fetching_stats})
-
 @app.route('/start-report', methods=['POST'])
 @login_required
 def start_report():
-    global is_fetching_stats
-    if is_fetching_stats:
-        return jsonify({'status': 'fetching', 'message': 'Stats fetch already in progress.'}), 429
-    is_fetching_stats = True
-    try:
-        data = request.get_json()
-        apps = data.get('apps', [])
-        period = data.get('period')
-        selected_events = data.get('selected_events', [])
-        # Run synchronously (not as a background job)
-        result = process_report_async(apps, period, selected_events)
-        return jsonify({'status': 'completed', 'result': result, 'fetching': False})
-    finally:
-        is_fetching_stats = False
+    data = request.get_json()
+    apps = data.get('apps', [])
+    period = data.get('period')
+    selected_events = data.get('selected_events', [])
+
+    # Run synchronously (not as a background job)
+    result = process_report_async(apps, period, selected_events)
+    return jsonify({
+        'status': 'completed',
+        'result': result
+    })
 
 @app.route('/report-status/<job_id>')
 @login_required
