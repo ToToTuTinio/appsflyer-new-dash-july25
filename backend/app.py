@@ -997,8 +997,8 @@ def get_fraud():
             blocked_rt_params = {"from": start_date, "to": end_date}
             blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
             if blocked_rt_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, skipping to next app.")
+                continue
             if blocked_rt_resp and blocked_rt_resp.status_code == 200:
                 rows = blocked_rt_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1020,8 +1020,8 @@ def get_fraud():
             blocked_pa_params = {"from": start_date, "to": end_date}
             blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
             if blocked_pa_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for detection API {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[FRAUD] Timeout detected for detection API {app_id}, skipping to next app.")
+                continue
             if blocked_pa_resp and blocked_pa_resp.status_code == 200:
                 rows = blocked_pa_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1043,8 +1043,8 @@ def get_fraud():
             blocked_events_params = {"from": start_date, "to": end_date}
             blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params)
             if blocked_events_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, skipping to next app.")
+                continue
             if blocked_events_resp and blocked_events_resp.status_code == 200:
                 rows = blocked_events_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1066,8 +1066,8 @@ def get_fraud():
             fraud_post_inapps_params = {"from": start_date, "to": end_date}
             fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params)
             if fraud_post_inapps_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, skipping to next app.")
+                continue
             if fraud_post_inapps_resp and fraud_post_inapps_resp.status_code == 200:
                 rows = fraud_post_inapps_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1089,8 +1089,8 @@ def get_fraud():
             blocked_clicks_params = {"from": start_date, "to": end_date}
             blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params)
             if blocked_clicks_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, skipping to next app.")
+                continue
             if blocked_clicks_resp and blocked_clicks_resp.status_code == 200:
                 rows = blocked_clicks_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1112,8 +1112,8 @@ def get_fraud():
             blocked_postbacks_params = {"from": start_date, "to": end_date}
             blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params)
             if blocked_postbacks_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, skipping to next app.")
+                continue
             if blocked_postbacks_resp and blocked_postbacks_resp.status_code == 200:
                 rows = blocked_postbacks_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1541,7 +1541,7 @@ def process_report_async(apps, period, selected_events):
                 print(f"[REPORT] Calling daily_report API for {app_id}...")
                 resp = make_api_request(url, params)
                 if resp == 'timeout':
-                    print(f"[REPORT] Timeout detected for {app_id}")
+                    print(f"[REPORT] Timeout detected for {app_id}, skipping to next app.")
                     continue
                 
                 daily_stats = {}
