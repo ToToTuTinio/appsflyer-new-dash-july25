@@ -3428,8 +3428,8 @@
                             } else if (data.status === 'failed') {
                                 updateProgress(`✗ Failed to generate report for ${period}`);
                                 return false;
-                            } else if (data.error && data.error.includes('BrokenPipeError')) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
+                            } else if (data.error) {
+                                updateProgress(`⚠ Error for ${period}: ${data.error}. Continuing to next period...`);
                                 return true;  // Continue to next period
                             }
                             
