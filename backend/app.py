@@ -50,11 +50,17 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%$^&*()_+')
 
-# Initialize rate limiter
+# Initialize rate limiter with Redis storage
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
+    storage_uri="redis://localhost:6379/1",  # Use Redis DB 1 for rate limiting
+    default_limits=["200 per day", "50 per hour"],
+    storage_options={
+        "socket_connect_timeout": 30,
+        "socket_timeout": 30,
+        "retry_on_timeout": True
+    }
 )
 
 # --- GLOBAL JSON ERROR HANDLER ---
