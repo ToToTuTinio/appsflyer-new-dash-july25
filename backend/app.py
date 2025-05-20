@@ -1707,10 +1707,12 @@ def process_report_async(apps, period, selected_events):
             
             return result
             
+    except BrokenPipeError as e:
+        print(f"[REPORT] BrokenPipeError (EPIPE) at outer level: {str(e)}. Returning empty result so frontend can proceed.")
+        return {'apps': [], 'error': 'BrokenPipeError (EPIPE) occurred'}
     except Exception as e:
         print(f"[REPORT] Error in process_report_async: {str(e)}")
         raise
-        
     return {'apps': [], 'error': 'Failed to process report'}
 
 @app.route('/start-report', methods=['POST'])
