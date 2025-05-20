@@ -55,10 +55,10 @@ limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     storage_uri="redis://localhost:6379/1",  # Use Redis DB 1 for rate limiting
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["10000 per hour", "5000 per minute"],
     storage_options={
-        "socket_connect_timeout": 30,
-        "socket_timeout": 30,
+        "socket_connect_timeout": 36000,
+        "socket_timeout": 36000,
         "retry_on_timeout": True
     }
 )
