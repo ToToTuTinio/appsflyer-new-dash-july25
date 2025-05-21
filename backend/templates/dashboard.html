@@ -313,7 +313,7 @@
                     <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
                     <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
                     <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="last30">Last 30 Days</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
                 </div>
                 <!-- Sub-tab content containers -->
                 <div id="stats-content-10d" class="stats-range-content" style="display:none;">
@@ -328,9 +328,9 @@
                     <button id="run-report-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                     <div id="stats-data-lastmonth" class="space-y-10"></div>
                 </div>
-                <div id="stats-content-last30" class="stats-range-content" style="display:none;">
-                    <button id="run-report-last30-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-last30"></div>
+                <div id="stats-content-30d" class="stats-range-content" style="display:none;">
+                    <button id="run-report-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-30d"></div>
                 </div>
                 <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                     Loading stats...
@@ -360,7 +360,7 @@
                         <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
                         <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
                         <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="last30">Last 30 Days</button>
+                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
                     </div>
                     <!-- Sub-tab content containers -->
                     <div id="fraud-content-10d" class="fraud-range-content" style="display:none;">
@@ -375,9 +375,9 @@
                         <button id="run-fraud-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
                         <div id="fraud-data-lastmonth"></div>
                     </div>
-                    <div id="fraud-content-last30" class="fraud-range-content" style="display:none;">
-                        <button id="run-fraud-last30-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-data-last30"></div>
+                    <div id="fraud-content-30d" class="fraud-range-content" style="display:none;">
+                        <button id="run-fraud-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-data-30d"></div>
                     </div>
                     <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                         Loading fraud data...
@@ -394,7 +394,7 @@
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
                         <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="last30">Last 30 Days</button>
+                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
                     </div>
                     <!-- Sub-tab content containers -->
                     <div id="fraud-source-content-10d" class="fraud-source-range-content" style="display:none;">
@@ -430,16 +430,16 @@
                         </div>
                         <div id="fraud-source-data-lastmonth"></div>
                     </div>
-                    <div id="fraud-source-content-last30" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-last30-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-last30" class="text-center text-gray-500 mt-8" style="display:none;">
+                    <div id="fraud-source-content-30d" class="fraud-source-range-content" style="display:none;">
+                        <button id="run-fraud-source-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-loading-30d" class="text-center text-gray-500 mt-8" style="display:none;">
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
                             <div>Loading fraud data...</div>
                         </div>
-                        <div id="fraud-source-error-last30" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
+                        <div id="fraud-source-error-30d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
                             Error loading fraud data. Please try again.
                         </div>
-                        <div id="fraud-source-data-last30"></div>
+                        <div id="fraud-source-data-30d"></div>
                     </div>
                     <div id="fraud-source-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                         Loading fraud per source data...
@@ -655,7 +655,7 @@
             '10d': null,
             'mtd': null,
             'lastmonth': null,
-            'last30': null
+            '30d': null
         };
 
         // Load stats data from localStorage
@@ -678,7 +678,7 @@
         }
 
         // Date range tab logic
-        const dateRanges = ['10d','mtd','lastmonth','last30'];
+        const dateRanges = ['10d','mtd','lastmonth','30d'];
         function switchStatsRangeTab(range) {
             document.querySelectorAll('.date-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600','text-green-700','bg-white');
@@ -694,7 +694,7 @@
                 '10d': '/get_subpage_10d',
                 'mtd': '/get_subpage_mtd',
                 'lastmonth': '/get_subpage_lastmonth',
-                'last30': '/get_stats?range=last30'
+                '30d': '/get_subpage_30d'
             };
             const endpoint = endpointMap[range];
             if (endpoint) {
@@ -734,7 +734,7 @@
             '10d': 'last10',
             'mtd': 'mtd',
             'lastmonth': 'lastmonth',
-            'last30': 'last30'
+            '30d': 'last30'
         };
         dateRanges.forEach(range => {
             const btn = document.getElementById(`run-report-${range}-btn`);
@@ -1703,12 +1703,12 @@
         };
 
         // --- Fraud Tab Logic (Tabs & RUN Button) ---
-        const fraudRanges = ['10d','mtd','lastmonth','last30'];
+        const fraudRanges = ['10d','mtd','lastmonth','30d'];
         const fraudAnalyticsEndpointMap = {
             '10d': '/get_fraud_subpage_10d',
             'mtd': '/get_fraud_subpage_mtd',
             'lastmonth': '/get_fraud_subpage_lastmonth',
-            'last30': '/get_fraud_subpage_30d'
+            '30d': '/get_fraud_subpage_30d'
         };
         function switchFraudRangeTab(range) {
             document.querySelectorAll('.fraud-range-tab').forEach(btn => {
@@ -1750,7 +1750,7 @@
             if (subtab === 'analytics') activateDefaultFraudAnalyticsTab();
             if (subtab === 'source') {
                 // Only render from cache, do NOT fetch on tab switch
-                const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', 'last30'];
+                const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', '30d'];
                 fraudSourceRanges.forEach(range => {
                     if (fraudSourceDataCache[range]) {
                         renderFraudSource(fraudSourceDataCache[range], range);
@@ -2102,7 +2102,7 @@
                 document.getElementById('fraud-analytics-tab-btn').classList.add('border-transparent', 'text-gray-500');
                 document.getElementById('fraud-analytics-subtab').style.display = 'none';
                 // Only render from cache, do NOT fetch on tab switch
-                const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', 'last30'];
+                const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', '30d'];
                 fraudSourceRanges.forEach(range => {
                     if (fraudSourceDataCache[range]) {
                         renderFraudSource(fraudSourceDataCache[range], range);
@@ -2329,13 +2329,13 @@
         }
 
         // Add RUN button logic for each period range in Fraud Per Source
-        const fraudSourceRanges = ['10d','mtd','lastmonth','last30'];
-        const fraudSourceDataCache = { '10d': null, 'mtd': null, 'lastmonth': null, 'last30': null };
+        const fraudSourceRanges = ['10d','mtd','lastmonth','30d'];
+        const fraudSourceDataCache = { '10d': null, 'mtd': null, 'lastmonth': null, '30d': null };
         const fraudSourcePeriodMap = {
             '10d': 'last10',
             'mtd': 'mtd',
             'lastmonth': 'lastmonth',
-            'last30': 'last30'
+            '30d': 'last30'
         };
         function switchFraudSourceRangeTab(range) {
             document.querySelectorAll('.fraud-source-range-tab').forEach(btn => {
@@ -2781,7 +2781,7 @@
             localStorage.removeItem('statsData');
             
             // Clear UI elements for all ranges
-            ['10d','mtd','lastmonth','last30'].forEach(range => {
+            ['10d','mtd','lastmonth','30d'].forEach(range => {
                 const statsDiv = document.getElementById(`stats-content-${range}`);
                 if (statsDiv) statsDiv.innerHTML = '';
                 const statsLoading = document.getElementById(`stats-loading-${range}`);
@@ -2803,7 +2803,7 @@
             localStorage.removeItem('fraudSourceRange');
             
             // Clear UI elements for all ranges
-            ['10d','mtd','lastmonth','last30'].forEach(range => {
+            ['10d','mtd','lastmonth','30d'].forEach(range => {
                 // Clear fraud analytics data
                 const fraudDiv = document.getElementById(`fraud-data-${range}`);
                 if (fraudDiv) fraudDiv.innerHTML = '';
@@ -3393,8 +3393,8 @@
             button.textContent = 'Generating Reports...';
             
             // Only use 30d period
-            const periods = ['last30'];
-            const fraudPeriods = ['last30'];
+            const periods = ['30d'];
+            const fraudPeriods = ['30d'];
             
             try {
                 // Create progress container
