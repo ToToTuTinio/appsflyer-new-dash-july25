@@ -3,9 +3,9 @@
 # Show logs in real-time with timestamps, filtering but keeping important requests
 echo "Showing important logs (Press Ctrl+C to stop)..."
 echo "----------------------------------------"
-tail -f gunicorn.out | while read line; do
+(tail -f gunicorn.out & tail -f worker.log) | while read line; do
     # Keep important page navigation and API calls
-    if echo "$line" | grep -q "GET /api/\|GET /dashboard\|GET /stats\|GET /fraud\|POST /get_stats\|POST /get_fraud\|POST /start-report\|GET /report-status\|POST /event-selections\|GET /active-apps\|POST /clear-apps-cache\|DEBUG in app:\|ERROR in app:\|WARNING in app:"; then
+    if echo "$line" | grep -q "GET /api/\|GET /dashboard\|GET /stats\|GET /fraud\|POST /get_stats\|POST /get_fraud\|POST /start-report\|GET /report-status\|POST /event-selections\|GET /active-apps\|POST /clear-apps-cache\|DEBUG in app:\|ERROR in app:\|WARNING in app:\|\[REPORT\]\|\[API\]\|\[FRAUD\]"; then
         # Add timestamp and print the line
         echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
     # Keep non-HTTP request logs (usually application logs)
