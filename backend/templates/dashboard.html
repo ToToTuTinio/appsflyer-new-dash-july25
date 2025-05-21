@@ -306,38 +306,32 @@
 
         <!-- Stats Tab Content -->
         <div id="stats-tab" class="tab-content">
-            <div class="bg-white rounded-2xl shadow-xl p-10">
-                <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
-                <!-- Date Range Tabs -->
-                <div class="flex border-b border-gray-200 mb-8 gap-2">
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-5xl mx-auto">
+                <h2 class="text-3xl font-bold text-gray-800 mb-8">Stats</h2>
+                
+                <!-- Date Range Filter -->
+                <div class="mb-8">
+                    <label for="stats-date-range" class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                    <select id="stats-date-range" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                        <option value="10d">Last 10 Days</option>
+                        <option value="mtd">Month to Date</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
                 </div>
-                <!-- Sub-tab content containers -->
-                <div id="stats-content-10d" class="stats-range-content" style="display:none;">
-                    <button id="run-report-10d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-10d" class="space-y-10"></div>
+
+                <!-- Stats Content -->
+                <div id="stats-content" class="space-y-10">
+                    <button id="run-report-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data" class="space-y-10"></div>
                 </div>
-                <div id="stats-content-mtd" class="stats-range-content" style="display:none;">
-                    <button id="run-report-mtd-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-mtd" class="space-y-10"></div>
-                </div>
-                <div id="stats-content-lastmonth" class="stats-range-content" style="display:none;">
-                    <button id="run-report-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-lastmonth" class="space-y-10"></div>
-                </div>
-                <div id="stats-content-30d" class="stats-range-content" style="display:none;">
-                    <button id="run-report-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-30d"></div>
-                </div>
+                
                 <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                     Loading stats...
                 </div>
                 <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
                     Error loading stats.
                 </div>
+                
                 <div class="flex justify-center mt-8 mb-2">
                     <button id="clear-stats-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Stats Cache</button>
                 </div>
@@ -352,33 +346,27 @@
                     <button id="fraud-analytics-tab-btn" class="subtab-button border-b-2 border-blue-500 text-blue-600 font-semibold px-4 py-2" onclick="switchFraudSubTab('analytics')">Fraud Analytics</button>
                     <button id="fraud-source-tab-btn" class="subtab-button border-b-2 border-transparent text-gray-500 font-semibold px-4 py-2" onclick="switchFraudSubTab('source')">Fraud Per Source</button>
                 </div>
+
                 <!-- Fraud Analytics Sub-page -->
                 <div id="fraud-analytics-subtab">
                     <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Analytics</h2>
-                    <!-- Date Range Tabs -->
-                    <div class="flex border-b border-gray-200 mb-8 gap-2">
-                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
-                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
-                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                        <button class="fraud-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+                    
+                    <!-- Date Range Filter -->
+                    <div class="mb-8">
+                        <label for="fraud-date-range" class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                        <select id="fraud-date-range" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="10d">Last 10 Days</option>
+                            <option value="mtd">Month to Date</option>
+                            <option value="30d">Last 30 Days</option>
+                        </select>
                     </div>
-                    <!-- Sub-tab content containers -->
-                    <div id="fraud-content-10d" class="fraud-range-content" style="display:none;">
-                        <button id="run-fraud-10d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-data-10d"></div>
+
+                    <!-- Fraud Content -->
+                    <div id="fraud-content" class="space-y-10">
+                        <button id="run-fraud-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-data"></div>
                     </div>
-                    <div id="fraud-content-mtd" class="fraud-range-content" style="display:none;">
-                        <button id="run-fraud-mtd-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-data-mtd"></div>
-                    </div>
-                    <div id="fraud-content-lastmonth" class="fraud-range-content" style="display:none;">
-                        <button id="run-fraud-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-data-lastmonth"></div>
-                    </div>
-                    <div id="fraud-content-30d" class="fraud-range-content" style="display:none;">
-                        <button id="run-fraud-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-data-30d"></div>
-                    </div>
+                    
                     <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                         Loading fraud data...
                     </div>
@@ -386,70 +374,33 @@
                         Error loading fraud data.
                     </div>
                 </div>
+
                 <!-- Fraud Per Source Sub-page -->
                 <div id="fraud-source-subtab" style="display:none;">
                     <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Per Source</h2>
-                    <!-- Date Range Tabs -->
-                    <div class="flex border-b border-gray-200 mb-8 gap-2">
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                        <button class="fraud-source-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+                    
+                    <!-- Date Range Filter -->
+                    <div class="mb-8">
+                        <label for="fraud-source-date-range" class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                        <select id="fraud-source-date-range" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="10d">Last 10 Days</option>
+                            <option value="mtd">Month to Date</option>
+                            <option value="30d">Last 30 Days</option>
+                        </select>
                     </div>
-                    <!-- Sub-tab content containers -->
-                    <div id="fraud-source-content-10d" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-10d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-10d" class="text-center text-gray-500 mt-8" style="display:none;">
-                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
-                            <div>Loading fraud data...</div>
-                        </div>
-                        <div id="fraud-source-error-10d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
-                            Error loading fraud data. Please try again.
-                        </div>
-                        <div id="fraud-source-data-10d"></div>
+
+                    <!-- Fraud Source Content -->
+                    <div id="fraud-source-content" class="space-y-10">
+                        <button id="run-fraud-source-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                        <div id="fraud-source-data"></div>
                     </div>
-                    <div id="fraud-source-content-mtd" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-mtd-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-mtd" class="text-center text-gray-500 mt-8" style="display:none;">
-                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
-                            <div>Loading fraud data...</div>
-                        </div>
-                        <div id="fraud-source-error-mtd" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
-                            Error loading fraud data. Please try again.
-                        </div>
-                        <div id="fraud-source-data-mtd"></div>
-                    </div>
-                    <div id="fraud-source-content-lastmonth" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-lastmonth" class="text-center text-gray-500 mt-8" style="display:none;">
-                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
-                            <div>Loading fraud data...</div>
-                        </div>
-                        <div id="fraud-source-error-lastmonth" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
-                            Error loading fraud data. Please try again.
-                        </div>
-                        <div id="fraud-source-data-lastmonth"></div>
-                    </div>
-                    <div id="fraud-source-content-30d" class="fraud-source-range-content" style="display:none;">
-                        <button id="run-fraud-source-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                        <div id="fraud-source-loading-30d" class="text-center text-gray-500 mt-8" style="display:none;">
-                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-green-600 mb-2"></div>
-                            <div>Loading fraud data...</div>
-                        </div>
-                        <div id="fraud-source-error-30d" class="text-center text-red-500 mt-8 p-4 bg-red-50 rounded-lg" style="display:none;">
-                            Error loading fraud data. Please try again.
-                        </div>
-                        <div id="fraud-source-data-30d"></div>
-                    </div>
+                    
                     <div id="fraud-source-loading" class="text-center text-gray-500 mt-8" style="display:none;">
-                        Loading fraud per source data...
+                        Loading fraud source data...
                     </div>
                     <div id="fraud-source-error" class="text-center text-red-500 mt-8" style="display:none;">
-                        Error loading fraud per source data.
+                        Error loading fraud source data.
                     </div>
-                </div>
-                <div class="flex justify-center mt-8 mb-2">
-                    <button id="clear-fraud-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Fraud Cache</button>
                 </div>
             </div>
         </div>
@@ -3384,16 +3335,13 @@
 
         // Add event listener for Get All Stats button
         document.getElementById('get-all-stats-btn').addEventListener('click', async function() {
-            if (!confirm('This will generate reports for all time periods. It may take several minutes. Continue?')) {
+            if (!confirm('This will generate reports for the last 30 days. It may take several minutes. Continue?')) {
                 return;
             }
             
             const button = this;
             button.disabled = true;
             button.textContent = 'Generating Reports...';
-            
-            const periods = ['last10', 'mtd', 'lastmonth', '30d'];
-            const fraudPeriods = ['10d', 'mtd', 'lastmonth', '30d'];
             
             try {
                 // Create progress container
@@ -3412,111 +3360,199 @@
                     progressDiv.scrollTop = progressDiv.scrollHeight;
                 };
 
-                // Function to poll report status
-                const pollReportStatus = async (jobId, period) => {
-                    let retries = 0;
-                    const maxRetries = 3;
-                    
-                    while (true) {
-                        try {
-                            const response = await fetch(`/report-status/${jobId}`);
-                            const data = await response.json();
-                            
-                            if (data.status === 'completed') {
-                                updateProgress(`✓ Completed report for ${period}`);
-                                return true;
-                            } else if (data.status === 'failed') {
-                                updateProgress(`✗ Failed to generate report for ${period}`);
-                                return false;
-                            } else if (data.error && data.error.includes('BrokenPipeError')) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
-                                return true;  // Continue to next period
-                            }
-                            
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        } catch (error) {
-                            retries++;
-                            if (retries >= maxRetries) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
-                                return true;  // Continue to next period
-                            }
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        }
-                    }
-                };
+                // Fetch stats for 30 days
+                updateProgress('Fetching stats data...');
+                const statsResponse = await fetch('/all-apps-stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apps: fetchedApps,
+                        period: '30d'
+                    })
+                });
+                if (!statsResponse.ok) {
+                    throw new Error('Failed to fetch stats data');
+                }
+                updateProgress('Stats data fetched successfully');
 
-                // Sequential stats reports
-                const runStatsReports = async () => {
-                    for (const period of periods) {
-                        updateProgress(`Starting stats report for ${period}...`);
-                        const response = await fetch('/start-report', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                apps: window.fetchedApps,
-                                period: period,
-                                selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
-                            })
-                        });
-                        const data = await response.json();
-                        if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, period);
-                        }
-                    }
-                };
+                // Fetch fraud data for 30 days
+                updateProgress('Fetching fraud data...');
+                const fraudResponse = await fetch('/get_fraud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apps: fetchedApps,
+                        period: '30d'
+                    })
+                });
+                if (!fraudResponse.ok) {
+                    throw new Error('Failed to fetch fraud data');
+                }
+                updateProgress('Fraud data fetched successfully');
 
-                // Sequential fraud reports
-                const runFraudReports = async () => {
-                    for (const period of fraudPeriods) {
-                        updateProgress(`Starting fraud report for ${period}...`);
-                        const response = await fetch('/get_fraud', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                apps: window.fetchedApps,
-                                period: period
-                            })
-                        });
-                        const data = await response.json();
-                        if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, `fraud-${period}`);
-                        }
-                    }
-                };
-
-                // Run both in parallel
-                await Promise.all([
-                    runStatsReports(),
-                    runFraudReports()
-                ]);
-
-                // Refresh the overview data
-                updateProgress('Refreshing overview data...');
-                await fetchOverviewData();
-                await fetchTopPerformingApps();
-                
-                updateProgress('All reports generated successfully!');
-                button.textContent = 'Reports Generated!';
+                // Update UI
+                button.textContent = 'Reports Generated Successfully!';
                 setTimeout(() => {
                     button.textContent = 'Get All Stats';
                     button.disabled = false;
                     progressContainer.remove();
                 }, 2000);
-                
+
             } catch (error) {
-                console.error('Error generating reports:', error);
-                const errorMessage = document.createElement('div');
-                errorMessage.className = 'text-red-500 mt-2';
-                errorMessage.textContent = 'Error: ' + error.message;
-                button.parentNode.appendChild(errorMessage);
+                console.error('Error:', error);
                 button.textContent = 'Error Generating Reports';
                 setTimeout(() => {
                     button.textContent = 'Get All Stats';
                     button.disabled = false;
-                    errorMessage.remove();
                 }, 2000);
             }
         });
+
+        // Update the date range change handlers
+        document.getElementById('stats-date-range').addEventListener('change', function() {
+            const range = this.value;
+            fetch(`/get_stats?range=${range}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.apps && data.apps.length > 0) {
+                        renderStatsApps(data.apps);
+                        document.getElementById('stats-error').style.display = 'none';
+                    } else {
+                        document.getElementById('stats-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                        document.getElementById('stats-error').style.display = '';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('stats-data').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data.</div>';
+                    document.getElementById('stats-error').style.display = '';
+                });
+        });
+
+        document.getElementById('fraud-date-range').addEventListener('change', function() {
+            const range = this.value;
+            fetch(`/get_fraud?range=${range}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.apps && data.apps.length > 0) {
+                        renderFraudAll(data);
+                        document.getElementById('fraud-error').style.display = 'none';
+                    } else {
+                        document.getElementById('fraud-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached fraud data available. Please run a report to load data.</div>';
+                        document.getElementById('fraud-error').style.display = '';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('fraud-data').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading fraud data.</div>';
+                    document.getElementById('fraud-error').style.display = '';
+                });
+        });
+
+        document.getElementById('fraud-source-date-range').addEventListener('change', function() {
+            const range = this.value;
+            fetch(`/get_fraud?range=${range}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.apps && data.apps.length > 0) {
+                        renderFraudSource(data);
+                        document.getElementById('fraud-source-error').style.display = 'none';
+                    } else {
+                        document.getElementById('fraud-source-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached fraud source data available. Please run a report to load data.</div>';
+                        document.getElementById('fraud-source-error').style.display = '';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('fraud-source-data').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading fraud source data.</div>';
+                    document.getElementById('fraud-source-error').style.display = '';
+                });
+        });
+
+        // Update the RUN REPORT button handlers
+        document.getElementById('run-report-btn').onclick = function() {
+            document.getElementById('stats-loading').style.display = '';
+            document.getElementById('stats-error').style.display = 'none';
+            fetch('/all-apps-stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apps: fetchedApps,
+                    period: '30d'  // Always fetch 30 days of data
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('stats-loading').style.display = 'none';
+                if (data && data.apps && data.apps.length > 0) {
+                    renderStatsApps(data.apps);
+                    document.getElementById('stats-error').style.display = 'none';
+                } else {
+                    document.getElementById('stats-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No stats data available.</div>';
+                    document.getElementById('stats-error').style.display = '';
+                }
+            })
+            .catch(() => {
+                document.getElementById('stats-loading').style.display = 'none';
+                document.getElementById('stats-error').textContent = 'Error loading stats data. Please try again.';
+                document.getElementById('stats-error').style.display = '';
+            });
+        };
+
+        document.getElementById('run-fraud-btn').onclick = function() {
+            document.getElementById('fraud-loading').style.display = '';
+            document.getElementById('fraud-error').style.display = 'none';
+            fetch('/get_fraud', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apps: fetchedApps,
+                    period: '30d'  // Always fetch 30 days of data
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('fraud-loading').style.display = 'none';
+                if (data && data.apps && data.apps.length > 0) {
+                    renderFraudAll(data);
+                    document.getElementById('fraud-error').style.display = 'none';
+                } else {
+                    document.getElementById('fraud-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No fraud data available.</div>';
+                    document.getElementById('fraud-error').style.display = '';
+                }
+            })
+            .catch(() => {
+                document.getElementById('fraud-loading').style.display = 'none';
+                document.getElementById('fraud-error').textContent = 'Error loading fraud data. Please try again.';
+                document.getElementById('fraud-error').style.display = '';
+            });
+        };
+
+        document.getElementById('run-fraud-source-btn').onclick = function() {
+            document.getElementById('fraud-source-loading').style.display = '';
+            document.getElementById('fraud-source-error').style.display = 'none';
+            fetch('/get_fraud', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apps: fetchedApps,
+                    period: '30d'  // Always fetch 30 days of data
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('fraud-source-loading').style.display = 'none';
+                if (data && data.apps && data.apps.length > 0) {
+                    renderFraudSource(data);
+                    document.getElementById('fraud-source-error').style.display = 'none';
+                } else {
+                    document.getElementById('fraud-source-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No fraud source data available.</div>';
+                    document.getElementById('fraud-source-error').style.display = '';
+                }
+            })
+            .catch(() => {
+                document.getElementById('fraud-source-loading').style.display = 'none';
+                document.getElementById('fraud-source-error').textContent = 'Error loading fraud source data. Please try again.';
+                document.getElementById('fraud-source-error').style.display = '';
+            });
+        };
     </script>
 </body>
 </html> 
