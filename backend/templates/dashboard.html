@@ -306,90 +306,67 @@
 
         <!-- Stats Tab Content -->
         <div id="stats-tab" class="tab-content">
-            <div class="bg-white rounded-2xl shadow-xl p-10">
-                <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
-                <!-- Date Range Dropdown Filter -->
-                <div class="flex items-center mb-8">
-                    <label for="stats-date-range" class="mr-4 font-semibold text-sm">Date Range:</label>
-                    <select id="stats-date-range" class="border border-gray-300 rounded px-4 py-2 text-sm">
-                        <option value="30d" selected>Last 30 Days</option>
-                        <option value="10d">Last 10 Days</option>
-                        <option value="mtd">Month to Date</option>
-                    </select>
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-extrabold text-gray-900">Stats</h2>
+                    <div class="flex items-center space-x-4">
+                        <select id="stats-date-range" class="border rounded px-3 py-2 text-sm">
+                            <option value="30d">Last 30 Days</option>
+                            <option value="10d">Last 10 Days</option>
+                            <option value="mtd">Month to Date</option>
+                        </select>
+                        <button id="run-stats-report" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            Run Report
+                        </button>
+                    </div>
                 </div>
-                <!-- Single content container -->
-                <div id="stats-content" class="stats-range-content">
-                    <div id="stats-data"></div>
-                </div>
-                <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
-                    Loading stats...
-                </div>
-                <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
-                    Error loading stats.
-                </div>
-                <div class="flex justify-center mt-8 mb-2">
-                    <button id="clear-stats-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Stats Cache</button>
-                </div>
+                <div id="stats-loading" class="loading-spinner mx-auto"></div>
+                <div id="stats-error" class="text-red-500 text-center py-4" style="display: none;"></div>
+                <div id="stats-data" class="mt-6"></div>
             </div>
         </div>
 
         <!-- Fraud Tab Content -->
         <div id="fraud-tab" class="tab-content">
-            <div class="bg-white rounded-lg shadow-lg p-8 max-w-5xl mx-auto">
-                <!-- Sub-tabs for Fraud Analytics and Fraud Per Source -->
-                <div class="flex space-x-4 mb-6">
-                    <button id="fraud-analytics-tab-btn" class="subtab-button border-b-2 border-blue-500 text-blue-600 font-semibold px-4 py-2" onclick="switchFraudSubTab('analytics')">Fraud Analytics</button>
-                    <button id="fraud-source-tab-btn" class="subtab-button border-b-2 border-transparent text-gray-500 font-semibold px-4 py-2" onclick="switchFraudSubTab('source')">Fraud Per Source</button>
-                </div>
-                <!-- Fraud Analytics Sub-page -->
-                <div id="fraud-analytics-subtab">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Analytics</h2>
-                    <!-- Date Range Dropdown Filter -->
-                    <div class="flex items-center mb-8">
-                        <label for="fraud-date-range" class="mr-4 font-semibold text-sm">Date Range:</label>
-                        <select id="fraud-date-range" class="border border-gray-300 rounded px-4 py-2 text-sm">
-                            <option value="30d" selected>Last 30 Days</option>
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-extrabold text-gray-900">Fraud Analytics</h2>
+                    <div class="flex items-center space-x-4">
+                        <select id="fraud-date-range" class="border rounded px-3 py-2 text-sm">
+                            <option value="30d">Last 30 Days</option>
                             <option value="10d">Last 10 Days</option>
                             <option value="mtd">Month to Date</option>
                         </select>
-                    </div>
-                    <!-- Single content container -->
-                    <div id="fraud-content" class="fraud-range-content">
-                        <div id="fraud-data"></div>
-                    </div>
-                    <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
-                        Loading fraud data...
-                    </div>
-                    <div id="fraud-error" class="text-center text-red-500 mt-8" style="display:none;">
-                        Error loading fraud data.
+                        <button id="run-fraud-report" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            Run Report
+                        </button>
                     </div>
                 </div>
-                <!-- Fraud Per Source Sub-page -->
-                <div id="fraud-source-subtab" style="display:none;">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-8">Fraud Per Source</h2>
-                    <!-- Date Range Dropdown Filter -->
-                    <div class="flex items-center mb-8">
-                        <label for="fraud-source-date-range" class="mr-4 font-semibold text-sm">Date Range:</label>
-                        <select id="fraud-source-date-range" class="border border-gray-300 rounded px-4 py-2 text-sm">
-                            <option value="30d" selected>Last 30 Days</option>
+                <div id="fraud-loading" class="loading-spinner mx-auto"></div>
+                <div id="fraud-error" class="text-red-500 text-center py-4" style="display: none;"></div>
+                <div id="fraud-data" class="mt-6"></div>
+            </div>
+        </div>
+
+        <!-- Fraud Per Source Tab Content -->
+        <div id="fraud-source-tab" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-extrabold text-gray-900">Fraud Per Source</h2>
+                    <div class="flex items-center space-x-4">
+                        <select id="fraud-source-date-range" class="border rounded px-3 py-2 text-sm">
+                            <option value="30d">Last 30 Days</option>
                             <option value="10d">Last 10 Days</option>
                             <option value="mtd">Month to Date</option>
                         </select>
-                    </div>
-                    <!-- Single content container -->
-                    <div id="fraud-source-content" class="fraud-source-range-content">
-                        <div id="fraud-source-data"></div>
-                    </div>
-                    <div id="fraud-source-loading" class="text-center text-gray-500 mt-8" style="display:none;">
-                        Loading fraud per source data...
-                    </div>
-                    <div id="fraud-source-error" class="text-center text-red-500 mt-8" style="display:none;">
-                        Error loading fraud per source data.
+                        <button id="run-fraud-source-report" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            Run Report
+                        </button>
                     </div>
                 </div>
-                <div class="flex justify-center mt-8 mb-2">
-                    <button id="clear-fraud-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Fraud Cache</button>
-                </div>
+                <div id="fraud-source-loading" class="loading-spinner mx-auto"></div>
+                <div id="fraud-source-error" class="text-red-500 text-center py-4" style="display: none;"></div>
+                <div id="fraud-source-data" class="mt-6"></div>
             </div>
         </div>
 
@@ -3570,64 +3547,193 @@
 
         // --- STATS PAGE LOGIC ---
         document.addEventListener('DOMContentLoaded', function() {
-            // Stats date range dropdown
             const statsRangeSelect = document.getElementById('stats-date-range');
             const statsDataDiv = document.getElementById('stats-data');
             const statsLoading = document.getElementById('stats-loading');
             const statsError = document.getElementById('stats-error');
-            const periodMap = { '10d': 'last10', 'mtd': 'mtd', '30d': 'last30' };
+            const runStatsReportBtn = document.getElementById('run-stats-report');
+            
+            const periodMap = {
+                '10d': 'last10',
+                'mtd': 'mtd',
+                '30d': 'last30'
+            };
 
+            // Load initial data
+            function loadStatsData() {
+                const savedData = localStorage.getItem('statsData');
+                if (savedData) {
+                    return JSON.parse(savedData);
+                }
+                return {};
+            }
+
+            // Save stats data
+            function saveStatsData(data, range) {
+                const allData = loadStatsData();
+                allData[range] = data;
+                localStorage.setItem('statsData', JSON.stringify(allData));
+            }
+
+            // Fetch and render stats for selected range
             function fetchAndRenderStats(range) {
                 statsLoading.style.display = '';
                 statsError.style.display = 'none';
-                statsDataDiv.innerHTML = '';
-                fetch('/get_stats', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        apps: window.fetchedApps || [],
-                        period: periodMap[range],
-                        selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
+                
+                const period = periodMap[range];
+                fetch(`/get_stats?period=${period}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.apps && data.apps.length > 0) {
+                            renderStatsApps(data.apps);
+                            saveStatsData(data, range);
+                        } else {
+                            statsDataDiv.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                        }
+                        statsLoading.style.display = 'none';
                     })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    statsLoading.style.display = 'none';
-                    if (data && data.apps && data.apps.length > 0) {
-                        renderStatsApps(data.apps);
-                    } else {
-                        statsDataDiv.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                    .catch(error => {
+                        statsError.textContent = "Error loading stats data. Please try again.";
                         statsError.style.display = '';
+                        statsLoading.style.display = 'none';
+                    });
+            }
+
+            // Render stats apps
+            function renderStatsApps(apps) {
+                statsDataDiv.innerHTML = '';
+                
+                apps.forEach(app => {
+                    const section = document.createElement('div');
+                    section.className = 'app-card';
+                    section.innerHTML = `<h2 class="text-xl font-bold mb-4">${app.app_name} (${app.app_id})</h2>`;
+                    
+                    if (app.table && app.table.length > 0) {
+                        const dates = app.table.map(r => r.date);
+                        const metrics = [
+                            { key: 'impressions', label: 'Impressions', isNumber: true },
+                            { key: 'clicks', label: 'Clicks', isNumber: true },
+                            { key: 'installs', label: 'Installs', isNumber: true }
+                        ];
+                        
+                        // Add event metrics if they exist
+                        if (app.selected_events) {
+                            app.selected_events.forEach(event => {
+                                metrics.push({ key: event, label: event, isNumber: true });
+                            });
+                        }
+                        
+                        // Add conversion metrics
+                        metrics.push(
+                            { key: 'imp_to_click', label: '% imp to click', percent: true },
+                            { key: 'click_to_install', label: '% click to install', percent: true }
+                        );
+
+                        // Create table
+                        const table = document.createElement('div');
+                        table.className = 'stats-table-container';
+                        table.innerHTML = `
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th class="sticky-metric-col">Metric</th>
+                                        ${dates.map(date => `<th>${date}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${metrics.map(metric => `
+                                        <tr>
+                                            <td class="sticky-metric-col">${metric.label}</td>
+                                            ${dates.map(date => {
+                                                const row = app.table.find(r => r.date === date);
+                                                const value = row ? row[metric.key] : 0;
+                                                return `<td>${metric.percent ? value.toFixed(2) + '%' : value.toLocaleString()}</td>`;
+                                            }).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                        section.appendChild(table);
                     }
-                })
-                .catch(() => {
-                    statsLoading.style.display = 'none';
-                    statsError.textContent = 'Error loading stats data for this range.';
-                    statsError.style.display = '';
+                    
+                    statsDataDiv.appendChild(section);
                 });
             }
 
+            // Event listeners
             statsRangeSelect.addEventListener('change', function() {
                 fetchAndRenderStats(this.value);
             });
 
-            // Initial load
-            fetchAndRenderStats(statsRangeSelect.value);
-
-            function renderStatsApps(apps) {
-                statsDataDiv.innerHTML = '';
-                if (!apps || apps.length === 0) {
-                    statsDataDiv.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+            runStatsReportBtn.addEventListener('click', function() {
+                if (!window.fetchedApps || !window.fetchedApps.length) {
+                    alert('No apps loaded. Please click Get Apps first.');
                     return;
                 }
-                // Render each app's stats (reuse your existing rendering logic here)
-                apps.forEach(app => {
-                    const section = document.createElement('div');
-                    section.className = 'mb-8';
-                    section.innerHTML = `<div class='font-bold text-lg mb-2'>${app.app_name}</div><pre>${JSON.stringify(app, null, 2)}</pre>`;
-                    statsDataDiv.appendChild(section);
+
+                const range = statsRangeSelect.value;
+                const period = periodMap[range];
+                
+                statsLoading.style.display = '';
+                statsError.style.display = 'none';
+                runStatsReportBtn.disabled = true;
+
+                let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                
+                fetch('/start-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apps: window.fetchedApps,
+                        period: period,
+                        selected_events: eventSelections
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'processing') {
+                        pollReportStatus(data.job_id, range);
+                    }
+                })
+                .catch(error => {
+                    runStatsReportBtn.disabled = false;
+                    statsLoading.style.display = 'none';
+                    statsError.textContent = "Error starting report generation. Please try again.";
+                    statsError.style.display = '';
                 });
+            });
+
+            function pollReportStatus(jobId, range) {
+                fetch(`/report-status/${jobId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'completed') {
+                            runStatsReportBtn.disabled = false;
+                            statsLoading.style.display = 'none';
+                            saveStatsData(data.result, range);
+                            renderStatsApps(data.result.apps || []);
+                            fetchOverviewData();
+                            fetchTopPerformingApps();
+                        } else if (data.status === 'failed') {
+                            runStatsReportBtn.disabled = false;
+                            statsLoading.style.display = 'none';
+                            statsError.textContent = "Error generating report. Please try again.";
+                            statsError.style.display = '';
+                        } else if (data.status === 'processing') {
+                            setTimeout(() => pollReportStatus(jobId, range), 5000);
+                        }
+                    })
+                    .catch(error => {
+                        runStatsReportBtn.disabled = false;
+                        statsLoading.style.display = 'none';
+                        statsError.textContent = "Error checking report status. Please try again.";
+                        statsError.style.display = '';
+                    });
             }
+
+            // Load initial data
+            fetchAndRenderStats(statsRangeSelect.value);
         });
 
         // --- FRAUD ANALYTICS LOGIC ---

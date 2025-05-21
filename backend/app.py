@@ -22,6 +22,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
+import uuid
+from threading import Thread
 
 # Initialize Redis connection
 redis_conn = Redis(host='localhost', port=6379, db=0)
@@ -856,30 +858,20 @@ def get_events():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/get_stats')
-@login_required
+@app.route('/get_stats', methods=['GET'])
 def get_stats():
+    period = request.args.get('period', 'last30')
     try:
-        range_key = request.args.get('range', '10d')
-        force = request.args.get('force', '0') == '1'
-        # If force, trigger a new fetch (client should call /all-apps-stats)
-        if force:
-            return jsonify({'error': 'Force fetch not implemented in /get_stats. Please use /all-apps-stats.'}), 400
-        # Return the most recent stats if available
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        # Use LIKE query for all ranges to ensure consistent behavior
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
-        row = c.fetchone()
-        conn.close()
-        if row:
-            data, updated_at = row
-            result = json.loads(data)
-            result['updated_at'] = updated_at
-            return jsonify(result)
-        else:
-            return jsonify({'apps': [], 'updated_at': None})
+        # Get cached data for the period
+        cache_key = f'stats_{period}'
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return jsonify(cached_data)
+        
+        # If no cached data, return empty result
+        return jsonify({'apps': []})
     except Exception as e:
+        app.logger.error(f"Error getting stats: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/update-credential', methods=['POST'])
@@ -939,222 +931,36 @@ def find_media_source_idx(header):
     print(f"[FRAUD] WARNING: Could not find Media Source column in header: {header}")
     return None
 
-@app.route('/get_fraud', methods=['POST'])
-@login_required
+@app.route('/get_fraud', methods=['GET'])
 def get_fraud():
+    period = request.args.get('period', 'last30')
     try:
-        data = request.get_json()
-        active_apps = data.get('apps', [])
-        period = data.get('period', 'last10')
-        force = data.get('force', False)
-        start_date, end_date = get_period_dates(period)
-        # Create a unique cache key based on period and sorted app IDs
-        app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
-        cache_key = f"{period}:{app_ids}"
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
-            range TEXT PRIMARY KEY,
-            data TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )''')
-        conn.commit()
-        if not force:
-            # Use LIKE query for all ranges to ensure consistent behavior
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
-            row = c.fetchone()
-            if row:
-                data, updated_at = row
-                result = json.loads(data)
-                # Only use cache if it contains at least one app
-                if result.get('apps') and len(result['apps']) > 0:
-                    result['updated_at'] = updated_at
-                    conn.close()
-                    return jsonify(result)
-        fraud_list = []
-        for app in active_apps:
-            app_id = app['app_id']
-            app_name = app['app_name']
-            print(f"[FRAUD] Fetching fraud data for app: {app_name} (App ID: {app_id})...")
-            table = []
-            app_errors = []
-            # Helper: aggregate by (date, media_source)
-            agg = {}
-            def add_metric(date, media_source, key):
-                k = (date, media_source)
-                if k not in agg:
-                    agg[k] = {
-                        "date": date,
-                        "media_source": media_source,
-                        "blocked_installs_rt": 0,
-                        "blocked_installs_pa": 0,
-                        "blocked_in_app_events": 0,
-                        "fraud_post_inapps": 0,
-                        "blocked_clicks": 0,
-                        "blocked_install_postbacks": 0
-                    }
-                agg[k][key] += 1
-            # Blocked Installs (RT)
-            blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
-            blocked_rt_params = {"from": start_date, "to": end_date}
-            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
-            if blocked_rt_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, skipping to next app.")
-                continue
-            if blocked_rt_resp and blocked_rt_resp.status_code == 200:
-                rows = blocked_rt_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Install Time") if "Install Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (RT) for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            install_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(install_date, media_source, "blocked_installs_rt")
-            elif blocked_rt_resp is not None:
-                app_errors.append(f"Blocked Installs (RT) API error: {blocked_rt_resp.status_code} {blocked_rt_resp.text[:200]}")
-            # Blocked Installs (PA)
-            blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
-            blocked_pa_params = {"from": start_date, "to": end_date}
-            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
-            if blocked_pa_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for detection API {app_id}, skipping to next app.")
-                continue
-            if blocked_pa_resp and blocked_pa_resp.status_code == 200:
-                rows = blocked_pa_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Install Time") if "Install Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (PA) for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            install_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(install_date, media_source, "blocked_installs_pa")
-            elif blocked_pa_resp is not None:
-                app_errors.append(f"Blocked Installs (PA) API error: {blocked_pa_resp.status_code} {blocked_pa_resp.text[:200]}")
-            # Blocked In-App Events
-            blocked_events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_in_app_events_report/v5"
-            blocked_events_params = {"from": start_date, "to": end_date}
-            blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params)
-            if blocked_events_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, skipping to next app.")
-                continue
-            if blocked_events_resp and blocked_events_resp.status_code == 200:
-                rows = blocked_events_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Event Time") if "Event Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked In-App Events for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            event_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(event_date, media_source, "blocked_in_app_events")
-            elif blocked_events_resp is not None:
-                app_errors.append(f"Blocked In-App Events API error: {blocked_events_resp.status_code} {blocked_events_resp.text[:200]}")
-            # Fraud Post Inapps
-            fraud_post_inapps_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/fraud-post-inapps/v5"
-            fraud_post_inapps_params = {"from": start_date, "to": end_date}
-            fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params)
-            if fraud_post_inapps_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, skipping to next app.")
-                continue
-            if fraud_post_inapps_resp and fraud_post_inapps_resp.status_code == 200:
-                rows = fraud_post_inapps_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Event Time") if "Event Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Fraud Post InApps for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            event_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(event_date, media_source, "fraud_post_inapps")
-            elif fraud_post_inapps_resp is not None:
-                app_errors.append(f"Fraud Post-InApps API error: {fraud_post_inapps_resp.status_code} {fraud_post_inapps_resp.text[:200]}")
-            # Blocked Clicks
-            blocked_clicks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_clicks_report/v5"
-            blocked_clicks_params = {"from": start_date, "to": end_date}
-            blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params)
-            if blocked_clicks_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, skipping to next app.")
-                continue
-            if blocked_clicks_resp and blocked_clicks_resp.status_code == 200:
-                rows = blocked_clicks_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Click Time") if "Click Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Clicks for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            click_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(click_date, media_source, "blocked_clicks")
-            elif blocked_clicks_resp is not None:
-                app_errors.append(f"Blocked Clicks API error: {blocked_clicks_resp.status_code} {blocked_clicks_resp.text[:200]}")
-            # Blocked Install Postbacks
-            blocked_postbacks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_install_postbacks/v5"
-            blocked_postbacks_params = {"from": start_date, "to": end_date}
-            blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params)
-            if blocked_postbacks_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, skipping to next app.")
-                continue
-            if blocked_postbacks_resp and blocked_postbacks_resp.status_code == 200:
-                rows = blocked_postbacks_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Install Time") if "Install Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Install Postbacks for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            install_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(install_date, media_source, "blocked_install_postbacks")
-            elif blocked_postbacks_resp is not None:
-                app_errors.append(f"Blocked Install Postbacks API error: {blocked_postbacks_resp.status_code} {blocked_postbacks_resp.text[:200]}")
-            # Aggregate all (date, media_source) rows
-            for (date, media_source), row in sorted(agg.items()):
-                # Include all rows, even if all metrics are zero
-                print(f"[FRAUD] Adding row for media source: {media_source} on date: {date}")
-                print(f"[FRAUD] Row metrics: {row}")
-                table.append(row)
-            print(f"[FRAUD] Final table for {app_name} has {len(table)} rows")
-            print(f"[FRAUD] Unique media sources: {sorted(set(row['media_source'] for row in table))}")
-            fraud_list.append({
-                'app_id': app_id,
-                'app_name': app_name,
-                'table': table,
-                'errors': app_errors
-            })
-        # Save to cache ONLY if there is at least one app
-        if len(fraud_list) > 0:
-            c.execute('REPLACE INTO fraud_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-                      (cache_key, json.dumps({'apps': fraud_list})))
-            conn.commit()
-        conn.close()
-        return jsonify({'apps': fraud_list})
+        # Get cached data for the period
+        cache_key = f'fraud_{period}'
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return jsonify(cached_data)
+        
+        # If no cached data, return empty result
+        return jsonify({'apps': []})
     except Exception as e:
-        print(f"[FRAUD] Error: {e}")
+        app.logger.error(f"Error getting fraud data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_fraud_source', methods=['GET'])
+def get_fraud_source():
+    period = request.args.get('period', 'last30')
+    try:
+        # Get cached data for the period
+        cache_key = f'fraud_source_{period}'
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return jsonify(cached_data)
+        
+        # If no cached data, return empty result
+        return jsonify({'apps': []})
+    except Exception as e:
+        app.logger.error(f"Error getting fraud source data: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/overview')
@@ -1413,107 +1219,6 @@ def stats_page():
 @app.route('/api/fraud-page')
 def fraud_page():
     return {'status': 'ok'}
-
-@app.route('/get_subpage_10d')
-def get_subpage_10d():
-    import logging
-    app.logger.debug('GET /get_subpage_10d')
-    return get_stats_for_range('10d')
-
-@app.route('/get_subpage_mtd')
-def get_subpage_mtd():
-    import logging
-    app.logger.debug('GET /get_subpage_mtd')
-    return get_stats_for_range('mtd')
-
-@app.route('/get_subpage_lastmonth')
-def get_subpage_lastmonth():
-    import logging
-    app.logger.debug('GET /get_subpage_lastmonth')
-    return get_stats_for_range('lastmonth')
-
-@app.route('/get_subpage_30d')
-def get_subpage_30d():
-    import logging
-    app.logger.debug('GET /get_subpage_30d')
-    return get_stats_for_range('30d')
-
-# --- Fraud Analytics endpoints ---
-@app.route('/get_fraud_subpage_10d')
-def get_fraud_subpage_10d():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_10d')
-    return get_fraud_for_range('10d')
-
-@app.route('/get_fraud_subpage_mtd')
-def get_fraud_subpage_mtd():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_mtd')
-    return get_fraud_for_range('mtd')
-
-@app.route('/get_fraud_subpage_lastmonth')
-def get_fraud_subpage_lastmonth():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_lastmonth')
-    return get_fraud_for_range('lastmonth')
-
-@app.route('/get_fraud_subpage_30d')
-def get_fraud_subpage_30d():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_30d')
-    return get_fraud_for_range('30d')
-
-# Helper to fetch fraud for a given range
-def get_fraud_for_range(range_key):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        period_map = {
-            '30d': ['30d', 'last30']
-        }
-        keys = period_map.get(range_key, [range_key])
-        row = None
-        for key in keys:
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
-            row = c.fetchone()
-            if row:
-                break
-        conn.close()
-        if row:
-            data, updated_at = row
-            result = json.loads(data)
-            result['updated_at'] = updated_at
-            return jsonify(result)
-        else:
-            return jsonify({'apps': [], 'updated_at': None})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# Helper to fetch stats for a given range (for Stats endpoints)
-def get_stats_for_range(range_key):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        period_map = {
-            '30d': ['30d', 'last30']
-        }
-        keys = period_map.get(range_key, [range_key])
-        row = None
-        for key in keys:
-            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
-            row = c.fetchone()
-            if row:
-                break
-        conn.close()
-        if row:
-            data, updated_at = row
-            result = json.loads(data)
-            result['updated_at'] = updated_at
-            return jsonify(result)
-        else:
-            return jsonify({'apps': [], 'updated_at': None})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 def process_report_async(apps, period, selected_events):
     """Background task to process report data"""
