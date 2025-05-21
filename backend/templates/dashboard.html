@@ -3404,12 +3404,16 @@
                 button.parentNode.appendChild(progressContainer);
                 const progressDiv = document.getElementById('report-progress');
 
-                // Function to update progress
-                const updateProgress = (message) => {
-                    const progressItem = document.createElement('div');
-                    progressItem.className = 'text-sm text-gray-700 mb-1';
+                // Function to update progress (one line per job)
+                const updateProgress = (label, message) => {
+                    let progressItem = document.getElementById(`progress-${label}`);
+                    if (!progressItem) {
+                        progressItem = document.createElement('div');
+                        progressItem.id = `progress-${label}`;
+                        progressItem.className = 'text-sm text-gray-700 mb-1';
+                        progressDiv.appendChild(progressItem);
+                    }
                     progressItem.textContent = message;
-                    progressDiv.appendChild(progressItem);
                     progressDiv.scrollTop = progressDiv.scrollHeight;
                 };
 
@@ -3420,23 +3424,23 @@
                         const response = await fetch(`/report-status/${jobId}`);
                         const data = await response.json();
                         if (data.status === 'completed') {
-                            updateProgress(`${label} report completed!`);
+                            updateProgress(label, `${label} report completed!`);
                             done = true;
                         } else if (data.status === 'failed') {
-                            updateProgress(`${label} report failed.`);
+                            updateProgress(label, `${label} report failed.`);
                             throw new Error(`${label} report failed.`);
                         } else {
-                            updateProgress(`${label} report processing...`);
+                            updateProgress(label, `${label} report processing...`);
                             await new Promise(res => setTimeout(res, 5000));
                         }
                     }
                 };
 
                 // Start both jobs in parallel
-                updateProgress('Starting stats and fraud reports for last 30 days...');
+                updateProgress('stats', 'Starting stats report...');
+                updateProgress('fraud', 'Starting fraud report...');
                 // 1. Start stats report
                 const statsPromise = (async () => {
-                    updateProgress('Starting stats report...');
                     const response = await fetch('/start-report', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -3448,14 +3452,14 @@
                     });
                     const data = await response.json();
                     if (data.status === 'started' || data.status === 'processing') {
-                        await pollReportStatus(data.job_id, 'Stats');
+                        await pollReportStatus(data.job_id, 'stats');
                     } else {
+                        updateProgress('stats', 'Stats report failed to start.');
                         throw new Error('Stats report failed to start.');
                     }
                 })();
                 // 2. Start fraud report
                 const fraudPromise = (async () => {
-                    updateProgress('Starting fraud report...');
                     const response = await fetch('/get_fraud', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -3466,9 +3470,9 @@
                     });
                     const data = await response.json();
                     if (data.status === 'started' || data.status === 'processing') {
-                        await pollReportStatus(data.job_id, 'Fraud');
+                        await pollReportStatus(data.job_id, 'fraud');
                     } else {
-                        updateProgress('Fraud report completed!');
+                        updateProgress('fraud', 'Fraud report completed!');
                     }
                 })();
 
@@ -3476,11 +3480,11 @@
                 await Promise.all([statsPromise, fraudPromise]);
 
                 // Refresh the overview data
-                updateProgress('Refreshing overview data...');
+                updateProgress('done', 'Refreshing overview data...');
                 await fetchOverviewData();
                 await fetchTopPerformingApps();
                 
-                updateProgress('Fetching data ends!');
+                updateProgress('done', 'Fetching data ends!');
                 button.textContent = 'Reports Generated!';
                 setTimeout(() => {
                     button.textContent = 'Get All Stats';
