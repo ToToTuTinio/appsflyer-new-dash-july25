@@ -1500,7 +1500,7 @@ def get_stats_for_range(range_key):
         keys = period_map.get(range_key, [range_key])
         row = None
         for key in keys:
-            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}:%",))
+            c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
             row = c.fetchone()
             if row:
                 break
