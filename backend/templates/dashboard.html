@@ -688,6 +688,7 @@
             document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
             document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`stats-content-${range}`).style.display = '';
+            document.getElementById(`run-report-${range}-btn`).style.display = 'block';
 
             // Fetch the correct endpoint for this range
             const endpointMap = {
@@ -1713,12 +1714,14 @@
         function switchFraudRangeTab(range) {
             document.querySelectorAll('.fraud-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
-                btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
+                btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-green-700', 'hover:border-green-400');
             });
-            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.remove('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.remove('border-transparent', 'text-gray-500', 'hover:text-green-700', 'hover:border-green-400');
             document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.add('border-green-600', 'text-green-700', 'bg-white');
             document.querySelectorAll('.fraud-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`fraud-content-${range}`).style.display = '';
+            document.getElementById(`run-fraud-${range}-btn`).style.display = 'block';
+
             // Fetch the correct endpoint for this range
             const endpoint = fraudAnalyticsEndpointMap[range];
             if (endpoint) {
@@ -2340,13 +2343,34 @@
         function switchFraudSourceRangeTab(range) {
             document.querySelectorAll('.fraud-source-range-tab').forEach(btn => {
                 btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
-                btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
+                btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-green-700', 'hover:border-green-400');
             });
-            document.querySelector(`.fraud-source-range-tab[data-range="${range}"]`).classList.remove('border-gray-200', 'text-gray-500', 'bg-gray-50');
+            document.querySelector(`.fraud-source-range-tab[data-range="${range}"]`).classList.remove('border-transparent', 'text-gray-500', 'hover:text-green-700', 'hover:border-green-400');
             document.querySelector(`.fraud-source-range-tab[data-range="${range}"]`).classList.add('border-green-600', 'text-green-700', 'bg-white');
             document.querySelectorAll('.fraud-source-range-content').forEach(div => div.style.display = 'none');
             document.getElementById(`fraud-source-content-${range}`).style.display = '';
-            if (fraudSourceDataCache[range]) renderFraudSource(fraudSourceDataCache[range], range);
+            document.getElementById(`run-fraud-source-${range}-btn`).style.display = 'block';
+
+            // Fetch the correct endpoint for this range
+            const endpoint = fraudAnalyticsEndpointMap[range];
+            if (endpoint) {
+                fetch(endpoint)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.apps && data.apps.length > 0) {
+                            renderFraudSource(data, range);
+                            document.getElementById(`fraud-source-loading-${range}`).style.display = 'none';
+                            document.getElementById(`fraud-source-error-${range}`).style.display = 'none';
+                        } else {
+                            document.getElementById(`fraud-source-data-${range}`).innerHTML = '<div class="text-gray-400 py-4 text-center">No cached fraud data available. Please run a report to load data.</div>';
+                            document.getElementById(`fraud-source-error-${range}`).style.display = '';
+                        }
+                    })
+                    .catch(() => {
+                        document.getElementById(`fraud-source-loading-${range}`).style.display = 'none';
+                        document.getElementById(`fraud-source-error-${range}`).style.display = '';
+                    });
+            }
         }
         document.querySelectorAll('.fraud-source-range-tab').forEach(btn => {
             btn.onclick = function() {
