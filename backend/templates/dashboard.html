@@ -1381,62 +1381,12 @@
             'lastmonth': '/get_fraud_subpage_lastmonth',
             '30d': '/get_fraud_subpage_30d'
         };
-        function switchFraudRangeTab(range) {
-            document.querySelectorAll('.fraud-range-tab').forEach(btn => {
-                btn.classList.remove('border-green-600', 'text-green-700', 'bg-white');
-                btn.classList.add('border-gray-200', 'text-gray-500', 'bg-gray-50');
-            });
-            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.remove('border-gray-200', 'text-gray-500', 'bg-gray-50');
-            document.querySelector(`.fraud-range-tab[data-range="${range}"]`).classList.add('border-green-600', 'text-green-700', 'bg-white');
-            document.querySelectorAll('.fraud-range-content').forEach(div => div.style.display = 'none');
-            document.getElementById(`fraud-content-${range}`).style.display = '';
-            // Fetch the correct endpoint for this range
-            const endpoint = fraudAnalyticsEndpointMap[range];
-            if (endpoint) {
-                fetch(endpoint)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && data.apps && data.apps.length > 0) {
-                            renderFraudAll(data, range);
-                            document.getElementById('fraud-error').style.display = 'none';
-                        } else {
-                            document.getElementById(`fraud-data-${range}`).innerHTML = '<div class="text-gray-400 py-4 text-center">No cached fraud data available. Please run a report to load data.</div>';
-                            document.getElementById('fraud-error').style.display = '';
-                        }
-                    })
                     .catch(() => {
                         document.getElementById(`fraud-data-${range}`).innerHTML = '<div class="text-red-500 py-4 text-center">Error loading fraud data for this range.</div>';
                         document.getElementById('fraud-error').style.display = '';
                     });
             }
         }
-        // Show the first tab by default when Fraud Analytics is activated
-        function activateDefaultFraudAnalyticsTab() {
-            switchFraudRangeTab('10d');
-        }
-        // Patch Fraud Analytics sub-page activation to call default
-        const origSwitchFraudSubTab = window.switchFraudSubTab;
-        window.switchFraudSubTab = function(subtab) {
-            origSwitchFraudSubTab(subtab);
-            if (subtab === 'analytics') activateDefaultFraudAnalyticsTab();
-            if (subtab === 'source') {
-                // Only render from cache, do NOT fetch on tab switch
-                const fraudSourceRanges = ['10d', 'mtd', 'lastmonth', '30d'];
-                fraudSourceRanges.forEach(range => {
-                    if (fraudSourceDataCache[range]) {
-                        renderFraudSource(fraudSourceDataCache[range], range);
-                    }
-                });
-            }
-            currentFraudSubTab = subtab;
-        };
-        document.querySelectorAll('.fraud-range-tab').forEach(btn => {
-            btn.onclick = function() {
-                switchFraudRangeTab(this.getAttribute('data-range'));
-            };
-        });
-        // Show the first tab by default
-        switchFraudRangeTab('10d');
         // RUN button logic
         fraudRanges.forEach(range => {
             document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
