@@ -308,30 +308,17 @@
         <div id="stats-tab" class="tab-content">
             <div class="bg-white rounded-2xl shadow-xl p-10">
                 <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
-                <!-- Date Range Tabs -->
-                <div class="flex border-b border-gray-200 mb-8 gap-2">
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
-                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
+                <!-- Date Range Dropdown Filter -->
+                <div class="mb-8 flex items-center gap-4">
+                    <label for="stats-range-select" class="text-sm font-medium text-gray-700">Date Range:</label>
+                    <select id="stats-range-select" class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="30d" selected>Last 30 Days</option>
+                        <option value="10d">Last 10 Days</option>
+                        <option value="mtd">Month to Date</option>
+                    </select>
                 </div>
-                <!-- Sub-tab content containers -->
-                <div id="stats-content-10d" class="stats-range-content" style="display:none;">
-                    <button id="run-report-10d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-10d" class="space-y-10"></div>
-                </div>
-                <div id="stats-content-mtd" class="stats-range-content" style="display:none;">
-                    <button id="run-report-mtd-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-mtd" class="space-y-10"></div>
-                </div>
-                <div id="stats-content-lastmonth" class="stats-range-content" style="display:none;">
-                    <button id="run-report-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-lastmonth" class="space-y-10"></div>
-                </div>
-                <div id="stats-content-30d" class="stats-range-content" style="display:none;">
-                    <button id="run-report-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data-30d"></div>
-                </div>
+                <!-- Stats Content Area -->
+                <div id="stats-content" class="space-y-10"></div>
                 <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                     Loading stats...
                 </div>
@@ -654,7 +641,6 @@
         const statsData = {
             '10d': null,
             'mtd': null,
-            'lastmonth': null,
             '30d': null
         };
 
@@ -664,7 +650,9 @@
             if (savedData) {
                 const parsedData = JSON.parse(savedData);
                 Object.keys(parsedData).forEach(range => {
-                    statsData[range] = parsedData[range];
+                    if (statsData.hasOwnProperty(range)) {
+                        statsData[range] = parsedData[range];
+                    }
                 });
                 return statsData;
             }
@@ -677,57 +665,130 @@
             localStorage.setItem('statsData', JSON.stringify(statsData));
         }
 
-        // Date range tab logic
-        const dateRanges = ['10d','mtd','lastmonth','30d'];
-        function switchStatsRangeTab(range) {
-            document.querySelectorAll('.date-range-tab').forEach(btn => {
-                btn.classList.remove('border-green-600','text-green-700','bg-white');
-                btn.classList.add('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
-            });
-            document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.remove('border-transparent','text-gray-500','hover:text-green-700','hover:border-green-400');
-            document.querySelector(`.date-range-tab[data-range="${range}"]`).classList.add('border-green-600','text-green-700','bg-white');
-            document.querySelectorAll('.stats-range-content').forEach(div => div.style.display = 'none');
-            document.getElementById(`stats-content-${range}`).style.display = '';
-
-            // Fetch the correct endpoint for this range
+        // Fetch and render stats for the selected range
+        function fetchAndRenderStats(range) {
             const endpointMap = {
                 '10d': '/get_subpage_10d',
                 'mtd': '/get_subpage_mtd',
-                'lastmonth': '/get_subpage_lastmonth',
                 '30d': '/get_subpage_30d'
             };
             const endpoint = endpointMap[range];
-            if (endpoint) {
-                fetch(endpoint)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && data.apps && data.apps.length > 0) {
-                            // Always force re-render with a small delay to ensure DOM is ready
-                            setTimeout(() => {
-                                renderStatsAppsForRange(range, data.apps);
-                                document.getElementById('stats-error').style.display = 'none';
-                            }, 80);
-                        } else {
-                            document.getElementById(`stats-data-${range}`).innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
-                            document.getElementById('stats-error').style.display = '';
-                        }
-                    })
-                    .catch(() => {
-                        document.getElementById(`stats-data-${range}`).innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
-                        document.getElementById('stats-error').style.display = '';
-                    });
+            const statsContent = document.getElementById('stats-content');
+            const loadingElem = document.getElementById('stats-loading');
+            const errorElem = document.getElementById('stats-error');
+            statsContent.innerHTML = '';
+            if (loadingElem) loadingElem.style.display = '';
+            if (errorElem) errorElem.style.display = 'none';
+            fetch(endpoint)
+                .then(r => r.json())
+                .then(data => {
+                    if (loadingElem) loadingElem.style.display = 'none';
+                    if (data && data.apps && data.apps.length > 0) {
+                        renderStatsApps(data.apps);
+                        errorElem.style.display = 'none';
+                    } else {
+                        statsContent.innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                        errorElem.style.display = '';
+                    }
+                })
+                .catch(() => {
+                    if (loadingElem) loadingElem.style.display = 'none';
+                    statsContent.innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
+                    if (errorElem) errorElem.style.display = '';
+                });
+        }
+
+        // Render stats apps in the unified content area
+        function renderStatsApps(apps) {
+            const container = document.getElementById('stats-content');
+            container.innerHTML = '';
+            if (!apps || apps.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                return;
             }
+            apps.forEach(app => {
+                const section = document.createElement('div');
+                section.className = 'app-card';
+                section.innerHTML = `<h2 class="text-xl font-bold mb-4">${app.app_name} (${app.app_id})</h2>`;
+                if (app.table && app.table.length > 0) {
+                    const dates = app.table.map(r => r.date);
+                    const metrics = [
+                        { key: 'impressions', label: 'Impressions', isNumber: true },
+                        { key: 'clicks', label: 'Clicks', isNumber: true },
+                        { key: 'installs', label: 'Installs', isNumber: true }
+                    ];
+                    if (app.selected_events) {
+                        app.selected_events.forEach(event => {
+                            metrics.push({ key: event, label: event, isNumber: true });
+                        });
+                    }
+                    metrics.push(
+                        { key: 'imp_to_click', label: '% imp to click', percent: true },
+                        { key: 'click_to_install', label: 'Conversion Rate', percent: true, decimals: 2 }
+                    );
+                    if (app.selected_events && app.selected_events[0]) {
+                        metrics.push({ key: 'install_to_' + app.selected_events[0], label: `% install to ${app.selected_events[0]}`, percent: true });
+                    }
+                    if (app.selected_events && app.selected_events[0] && app.selected_events[1]) {
+                        metrics.push({ key: app.selected_events[0] + '_to_' + app.selected_events[1], label: `% ${app.selected_events[0]} to ${app.selected_events[1]}`, percent: true });
+                    }
+                    metrics.push(
+                        { key: 'blocked_rt_rate', label: '% blocked installs (RT)', percent: true },
+                        { key: 'blocked_pa_rate', label: '% blocked installs (PA)', percent: true }
+                    );
+                    app.table.forEach(row => {
+                        if (app.selected_events && app.selected_events[0] && row.installs > 0 && row[app.selected_events[0]] !== undefined) {
+                            row['install_to_' + app.selected_events[0]] = row[app.selected_events[0]] / row.installs;
+                        }
+                        if (app.selected_events && app.selected_events[0] && app.selected_events[1] && row[app.selected_events[0]] > 0 && row[app.selected_events[1]] !== undefined) {
+                            row[app.selected_events[0] + '_to_' + app.selected_events[1]] = row[app.selected_events[1]] / row[app.selected_events[0]];
+                        }
+                    });
+                    // Render table
+                    const table = document.createElement('table');
+                    table.className = 'stats-table';
+                    const thead = document.createElement('thead');
+                    thead.innerHTML = `<tr><th>Date</th>${metrics.map(m => `<th>${m.label}</th>`).join('')}</tr>`;
+                    table.appendChild(thead);
+                    const tbody = document.createElement('tbody');
+                    app.table.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${row.date}</td>` + metrics.map(m => {
+                            let val = row[m.key];
+                            if (m.percent && typeof val === 'number') {
+                                val = (val * 100).toFixed(m.decimals || 1) + '%';
+                            } else if (typeof val === 'number') {
+                                val = val.toLocaleString();
+                            } else if (val === undefined || val === null) {
+                                val = '-';
+                            }
+                            return `<td>${val}</td>`;
+                        }).join('');
+                        tbody.appendChild(tr);
+                    });
+                    table.appendChild(tbody);
+                    section.appendChild(table);
+                } else {
+                    section.innerHTML += '<div class="text-gray-400 py-4">No data available for this app.</div>';
+                }
+                container.appendChild(section);
+            });
         }
-        document.querySelectorAll('.date-range-tab').forEach(btn => {
-            btn.onclick = function() {
-                switchStatsRangeTab(this.getAttribute('data-range'));
-            };
+
+        // Listen for dropdown changes
+        document.getElementById('stats-range-select').addEventListener('change', function() {
+            fetchAndRenderStats(this.value);
         });
-        // Always show 'Last 10 Days' as the default tab when entering the STATS page
+
+        // On tab switch to Stats, show default (last 30 days)
         function activateDefaultStatsTab() {
-            switchStatsRangeTab('10d');
+            document.getElementById('stats-range-select').value = '30d';
+            fetchAndRenderStats('30d');
         }
-        activateDefaultStatsTab();
+        // If stats tab is active on load, show default
+        if (document.getElementById('stats-tab') && document.getElementById('stats-tab').classList.contains('active')) {
+            activateDefaultStatsTab();
+        }
 
         // Patch RUN REPORT button logic to add logging and defensive checks
         const periodMap = {
@@ -827,7 +888,7 @@
 
         // Update renderStatsAppsForRange to target the correct data div
         function renderStatsAppsForRange(range, apps) {
-            const container = document.getElementById(`stats-data-${range}`);
+            const container = document.getElementById(`stats-content-${range}`);
             container.innerHTML = '';
             
             if (!apps || apps.length === 0) {
@@ -2948,12 +3009,12 @@
                             renderStatsAppsForRange('10d', data.apps);
                             document.getElementById('stats-error').style.display = 'none';
                         } else {
-                            document.getElementById('stats-data-10d').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
+                            document.getElementById('stats-content-10d').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
                             document.getElementById('stats-error').style.display = '';
                         }
                     })
                     .catch(() => {
-                        document.getElementById('stats-data-10d').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
+                        document.getElementById('stats-content-10d').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
                         document.getElementById('stats-error').style.display = '';
                     });
             }
