@@ -3267,7 +3267,7 @@
                                     data-event-num="2">
                                 <option value="">No Events Found.</option>
                             </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <div class="pointer-events-none absolute ins'30d': ['30d', 'last30']et-y-0 right-0 flex items-center px-2 text-gray-700">
                                 <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M10 12l-5-5 1.41-1.41L10 9.17l3.59-3.58L15 7l-5 5z"/>
                                 </svg>
@@ -3384,7 +3384,7 @@
 
         // Add event listener for Get All Stats button
         document.getElementById('get-all-stats-btn').addEventListener('click', async function() {
-            if (!confirm('This will generate reports for all time periods. It may take several minutes. Continue?')) {
+            if (!confirm('This will generate reports for the last 30 days. Continue?')) {
                 return;
             }
             
@@ -3392,8 +3392,9 @@
             button.disabled = true;
             button.textContent = 'Generating Reports...';
             
-            const periods = ['last10', 'mtd', 'lastmonth', '30d'];
-            const fraudPeriods = ['10d', 'mtd', 'lastmonth', '30d'];
+            // Only use 30d period
+            const periods = ['30d'];
+            const fraudPeriods = ['30d'];
             
             try {
                 // Create progress container
@@ -3448,19 +3449,19 @@
                 // Sequential stats reports
                 const runStatsReports = async () => {
                     for (const period of periods) {
-                        updateProgress(`Starting stats report for ${period}...`);
+                        updateProgress(`Starting stats report for last 30 days...`);
                         const response = await fetch('/start-report', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 apps: window.fetchedApps,
-                                period: period,
+                                period: 'last30',
                                 selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
                             })
                         });
                         const data = await response.json();
                         if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, period);
+                            await pollReportStatus(data.job_id, 'last 30 days');
                         }
                     }
                 };
@@ -3468,18 +3469,18 @@
                 // Sequential fraud reports
                 const runFraudReports = async () => {
                     for (const period of fraudPeriods) {
-                        updateProgress(`Starting fraud report for ${period}...`);
+                        updateProgress(`Starting fraud report for last 30 days...`);
                         const response = await fetch('/get_fraud', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 apps: window.fetchedApps,
-                                period: period
+                                period: 'last30'
                             })
                         });
                         const data = await response.json();
                         if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, `fraud-${period}`);
+                            await pollReportStatus(data.job_id, `fraud-last30`);
                         }
                     }
                 };

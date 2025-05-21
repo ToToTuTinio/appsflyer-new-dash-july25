@@ -1469,9 +1469,6 @@ def get_fraud_for_range(range_key):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         period_map = {
-            '10d': ['10d', 'last10'],
-            'mtd': ['mtd'],
-            'lastmonth': ['lastmonth'],
             '30d': ['30d', 'last30']
         }
         keys = period_map.get(range_key, [range_key])
@@ -1498,9 +1495,6 @@ def get_stats_for_range(range_key):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         period_map = {
-            '10d': ['10d', 'last10'],
-            'mtd': ['mtd'],
-            'lastmonth': ['lastmonth'],
             '30d': ['30d', 'last30']
         }
         keys = period_map.get(range_key, [range_key])
