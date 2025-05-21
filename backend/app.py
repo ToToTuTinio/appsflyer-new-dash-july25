@@ -1161,10 +1161,10 @@ def get_fraud():
 @login_required
 def overview():
     try:
-        # Read the most recent 'last10' stats_cache entry (regardless of event selections or app IDs)
+        # Read the most recent 'last30' stats_cache entry (regardless of event selections or app IDs)
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last30%' ORDER BY updated_at DESC LIMIT 1")
         row = c.fetchone()
         total_impressions = 0
         total_clicks = 0
@@ -1198,8 +1198,8 @@ def overview():
         trend_clicks = [date_map[d]['clicks'] for d in trend_dates]
         trend_installs = [date_map[d]['installs'] for d in trend_dates]
 
-        # Use only the most recent 'last10:' fraud_cache entry for Top Fraudulent Sources
-        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last10:%' ORDER BY updated_at DESC LIMIT 1")
+        # Use only the most recent 'last2:' fraud_cache entry for Top Fraudulent Sources
+        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last2:%' ORDER BY updated_at DESC LIMIT 1")
         fraud_cache_row = c.fetchone()
         top_bad_sources_by_app = []
         if fraud_cache_row:
@@ -1720,17 +1720,30 @@ def process_report_async(apps, period, selected_events):
 @app.route('/start-report', methods=['POST'])
 @login_required
 def start_report():
-    data = request.get_json()
-    apps = data.get('apps', [])
-    period = data.get('period')
-    selected_events = data.get('selected_events', [])
+    try:
+        data = request.get_json()
+        apps = data.get('apps', [])
+        period = 'last30'  # Force last 30 days period
+        selected_events = data.get('events', [])
 
-    # Run synchronously (not as a background job)
-    result = process_report_async(apps, period, selected_events)
-    return jsonify({
-        'status': 'completed',
-        'result': result
-    })
+        if not apps:
+            return jsonify({'error': 'No apps selected'}), 400
+
+        # Start the report generation in the background
+        job = task_queue.enqueue(
+            process_report_async,
+            args=(apps, period, selected_events),
+            job_timeout='1h'
+        )
+
+        return jsonify({
+            'job_id': job.id,
+            'status': 'started',
+            'message': 'Report generation started'
+        })
+    except Exception as e:
+        print(f"Error starting report: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/report-status/<job_id>')
 @login_required
