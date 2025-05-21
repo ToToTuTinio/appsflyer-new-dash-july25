@@ -603,34 +603,7 @@
             '30d': 'last30'
         };
 
-        function updateStatsDisplay(range) {
-            const endpointMap = {
-                '10d': '/get_subpage_10d',
-                'mtd': '/get_subpage_mtd',
-                'lastmonth': '/get_subpage_lastmonth',
-                '30d': '/get_subpage_30d'
-            };
-            const endpoint = endpointMap[range];
-            if (endpoint) {
-                fetch(endpoint)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && data.apps && data.apps.length > 0) {
-                            renderStatsAppsForRange(range, data.apps);
-                            document.getElementById('stats-error').style.display = 'none';
-                        } else {
-                            document.getElementById('stats-data').innerHTML = '<div class="text-gray-400 py-4 text-center">No cached stats data available. Please run a report to load data.</div>';
-                            document.getElementById('stats-error').style.display = '';
-                        }
-                    })
-                    .catch(() => {
-                        document.getElementById('stats-data').innerHTML = '<div class="text-red-500 py-4 text-center">Error loading stats data for this range.</div>';
-                        document.getElementById('stats-error').style.display = '';
-                    });
-            }
-        }
-
-        // Initialize stats display with default range
+        // Initialize stats display when the page loads
         function initializeStatsDisplay() {
             const defaultRange = '10d';
             updateStatsDisplay(defaultRange);
