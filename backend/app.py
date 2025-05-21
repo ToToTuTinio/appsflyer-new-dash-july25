@@ -279,30 +279,17 @@ def app_stats(app_id):
         return jsonify({"error": str(e)}), 500
 
 def get_period_dates(period):
-    today = datetime.date.today()
-    if period in ('today',):
-        start_date = end_date = today
-    elif period in ('yesterday',):
-        start_date = end_date = today - datetime.timedelta(days=1)
-    elif period in ('last30', '30d'):
-        start_date = today - datetime.timedelta(days=29)
-        end_date = today
-    elif period in ('last10', '10d'):
-        start_date = today - datetime.timedelta(days=9)
-        end_date = today
+    today = datetime.datetime.now()
+    if period == 'last30':
+        start_date = (today - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    elif period == 'last10':
+        start_date = (today - datetime.timedelta(days=10)).strftime('%Y-%m-%d')
     elif period == 'mtd':
-        start_date = today.replace(day=1)
-        end_date = today
-    elif period == 'lastmonth':
-        first_of_this_month = today.replace(day=1)
-        last_month_end = first_of_this_month - datetime.timedelta(days=1)
-        start_date = last_month_end.replace(day=1)
-        end_date = last_month_end
+        start_date = today.replace(day=1).strftime('%Y-%m-%d')
     else:
-        # Default to last 10 days
-        start_date = today - datetime.timedelta(days=9)
-        end_date = today
-    return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+        start_date = (today - datetime.timedelta(days=30)).strftime('%Y-%m-%d')  # Default to 30d
+    end_date = today.strftime('%Y-%m-%d')
+    return start_date, end_date
 
 @app.route('/app-events/<app_id>')
 @login_required
@@ -945,12 +932,12 @@ def get_fraud():
     try:
         data = request.get_json()
         active_apps = data.get('apps', [])
+        period = data.get('period', 'last10')
         force = data.get('force', False)
-        # Always use last 30 days
-        start_date, end_date = get_period_dates('last30')
-        # Create a unique cache key based on sorted app IDs
+        start_date, end_date = get_period_dates(period)
+        # Create a unique cache key based on period and sorted app IDs
         app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
-        cache_key = f"last30:{app_ids}"
+        cache_key = f"{period}:{app_ids}"
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
@@ -960,8 +947,8 @@ def get_fraud():
         )''')
         conn.commit()
         if not force:
-            # Use LIKE query for last30 range
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"last30%",))
+            # Use LIKE query for all ranges to ensure consistent behavior
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
             row = c.fetchone()
             if row:
                 data, updated_at = row
@@ -1414,38 +1401,30 @@ def stats_page():
 def fraud_page():
     return {'status': 'ok'}
 
-@app.route('/get_subpage_10d')
-def get_subpage_10d():
-    import logging
-    app.logger.debug('GET /get_subpage_10d')
-    return get_stats_for_range('10d')
-
-@app.route('/get_subpage_mtd')
-def get_subpage_mtd():
-    import logging
-    app.logger.debug('GET /get_subpage_mtd')
-    return get_stats_for_range('mtd')
-
-@app.route('/get_subpage_lastmonth')
-def get_subpage_lastmonth():
-    import logging
-    app.logger.debug('GET /get_subpage_lastmonth')
-    return get_stats_for_range('lastmonth')
-
-@app.route('/get_subpage_30d')
-def get_subpage_30d():
-    import logging
-    app.logger.debug('GET /get_subpage_30d')
-    return get_stats_for_range('30d')
-
 # --- Fraud Analytics endpoints ---
-@app.route('/get_fraud_data')
-@login_required
-def get_fraud_data():
+@app.route('/get_fraud_subpage_10d')
+def get_fraud_subpage_10d():
+    return get_fraud_for_range('30d')  # Always return 30d data
+
+@app.route('/get_fraud_subpage_mtd')
+def get_fraud_subpage_mtd():
+    return get_fraud_for_range('30d')  # Always return 30d data
+
+@app.route('/get_fraud_subpage_lastmonth')
+def get_fraud_subpage_lastmonth():
+    return get_fraud_for_range('30d')  # Always return 30d data
+
+@app.route('/get_fraud_subpage_30d')
+def get_fraud_subpage_30d():
+    return get_fraud_for_range('30d')
+
+# Helper to fetch fraud for a given range
+def get_fraud_for_range(range_key):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"last30%",))
+        # Always fetch 30d data
+        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('last30%',))
         row = c.fetchone()
         conn.close()
         if row:
@@ -1458,14 +1437,13 @@ def get_fraud_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Helper to fetch stats data
-@app.route('/get_stats_data')
-@login_required
-def get_stats_data():
+# Helper to fetch stats for a given range (for Stats endpoints)
+def get_stats_for_range(range_key):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"last30%",))
+        # Always fetch 30d data
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('last30%',))
         row = c.fetchone()
         conn.close()
         if row:

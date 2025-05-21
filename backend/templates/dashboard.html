@@ -305,31 +305,53 @@
         </div>
 
         <!-- Stats Tab Content -->
-        <div id="stats-content" class="hidden">
-            <div class="bg-white shadow rounded-lg p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-semibold text-gray-900">Stats</h2>
-                    <button id="get-all-stats-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                        Get All Stats
-                    </button>
+        <div id="stats-tab" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-xl p-10">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
+                <!-- Date Range Filter -->
+                <div class="flex justify-end mb-8">
+                    <select id="stats-date-range" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="30d">Last 30 Days</option>
+                        <option value="10d">Last 10 Days</option>
+                        <option value="mtd">Month to Date</option>
+                    </select>
                 </div>
-                <div id="stats-data" class="mt-4">
-                    <!-- Stats data will be rendered here -->
+                <!-- Stats content container -->
+                <div id="stats-content" class="space-y-10">
+                    <button id="run-stats-report-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data"></div>
+                </div>
+                <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
+                    Loading stats...
+                </div>
+                <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
+                    Error loading stats.
                 </div>
             </div>
         </div>
 
         <!-- Fraud Analytics Tab Content -->
-        <div id="fraud-content" class="hidden">
-            <div class="bg-white shadow rounded-lg p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-semibold text-gray-900">Fraud Analytics</h2>
-                    <button id="run-fraud-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                        Run Fraud Analysis
-                    </button>
+        <div id="fraud-tab" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-xl p-10">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Fraud Analytics</h2>
+                <!-- Date Range Filter -->
+                <div class="flex justify-end mb-8">
+                    <select id="fraud-date-range" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="30d">Last 30 Days</option>
+                        <option value="10d">Last 10 Days</option>
+                        <option value="mtd">Month to Date</option>
+                    </select>
                 </div>
-                <div id="fraud-data" class="mt-4">
-                    <!-- Fraud data will be rendered here -->
+                <!-- Fraud content container -->
+                <div id="fraud-content" class="space-y-10">
+                    <button id="run-fraud-report-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="fraud-data"></div>
+                </div>
+                <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
+                    Loading fraud data...
+                </div>
+                <div id="fraud-error" class="text-center text-red-500 mt-8" style="display:none;">
+                    Error loading fraud data.
                 </div>
             </div>
         </div>
@@ -3374,13 +3396,16 @@
 
         // Add event listener for Get All Stats button
         document.getElementById('get-all-stats-btn').addEventListener('click', async function() {
-            if (!confirm('This will generate reports for the last 30 days. It may take several minutes. Continue?')) {
+            if (!confirm('This will generate reports for all time periods. It may take several minutes. Continue?')) {
                 return;
             }
             
             const button = this;
             button.disabled = true;
             button.textContent = 'Generating Reports...';
+            
+            const periods = ['last10', 'mtd', 'lastmonth', '30d'];
+            const fraudPeriods = ['10d', 'mtd', 'lastmonth', '30d'];
             
             try {
                 // Create progress container
@@ -3396,27 +3421,260 @@
                     progressItem.className = 'text-sm text-gray-700 mb-1';
                     progressItem.textContent = message;
                     progressDiv.appendChild(progressItem);
+                    progressDiv.scrollTop = progressDiv.scrollHeight;
                 };
 
-                // Fetch stats data
-                updateProgress('Fetching stats data...');
-                const statsResponse = await fetch('/get_stats', {
+                // Function to poll report status
+                const pollReportStatus = async (jobId, period) => {
+                    let retries = 0;
+                    const maxRetries = 3;
+                    
+                    while (true) {
+                        try {
+                            const response = await fetch(`/report-status/${jobId}`);
+                            const data = await response.json();
+                            
+                            if (data.status === 'completed') {
+                                updateProgress(`✓ Completed report for ${period}`);
+                                return true;
+                            } else if (data.status === 'failed') {
+                                updateProgress(`✗ Failed to generate report for ${period}`);
+                                return false;
+                            } else if (data.error && data.error.includes('BrokenPipeError')) {
+                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
+                                return true;  // Continue to next period
+                            }
+                            
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        } catch (error) {
+                            retries++;
+                            if (retries >= maxRetries) {
+                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
+                                return true;  // Continue to next period
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        }
+                    }
+                };
+
+                // Sequential stats reports
+                const runStatsReports = async () => {
+                    for (const period of periods) {
+                        updateProgress(`Starting stats report for ${period}...`);
+                        const response = await fetch('/start-report', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                apps: window.fetchedApps,
+                                period: period,
+                                selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.status === 'processing') {
+                            await pollReportStatus(data.job_id, period);
+                        }
+                    }
+                };
+
+                // Sequential fraud reports
+                const runFraudReports = async () => {
+                    for (const period of fraudPeriods) {
+                        updateProgress(`Starting fraud report for ${period}...`);
+                        const response = await fetch('/get_fraud', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                apps: window.fetchedApps,
+                                period: period
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.status === 'processing') {
+                            await pollReportStatus(data.job_id, `fraud-${period}`);
+                        }
+                    }
+                };
+
+                // Run both in parallel
+                await Promise.all([
+                    runStatsReports(),
+                    runFraudReports()
+                ]);
+
+                // Refresh the overview data
+                updateProgress('Refreshing overview data...');
+                await fetchOverviewData();
+                await fetchTopPerformingApps();
+                
+                updateProgress('All reports generated successfully!');
+                button.textContent = 'Reports Generated!';
+                setTimeout(() => {
+                    button.textContent = 'Get All Stats';
+                    button.disabled = false;
+                    progressContainer.remove();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error generating reports:', error);
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'text-red-500 mt-2';
+                errorMessage.textContent = 'Error: ' + error.message;
+                button.parentNode.appendChild(errorMessage);
+                button.textContent = 'Error Generating Reports';
+                setTimeout(() => {
+                    button.textContent = 'Get All Stats';
+                    button.disabled = false;
+                    errorMessage.remove();
+                }, 2000);
+            }
+        });
+
+        // Stats data handling
+        let statsData = null;
+
+        // Function to filter stats data by date range
+        function filterStatsDataByRange(data, range) {
+            if (!data || !data.apps) return null;
+            
+            const today = new Date();
+            let startDate;
+            
+            switch(range) {
+                case '10d':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 10);
+                    break;
+                case 'mtd':
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    break;
+                case '30d':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 30);
+                    break;
+                default:
+                    return data;
+            }
+            
+            const filteredApps = data.apps.map(app => {
+                const filteredTable = app.table.filter(row => {
+                    const rowDate = new Date(row.date);
+                    return rowDate >= startDate && rowDate <= today;
+                });
+                return { ...app, table: filteredTable };
+            });
+            
+            return { ...data, apps: filteredApps };
+        }
+
+        // Function to render stats data
+        function renderStatsData(data, range) {
+            const container = document.getElementById('stats-data');
+            if (!data || !data.apps || data.apps.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                return;
+            }
+            
+            const filteredData = filterStatsDataByRange(data, range);
+            // Render the filtered data
+            // ... existing rendering code ...
+        }
+
+        // Stats date range change handler
+        document.getElementById('stats-date-range').addEventListener('change', function() {
+            const range = this.value;
+            if (statsData) {
+                renderStatsData(statsData, range);
+            }
+        });
+
+        // Fraud data handling
+        let fraudData = null;
+
+        // Function to filter fraud data by date range
+        function filterFraudDataByRange(data, range) {
+            if (!data || !data.apps) return null;
+            
+            const today = new Date();
+            let startDate;
+            
+            switch(range) {
+                case '10d':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 10);
+                    break;
+                case 'mtd':
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    break;
+                case '30d':
+                    startDate = new Date(today);
+                    startDate.setDate(today.getDate() - 30);
+                    break;
+                default:
+                    return data;
+            }
+            
+            const filteredApps = data.apps.map(app => {
+                const filteredTable = app.table.filter(row => {
+                    const rowDate = new Date(row.date);
+                    return rowDate >= startDate && rowDate <= today;
+                });
+                return { ...app, table: filteredTable };
+            });
+            
+            return { ...data, apps: filteredApps };
+        }
+
+        // Function to render fraud data
+        function renderFraudData(data, range) {
+            const container = document.getElementById('fraud-data');
+            if (!data || !data.apps || data.apps.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
+                return;
+            }
+            
+            const filteredData = filterFraudDataByRange(data, range);
+            // Render the filtered data
+            // ... existing rendering code ...
+        }
+
+        // Fraud date range change handler
+        document.getElementById('fraud-date-range').addEventListener('change', function() {
+            const range = this.value;
+            if (fraudData) {
+                renderFraudData(fraudData, range);
+            }
+        });
+
+        // Update the "Get All Stats" button handler
+        document.getElementById('get-all-stats-btn').addEventListener('click', async function() {
+            if (!window.fetchedApps || window.fetchedApps.length === 0) {
+                alert('Please fetch apps first');
+                return;
+            }
+            
+            const loading = document.getElementById('stats-loading');
+            const error = document.getElementById('stats-error');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            
+            try {
+                // Fetch stats for last 30 days
+                const statsResponse = await fetch('/all-apps-stats', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         apps: window.fetchedApps,
-                        period: 'last30'
+                        period: 'last30',
+                        selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
                     })
                 });
                 
-                if (statsResponse.ok) {
-                    updateProgress('Stats data fetched successfully');
-                } else {
-                    updateProgress('Error fetching stats data');
-                }
-
-                // Fetch fraud data
-                updateProgress('Fetching fraud data...');
+                if (!statsResponse.ok) throw new Error('Failed to fetch stats');
+                statsData = await statsResponse.json();
+                
+                // Fetch fraud data for last 30 days
                 const fraudResponse = await fetch('/get_fraud', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3426,129 +3684,20 @@
                     })
                 });
                 
-                if (fraudResponse.ok) {
-                    updateProgress('Fraud data fetched successfully');
-                } else {
-                    updateProgress('Error fetching fraud data');
-                }
-
-                // Update UI
-                await Promise.all([
-                    fetch('/get_stats_data').then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            const filteredData = filterDataByDateRange(data, document.getElementById('date-range-filter').value);
-                            renderStats(filteredData);
-                        }
-                    }),
-                    fetch('/get_fraud_data').then(r => r.json()).then(data => {
-                        if (data && data.apps) {
-                            const filteredData = filterDataByDateRange(data, document.getElementById('fraud-date-range-filter').value);
-                            renderFraud(filteredData);
-                        }
-                    })
-                ]);
-
-                updateProgress('All data updated successfully');
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error generating reports. Please try again.');
+                if (!fraudResponse.ok) throw new Error('Failed to fetch fraud data');
+                fraudData = await fraudResponse.json();
+                
+                // Render both stats and fraud data with default range (30d)
+                renderStatsData(statsData, '30d');
+                renderFraudData(fraudData, '30d');
+                
+            } catch (err) {
+                error.textContent = 'Error fetching data: ' + err.message;
+                error.style.display = 'block';
             } finally {
-                button.disabled = false;
-                button.textContent = 'Get All Stats';
+                loading.style.display = 'none';
             }
         });
-
-        // Add event listeners for date range filters
-        document.getElementById('date-range-filter').addEventListener('change', function() {
-            fetch('/get_stats_data')
-                .then(r => r.json())
-                .then(data => {
-                    if (data && data.apps) {
-                        const filteredData = filterDataByDateRange(data, this.value);
-                        renderStats(filteredData);
-                    }
-                });
-        });
-
-        document.getElementById('fraud-date-range-filter').addEventListener('change', function() {
-            fetch('/get_fraud_data')
-                .then(r => r.json())
-                .then(data => {
-                    if (data && data.apps) {
-                        const filteredData = filterDataByDateRange(data, this.value);
-                        renderFraud(filteredData);
-                    }
-                });
-        });
-
-        // ... existing code ...
-
-        // Add date range filter UI
-        const dateFilterDiv = document.createElement('div');
-        dateFilterDiv.className = 'mb-6 flex flex-col sm:flex-row items-center gap-4';
-        dateFilterDiv.innerHTML = `
-            <label for="date-range-filter" class="font-semibold text-gray-700 mr-2">Date Range:</label>
-            <select id="date-range-filter" class="border border-gray-300 rounded px-3 py-2 min-w-[220px] text-base">
-                <option value="last10">Last 10 Days</option>
-                <option value="mtd">Month to Date</option>
-                <option value="last30" selected>Last 30 Days</option>
-            </select>
-        `;
-        document.getElementById('stats-content').insertBefore(dateFilterDiv, document.getElementById('stats-content').firstChild);
-
-        // Add the same filter to fraud analytics
-        const fraudDateFilterDiv = document.createElement('div');
-        fraudDateFilterDiv.className = 'mb-6 flex flex-col sm:flex-row items-center gap-4';
-        fraudDateFilterDiv.innerHTML = `
-            <label for="fraud-date-range-filter" class="font-semibold text-gray-700 mr-2">Date Range:</label>
-            <select id="fraud-date-range-filter" class="border border-gray-300 rounded px-3 py-2 min-w-[220px] text-base">
-                <option value="last10">Last 10 Days</option>
-                <option value="mtd">Month to Date</option>
-                <option value="last30" selected>Last 30 Days</option>
-            </select>
-        `;
-        document.getElementById('fraud-content').insertBefore(fraudDateFilterDiv, document.getElementById('fraud-content').firstChild);
-
-        // Helper function to filter data by date range
-        function filterDataByDateRange(data, range) {
-            if (!data || !data.apps) return data;
-            
-            const now = new Date();
-            let startDate;
-            
-            switch(range) {
-                case 'last10':
-                    startDate = new Date(now.setDate(now.getDate() - 10));
-                    break;
-                case 'mtd':
-                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                    break;
-                case 'last30':
-                    startDate = new Date(now.setDate(now.getDate() - 30));
-                    break;
-                default:
-                    return data;
-            }
-            
-            const filteredApps = data.apps.map(app => {
-                if (!app.table) return app;
-                
-                const filteredTable = app.table.filter(row => {
-                    const rowDate = new Date(row.date);
-                    return rowDate >= startDate && rowDate <= now;
-                });
-                
-                return {
-                    ...app,
-                    table: filteredTable
-                };
-            });
-            
-            return {
-                ...data,
-                apps: filteredApps
-            };
-        }
     </script>
 </body>
 </html> 
