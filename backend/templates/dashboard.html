@@ -308,18 +308,29 @@
         <div id="stats-tab" class="tab-content">
             <div class="bg-white rounded-2xl shadow-xl p-10">
                 <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Stats</h2>
-                <!-- Date Range Filter -->
-                <div class="flex justify-end mb-8">
-                    <select id="stats-date-range" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                        <option value="30d">Last 30 Days</option>
-                        <option value="10d">Last 10 Days</option>
-                        <option value="mtd">Month to Date</option>
-                    </select>
+                <!-- Date Range Tabs -->
+                <div class="flex border-b border-gray-200 mb-8 gap-2">
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="10d">Last 10 Days</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="mtd">Month to Date</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="lastmonth">Last Month</button>
+                    <button class="date-range-tab px-6 py-2 rounded-full font-semibold text-sm border-2 border-gray-200 bg-gray-50 hover:bg-green-100 transition" data-range="30d">Last 30 Days</button>
                 </div>
-                <!-- Stats content container -->
-                <div id="stats-content" class="space-y-10">
-                    <button id="run-stats-report-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="stats-data"></div>
+                <!-- Sub-tab content containers -->
+                <div id="stats-content-10d" class="stats-range-content" style="display:none;">
+                    <button id="run-report-10d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-10d" class="space-y-10"></div>
+                </div>
+                <div id="stats-content-mtd" class="stats-range-content" style="display:none;">
+                    <button id="run-report-mtd-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-mtd" class="space-y-10"></div>
+                </div>
+                <div id="stats-content-lastmonth" class="stats-range-content" style="display:none;">
+                    <button id="run-report-lastmonth-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-lastmonth" class="space-y-10"></div>
+                </div>
+                <div id="stats-content-30d" class="stats-range-content" style="display:none;">
+                    <button id="run-report-30d-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
+                    <div id="stats-data-30d"></div>
                 </div>
                 <div id="stats-loading" class="text-center text-gray-500 mt-8" style="display:none;">
                     Loading stats...
@@ -327,31 +338,8 @@
                 <div id="stats-error" class="text-center text-red-500 mt-8" style="display:none;">
                     Error loading stats.
                 </div>
-            </div>
-        </div>
-
-        <!-- Fraud Analytics Tab Content -->
-        <div id="fraud-tab" class="tab-content">
-            <div class="bg-white rounded-2xl shadow-xl p-10">
-                <h2 class="text-3xl font-extrabold text-gray-900 mb-8">Fraud Analytics</h2>
-                <!-- Date Range Filter -->
-                <div class="flex justify-end mb-8">
-                    <select id="fraud-date-range" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                        <option value="30d">Last 30 Days</option>
-                        <option value="10d">Last 10 Days</option>
-                        <option value="mtd">Month to Date</option>
-                    </select>
-                </div>
-                <!-- Fraud content container -->
-                <div id="fraud-content" class="space-y-10">
-                    <button id="run-fraud-report-btn" style="display:none" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl text-lg font-bold shadow-lg mb-6 transition">RUN REPORT</button>
-                    <div id="fraud-data"></div>
-                </div>
-                <div id="fraud-loading" class="text-center text-gray-500 mt-8" style="display:none;">
-                    Loading fraud data...
-                </div>
-                <div id="fraud-error" class="text-center text-red-500 mt-8" style="display:none;">
-                    Error loading fraud data.
+                <div class="flex justify-center mt-8 mb-2">
+                    <button id="clear-stats-cache-btn" class="border border-red-400 text-red-600 px-3 py-1 rounded text-xs font-semibold hover:bg-red-50 transition">Clear Stats Cache</button>
                 </div>
             </div>
         </div>
@@ -3527,175 +3515,6 @@
                     button.disabled = false;
                     errorMessage.remove();
                 }, 2000);
-            }
-        });
-
-        // Stats data handling
-        let statsData = null;
-
-        // Function to filter stats data by date range
-        function filterStatsDataByRange(data, range) {
-            if (!data || !data.apps) return null;
-            
-            const today = new Date();
-            let startDate;
-            
-            switch(range) {
-                case '10d':
-                    startDate = new Date(today);
-                    startDate.setDate(today.getDate() - 10);
-                    break;
-                case 'mtd':
-                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-                    break;
-                case '30d':
-                    startDate = new Date(today);
-                    startDate.setDate(today.getDate() - 30);
-                    break;
-                default:
-                    return data;
-            }
-            
-            const filteredApps = data.apps.map(app => {
-                const filteredTable = app.table.filter(row => {
-                    const rowDate = new Date(row.date);
-                    return rowDate >= startDate && rowDate <= today;
-                });
-                return { ...app, table: filteredTable };
-            });
-            
-            return { ...data, apps: filteredApps };
-        }
-
-        // Function to render stats data
-        function renderStatsData(data, range) {
-            const container = document.getElementById('stats-data');
-            if (!data || !data.apps || data.apps.length === 0) {
-                container.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
-                return;
-            }
-            
-            const filteredData = filterStatsDataByRange(data, range);
-            // Render the filtered data
-            // ... existing rendering code ...
-        }
-
-        // Stats date range change handler
-        document.getElementById('stats-date-range').addEventListener('change', function() {
-            const range = this.value;
-            if (statsData) {
-                renderStatsData(statsData, range);
-            }
-        });
-
-        // Fraud data handling
-        let fraudData = null;
-
-        // Function to filter fraud data by date range
-        function filterFraudDataByRange(data, range) {
-            if (!data || !data.apps) return null;
-            
-            const today = new Date();
-            let startDate;
-            
-            switch(range) {
-                case '10d':
-                    startDate = new Date(today);
-                    startDate.setDate(today.getDate() - 10);
-                    break;
-                case 'mtd':
-                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-                    break;
-                case '30d':
-                    startDate = new Date(today);
-                    startDate.setDate(today.getDate() - 30);
-                    break;
-                default:
-                    return data;
-            }
-            
-            const filteredApps = data.apps.map(app => {
-                const filteredTable = app.table.filter(row => {
-                    const rowDate = new Date(row.date);
-                    return rowDate >= startDate && rowDate <= today;
-                });
-                return { ...app, table: filteredTable };
-            });
-            
-            return { ...data, apps: filteredApps };
-        }
-
-        // Function to render fraud data
-        function renderFraudData(data, range) {
-            const container = document.getElementById('fraud-data');
-            if (!data || !data.apps || data.apps.length === 0) {
-                container.innerHTML = '<div class="text-gray-400 py-4 text-center">No data available for this range.</div>';
-                return;
-            }
-            
-            const filteredData = filterFraudDataByRange(data, range);
-            // Render the filtered data
-            // ... existing rendering code ...
-        }
-
-        // Fraud date range change handler
-        document.getElementById('fraud-date-range').addEventListener('change', function() {
-            const range = this.value;
-            if (fraudData) {
-                renderFraudData(fraudData, range);
-            }
-        });
-
-        // Update the "Get All Stats" button handler
-        document.getElementById('get-all-stats-btn').addEventListener('click', async function() {
-            if (!window.fetchedApps || window.fetchedApps.length === 0) {
-                alert('Please fetch apps first');
-                return;
-            }
-            
-            const loading = document.getElementById('stats-loading');
-            const error = document.getElementById('stats-error');
-            
-            loading.style.display = 'block';
-            error.style.display = 'none';
-            
-            try {
-                // Fetch stats for last 30 days
-                const statsResponse = await fetch('/all-apps-stats', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        apps: window.fetchedApps,
-                        period: 'last30',
-                        selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
-                    })
-                });
-                
-                if (!statsResponse.ok) throw new Error('Failed to fetch stats');
-                statsData = await statsResponse.json();
-                
-                // Fetch fraud data for last 30 days
-                const fraudResponse = await fetch('/get_fraud', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        apps: window.fetchedApps,
-                        period: 'last30'
-                    })
-                });
-                
-                if (!fraudResponse.ok) throw new Error('Failed to fetch fraud data');
-                fraudData = await fraudResponse.json();
-                
-                // Render both stats and fraud data with default range (30d)
-                renderStatsData(statsData, '30d');
-                renderFraudData(fraudData, '30d');
-                
-            } catch (err) {
-                error.textContent = 'Error fetching data: ' + err.message;
-                error.style.display = 'block';
-            } finally {
-                loading.style.display = 'none';
             }
         });
     </script>
