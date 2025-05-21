@@ -1383,61 +1383,52 @@
         };
 
         // RUN button logic
-        fraudRanges.forEach(range => {
-            document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
-                document.getElementById('fraud-loading').style.display = '';
-                document.getElementById('fraud-error').style.display = 'none';
-                fetch('/get_fraud', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        apps: fetchedApps,
-                        period: periodMap[range]
-                    })
+        document.getElementById('run-fraud-report').onclick = function() {
+            const range = document.getElementById('fraud-date-range').value;
+            document.getElementById('fraud-loading').style.display = '';
+            document.getElementById('fraud-error').style.display = 'none';
+            fetch('/get_fraud', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apps: window.fetchedApps,
+                    period: periodMap[range]
                 })
-                .then(r => {
-                    if (!r.ok) {
-                        if (r.status === 504) {
-                            // 504 Gateway Timeout: do nothing (no error message)
-                            return;
-                        }
-                        // Other errors: show a generic error
-                        document.getElementById('fraud-error').textContent = 'Error loading fraud data. Please try again.';
-                        document.getElementById('fraud-error').style.display = '';
-                        return;
-                    }
-                    return r.text();
-                })
-                .then(text => {
-                    if (!text) return; // If no data (due to 504), do nothing
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        document.getElementById('fraud-loading').style.display = 'none';
-                        document.getElementById('fraud-error').style.display = 'none';
-                        return;
-                    }
-                    if (data.status === 'processing') {
-                        document.getElementById('fraud-loading').style.display = 'none';
-                        document.getElementById('fraud-error').style.display = 'none';
-                        setTimeout(() => document.getElementById(`run-fraud-${range}-btn`).onclick(), 30000);
-                        return;
-                    }
+            })
+            .then(r => {
+                if (!r.ok) {
+                    if (r.status === 504) return;
+                    document.getElementById('fraud-error').textContent = 'Error loading fraud data. Please try again.';
+                    document.getElementById('fraud-error').style.display = '';
+                    return;
+                }
+                return r.text();
+            })
+            .then(text => {
+                if (!text) return;
+                let data;
+                try { data = JSON.parse(text); } catch (e) {
                     document.getElementById('fraud-loading').style.display = 'none';
                     document.getElementById('fraud-error').style.display = 'none';
-                    // --- FIX: Cache the data for this range ---
-                    fraudDataCache[range] = data;
-                    // --- Always render after fetch ---
-                    renderFraudAll(data, range);
-                })
-                .catch(() => {
+                    return;
+                }
+                if (data.status === 'processing') {
                     document.getElementById('fraud-loading').style.display = 'none';
-                    document.getElementById('fraud-error').textContent = 'Network error. Please try again.';
-                    document.getElementById('fraud-error').style.display = '';
-                });
-            };
-        });
+                    document.getElementById('fraud-error').style.display = 'none';
+                    setTimeout(() => document.getElementById('run-fraud-report').onclick(), 30000);
+                    return;
+                }
+                document.getElementById('fraud-loading').style.display = 'none';
+                document.getElementById('fraud-error').style.display = 'none';
+                renderFraudAll(data, range);
+            })
+            .catch(() => {
+                document.getElementById('fraud-loading').style.display = 'none';
+                document.getElementById('fraud-error').textContent = 'Network error. Please try again.';
+                document.getElementById('fraud-error').style.display = '';
+            });
+        };
+
         function renderFraudAll(data, range) {
             const container = document.getElementById(`fraud-data-${range}`);
             container.innerHTML = '';
