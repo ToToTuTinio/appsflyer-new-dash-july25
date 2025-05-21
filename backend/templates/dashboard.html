@@ -1381,12 +1381,7 @@
             'lastmonth': '/get_fraud_subpage_lastmonth',
             '30d': '/get_fraud_subpage_30d'
         };
-                    .catch(() => {
-                        document.getElementById(`fraud-data-${range}`).innerHTML = '<div class="text-red-500 py-4 text-center">Error loading fraud data for this range.</div>';
-                        document.getElementById('fraud-error').style.display = '';
-                    });
-            }
-        }
+
         // RUN button logic
         fraudRanges.forEach(range => {
             document.getElementById(`run-fraud-${range}-btn`).onclick = function() {
