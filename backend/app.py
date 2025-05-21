@@ -945,12 +945,12 @@ def get_fraud():
     try:
         data = request.get_json()
         active_apps = data.get('apps', [])
-        period = data.get('period', 'last10')
         force = data.get('force', False)
-        start_date, end_date = get_period_dates(period)
-        # Create a unique cache key based on period and sorted app IDs
+        # Always use last 30 days
+        start_date, end_date = get_period_dates('last30')
+        # Create a unique cache key based on sorted app IDs
         app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
-        cache_key = f"{period}:{app_ids}"
+        cache_key = f"last30:{app_ids}"
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS fraud_cache (
@@ -960,8 +960,8 @@ def get_fraud():
         )''')
         conn.commit()
         if not force:
-            # Use LIKE query for all ranges to ensure consistent behavior
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
+            # Use LIKE query for last30 range
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"last30%",))
             row = c.fetchone()
             if row:
                 data, updated_at = row
@@ -1439,96 +1439,44 @@ def get_subpage_30d():
     return get_stats_for_range('30d')
 
 # --- Fraud Analytics endpoints ---
-@app.route('/get_fraud_subpage_10d')
-def get_fraud_subpage_10d():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_10d')
-    return get_fraud_for_range('10d')
-
-@app.route('/get_fraud_subpage_mtd')
-def get_fraud_subpage_mtd():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_mtd')
-    return get_fraud_for_range('mtd')
-
-@app.route('/get_fraud_subpage_lastmonth')
-def get_fraud_subpage_lastmonth():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_lastmonth')
-    return get_fraud_for_range('lastmonth')
-
-@app.route('/get_fraud_subpage_30d')
-def get_fraud_subpage_30d():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_30d')
-    return get_fraud_for_range('30d')
-
-# Helper to fetch fraud for a given range
-def get_fraud_for_range(range_key):
+@app.route('/get_fraud_data')
+@login_required
+def get_fraud_data():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        
-        # Always fetch the 30-day data
-        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('30d%',))
+        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"last30%",))
         row = c.fetchone()
         conn.close()
-        
         if row:
             data, updated_at = row
             result = json.loads(data)
             result['updated_at'] = updated_at
-            
-            # Filter the data based on the requested range
-            start_date, end_date = get_period_dates(range_key)
-            filtered_data = filter_data_by_date_range(result, start_date, end_date)
-            return jsonify(filtered_data)
+            return jsonify(result)
         else:
             return jsonify({'apps': [], 'updated_at': None})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Helper to fetch stats for a given range (for Stats endpoints)
-def get_stats_for_range(range_key):
+# Helper to fetch stats data
+@app.route('/get_stats_data')
+@login_required
+def get_stats_data():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        
-        # Always fetch the 30-day data
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('30d%',))
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"last30%",))
         row = c.fetchone()
         conn.close()
-        
         if row:
             data, updated_at = row
             result = json.loads(data)
             result['updated_at'] = updated_at
-            
-            # Filter the data based on the requested range
-            start_date, end_date = get_period_dates(range_key)
-            filtered_data = filter_data_by_date_range(result, start_date, end_date)
-            return jsonify(filtered_data)
+            return jsonify(result)
         else:
             return jsonify({'apps': [], 'updated_at': None})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-def filter_data_by_date_range(data, start_date, end_date):
-    """Filter data by date range from cached 30-day data."""
-    if not data or 'apps' not in data:
-        return data
-    
-    filtered_apps = []
-    for app in data['apps']:
-        filtered_app = app.copy()
-        if 'table' in app:
-            filtered_app['table'] = [
-                row for row in app['table']
-                if start_date <= row.get('date', '') <= end_date
-            ]
-        filtered_apps.append(filtered_app)
-    
-    return {'apps': filtered_apps, 'updated_at': data.get('updated_at')}
 
 def process_report_async(apps, period, selected_events):
     """Background task to process report data"""
