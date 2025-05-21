@@ -1676,32 +1676,36 @@ def process_report_async(apps, period, selected_events):
                 continue
                 
         # Save to cache
-        if stats_list:
-            app_ids = '-'.join(sorted([app['app_id'] for app in apps]))
-            event1 = ''
-            event2 = ''
-            if apps and selected_events:
-                first_app_id = apps[0]['app_id']
-                events = selected_events.get(first_app_id, [])
-                if len(events) > 0:
-                    event1 = events[0] or ''
-                if len(events) > 1:
-                    event2 = events[1] or ''
-            cache_key = f"{period}:{event1}:{event2}:{app_ids}"
-            
-            result = {
-                'apps': stats_list,
-                'updated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
-            
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-                     (cache_key, json.dumps(result)))
-            conn.commit()
-            conn.close()
-            
-            return result
+        try:
+            if stats_list:
+                app_ids = '-'.join(sorted([app['app_id'] for app in apps]))
+                event1 = ''
+                event2 = ''
+                if apps and selected_events:
+                    first_app_id = apps[0]['app_id']
+                    events = selected_events.get(first_app_id, [])
+                    if len(events) > 0:
+                        event1 = events[0] or ''
+                    if len(events) > 1:
+                        event2 = events[1] or ''
+                cache_key = f"{period}:{event1}:{event2}:{app_ids}"
+                result = {
+                    'apps': stats_list,
+                    'updated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                         (cache_key, json.dumps(result)))
+                conn.commit()
+                conn.close()
+                print(f"[DEBUG] Stats cache written: {cache_key}")
+        except BrokenPipeError as e:
+            print(f"[REPORT] BrokenPipeError (EPIPE) at cache write: {str(e)}. Returning empty result so frontend can proceed.")
+            return {'apps': [], 'error': 'BrokenPipeError (EPIPE) occurred'}
+        except Exception as e:
+            print(f"[REPORT] Error writing stats cache: {str(e)}")
+            return {'apps': [], 'error': str(e)}
             
     except BrokenPipeError as e:
         print(f"[REPORT] BrokenPipeError (EPIPE) at outer level: {str(e)}. Returning empty result so frontend can proceed.")

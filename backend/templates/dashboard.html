@@ -3414,89 +3414,73 @@
                 };
 
                 // Function to poll report status
-                const pollReportStatus = async (jobId, period) => {
-                    let retries = 0;
-                    const maxRetries = 3;
-                    
-                    while (true) {
-                        try {
-                            const response = await fetch(`/report-status/${jobId}`);
-                            const data = await response.json();
-                            
-                            if (data.status === 'completed') {
-                                updateProgress(`✓ Completed report for ${period}`);
-                                return true;
-                            } else if (data.status === 'failed') {
-                                updateProgress(`✗ Failed to generate report for ${period}`);
-                                return false;
-                            } else if (data.error && data.error.includes('BrokenPipeError')) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
-                                return true;  // Continue to next period
-                            }
-                            
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        } catch (error) {
-                            retries++;
-                            if (retries >= maxRetries) {
-                                updateProgress(`⚠ Connection error for ${period}, continuing to next period...`);
-                                return true;  // Continue to next period
-                            }
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        }
-                    }
-                };
-
-                // Sequential stats reports
-                const runStatsReports = async () => {
-                    for (const period of periods) {
-                        updateProgress(`Starting stats report for last 30 days...`);
-                        const response = await fetch('/start-report', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                apps: window.fetchedApps,
-                                period: 'last30',
-                                selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
-                            })
-                        });
+                const pollReportStatus = async (jobId, label) => {
+                    let done = false;
+                    while (!done) {
+                        const response = await fetch(`/report-status/${jobId}`);
                         const data = await response.json();
-                        if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, 'last 30 days');
+                        if (data.status === 'completed') {
+                            updateProgress(`${label} report completed!`);
+                            done = true;
+                        } else if (data.status === 'failed') {
+                            updateProgress(`${label} report failed.`);
+                            throw new Error(`${label} report failed.`);
+                        } else {
+                            updateProgress(`${label} report processing...`);
+                            await new Promise(res => setTimeout(res, 5000));
                         }
                     }
                 };
 
-                // Sequential fraud reports
-                const runFraudReports = async () => {
-                    for (const period of fraudPeriods) {
-                        updateProgress(`Starting fraud report for last 30 days...`);
-                        const response = await fetch('/get_fraud', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                apps: window.fetchedApps,
-                                period: 'last30'
-                            })
-                        });
-                        const data = await response.json();
-                        if (data.status === 'processing') {
-                            await pollReportStatus(data.job_id, `fraud-last30`);
-                        }
+                // Start both jobs in parallel
+                updateProgress('Starting stats and fraud reports for last 30 days...');
+                // 1. Start stats report
+                const statsPromise = (async () => {
+                    updateProgress('Starting stats report...');
+                    const response = await fetch('/start-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            apps: window.fetchedApps,
+                            period: 'last30',
+                            selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'started' || data.status === 'processing') {
+                        await pollReportStatus(data.job_id, 'Stats');
+                    } else {
+                        throw new Error('Stats report failed to start.');
                     }
-                };
+                })();
+                // 2. Start fraud report
+                const fraudPromise = (async () => {
+                    updateProgress('Starting fraud report...');
+                    const response = await fetch('/get_fraud', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            apps: window.fetchedApps,
+                            period: 'last30'
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'started' || data.status === 'processing') {
+                        await pollReportStatus(data.job_id, 'Fraud');
+                    } else {
+                        updateProgress('Fraud report completed!');
+                    }
+                })();
 
-                // Run both in parallel
-                await Promise.all([
-                    runStatsReports(),
-                    runFraudReports()
-                ]);
+                // Wait for both to finish
+                await Promise.all([statsPromise, fraudPromise]);
 
                 // Refresh the overview data
                 updateProgress('Refreshing overview data...');
                 await fetchOverviewData();
                 await fetchTopPerformingApps();
                 
-                updateProgress('All reports generated successfully!');
+                updateProgress('Fetching data ends!');
                 button.textContent = 'Reports Generated!';
                 setTimeout(() => {
                     button.textContent = 'Get All Stats';
