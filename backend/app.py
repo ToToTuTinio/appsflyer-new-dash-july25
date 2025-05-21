@@ -961,7 +961,7 @@ def get_fraud():
     try:
         data = request.get_json()
         active_apps = data.get('apps', [])
-        period = data.get('period', 'last10')
+        period = 'last30'  # Force last 30 days period
         force = data.get('force', False)
         start_date, end_date = get_period_dates(period)
         # Create a unique cache key based on period and sorted app IDs
@@ -976,8 +976,8 @@ def get_fraud():
         )''')
         conn.commit()
         if not force:
-            # Use LIKE query for all ranges to ensure consistent behavior
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
+            # Use LIKE query for last30 range
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('last30%',))
             row = c.fetchone()
             if row:
                 data, updated_at = row
@@ -1484,16 +1484,9 @@ def get_fraud_for_range(range_key):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        period_map = {
-            '30d': ['30d', 'last30']
-        }
-        keys = period_map.get(range_key, [range_key])
-        row = None
-        for key in keys:
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
-            row = c.fetchone()
-            if row:
-                break
+        # Only use last30 period
+        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('last30%',))
+        row = c.fetchone()
         conn.close()
         if row:
             data, updated_at = row
