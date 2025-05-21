@@ -1,19 +1,3 @@
-import logging
-import logging.handlers
-import os
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler('gunicorn.out'),
-        logging.FileHandler('worker.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
 from flask_cors import CORS
 import os
@@ -961,7 +945,7 @@ def get_fraud():
     try:
         data = request.get_json()
         active_apps = data.get('apps', [])
-        period = 'last30'  # Force last 30 days period
+        period = data.get('period', 'last10')
         force = data.get('force', False)
         start_date, end_date = get_period_dates(period)
         # Create a unique cache key based on period and sorted app IDs
@@ -976,8 +960,8 @@ def get_fraud():
         )''')
         conn.commit()
         if not force:
-            # Use LIKE query for last30 range
-            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('last30%',))
+            # Use LIKE query for all ranges to ensure consistent behavior
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
             row = c.fetchone()
             if row:
                 data, updated_at = row
@@ -1177,10 +1161,10 @@ def get_fraud():
 @login_required
 def overview():
     try:
-        # Read the most recent 'last30' stats_cache entry (regardless of event selections or app IDs)
+        # Read the most recent 'last10' stats_cache entry (regardless of event selections or app IDs)
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last30%' ORDER BY updated_at DESC LIMIT 1")
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
         row = c.fetchone()
         total_impressions = 0
         total_clicks = 0
@@ -1214,8 +1198,8 @@ def overview():
         trend_clicks = [date_map[d]['clicks'] for d in trend_dates]
         trend_installs = [date_map[d]['installs'] for d in trend_dates]
 
-        # Use only the most recent 'last2:' fraud_cache entry for Top Fraudulent Sources
-        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last2:%' ORDER BY updated_at DESC LIMIT 1")
+        # Use only the most recent 'last10:' fraud_cache entry for Top Fraudulent Sources
+        c.execute("SELECT range FROM fraud_cache WHERE range LIKE 'last10:%' ORDER BY updated_at DESC LIMIT 1")
         fraud_cache_row = c.fetchone()
         top_bad_sources_by_app = []
         if fraud_cache_row:
@@ -1484,9 +1468,19 @@ def get_fraud_for_range(range_key):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        # Only use last30 period
-        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", ('last30%',))
-        row = c.fetchone()
+        period_map = {
+            '10d': ['10d', 'last10'],
+            'mtd': ['mtd'],
+            'lastmonth': ['lastmonth'],
+            '30d': ['30d', 'last30']
+        }
+        keys = period_map.get(range_key, [range_key])
+        row = None
+        for key in keys:
+            c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
+            row = c.fetchone()
+            if row:
+                break
         conn.close()
         if row:
             data, updated_at = row
@@ -1504,6 +1498,9 @@ def get_stats_for_range(range_key):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         period_map = {
+            '10d': ['10d', 'last10'],
+            'mtd': ['mtd'],
+            'lastmonth': ['lastmonth'],
             '30d': ['30d', 'last30']
         }
         keys = period_map.get(range_key, [range_key])
@@ -1527,8 +1524,8 @@ def get_stats_for_range(range_key):
 def process_report_async(apps, period, selected_events):
     """Background task to process report data"""
     try:
-        logger.info(f"[REPORT] Starting async report processing for period: {period}")
-        logger.info(f"[REPORT] Processing {len(apps)} apps")
+        print(f"[REPORT] Starting async report processing for period: {period}")
+        print(f"[REPORT] Processing {len(apps)} apps")
         
         start_date, end_date = get_period_dates(period)
         stats_list = []
@@ -1536,25 +1533,25 @@ def process_report_async(apps, period, selected_events):
         for app in apps:
             app_id = app['app_id']
             app_name = app['app_name']
-            logger.info(f"[REPORT] Processing app: {app_name} (App ID: {app_id})...")
+            print(f"[REPORT] Processing app: {app_name} (App ID: {app_id})...")
             
             # Use the aggregate daily report endpoint for main stats
             url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
             params = {"from": start_date, "to": end_date}
             
             try:
-                logger.info(f"[REPORT] Calling daily_report API for {app_id}...")
+                print(f"[REPORT] Calling daily_report API for {app_id}...")
                 resp = make_api_request(url, params)
                 if resp == 'timeout':
-                    logger.warning(f"[REPORT] Timeout detected for {app_id}, skipping to next app.")
+                    print(f"[REPORT] Timeout detected for {app_id}, skipping to next app.")
                     continue
                 
                 daily_stats = {}
                 if resp and resp.status_code == 200:
-                    logger.info(f"[REPORT] Got daily_report for {app_id}")
+                    print(f"[REPORT] Got daily_report for {app_id}")
                     rows = resp.text.strip().split("\n")
                     if len(rows) < 2:  # Only header or empty
-                        logger.warning(f"[REPORT] No data returned for {app_id}")
+                        print(f"[REPORT] No data returned for {app_id}")
                         continue
                         
                     header = rows[0].split(",")
@@ -1582,7 +1579,7 @@ def process_report_async(apps, period, selected_events):
                     date_idx = find_col('date', 'Date')
                     
                     if None in [impressions_idx, clicks_idx, installs_idx, date_idx]:
-                        logger.warning(f"[REPORT] Could not find all required columns for {app_id}")
+                        print(f"[REPORT] Could not find all required columns for {app_id}")
                         continue
                         
                     # Process each row
@@ -1608,12 +1605,7 @@ def process_report_async(apps, period, selected_events):
                 # Add blocked installs data
                 blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
                 blocked_rt_resp = make_api_request(blocked_rt_url, params)
-                if blocked_rt_resp == 'timeout':
-                    logger.warning(f"[REPORT] Timeout detected for blocked_installs_report {app_id}, skipping to next app.")
-                    continue
-                
                 if blocked_rt_resp and blocked_rt_resp.status_code == 200:
-                    logger.info(f"[REPORT] Got blocked_installs_report for {app_id}")
                     rows = blocked_rt_resp.text.strip().split("\n")
                     if len(rows) > 1:
                         header = rows[0].split(",")
@@ -1623,17 +1615,15 @@ def process_report_async(apps, period, selected_events):
                             if date_idx is not None and len(cols) > date_idx:
                                 install_date = cols[date_idx].split(" ")[0]
                                 if install_date in daily_stats:
-                                    daily_stats[install_date]["blocked_installs_rt"] = daily_stats[install_date].get("blocked_installs_rt", 0) + 1
-                else:
-                    logger.warning(f"[REPORT] blocked_installs_report API error for {app_id}: {blocked_rt_resp.status_code if blocked_rt_resp else 'No response'}")
-
-                # Process in-app events if selected
+                                    daily_stats[install_date]["blocked_installs_rt"] += 1
+                                    
+                # Add event data if selected
                 event_data = {}
-                if selected_events:
+                selected = selected_events.get(app_id, [])
+                if selected:
                     events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
                     events_resp = make_api_request(events_url, params)
                     if events_resp and events_resp.status_code == 200:
-                        logger.info(f"[REPORT] Got in_app_events_report for {app_id}")
                         rows = events_resp.text.strip().split("\n")
                         if len(rows) > 1:
                             header = rows[0].split(",")
@@ -1645,13 +1635,11 @@ def process_report_async(apps, period, selected_events):
                                 if event_name_idx is not None and event_time_idx is not None and len(cols) > max(event_name_idx, event_time_idx):
                                     event_name = cols[event_name_idx]
                                     event_date = cols[event_time_idx].split(" ")[0]
-                                    if event_name in selected_events:
+                                    if event_name in selected:
                                         event_data.setdefault(event_name, {})
                                         event_data[event_name].setdefault(event_date, 0)
                                         event_data[event_name][event_date] += 1
-                    else:
-                        logger.warning(f"[REPORT] in_app_events_report API error for {app_id}: {events_resp.status_code if events_resp else 'No response'}")
-
+                                        
                 # Prepare daily stats for frontend
                 all_dates = sorted(daily_stats.keys())
                 table = []
@@ -1672,8 +1660,8 @@ def process_report_async(apps, period, selected_events):
                     row["blocked_pa_rate"] = round(row["blocked_installs_pa"] / row["installs"], 2) if row["installs"] > 0 else 0
                     
                     # Add event counts
-                    if selected_events:
-                        for event in selected_events:
+                    if selected:
+                        for event in selected:
                             row[event] = event_data.get(event, {}).get(date, 0)
                             
                     table.append(row)
@@ -1682,15 +1670,15 @@ def process_report_async(apps, period, selected_events):
                     'app_id': app_id,
                     'app_name': app_name,
                     'table': table,
-                    'selected_events': selected_events,
+                    'selected_events': selected,
                     'traffic': sum(r['impressions'] + r['clicks'] for r in table)
                 })
                 
             except Exception as e:
-                logger.error(f"[REPORT] Error processing app {app_id}: {str(e)}")
+                print(f"[REPORT] Error processing app {app_id}: {str(e)}")
                 continue
             except BrokenPipeError as e:
-                logger.error(f"[REPORT] BrokenPipeError (EPIPE) for app {app_id}: {str(e)}. Skipping to next app.")
+                print(f"[REPORT] BrokenPipeError (EPIPE) for app {app_id}: {str(e)}. Skipping to next app.")
                 continue
                 
         # Save to cache
@@ -1719,47 +1707,30 @@ def process_report_async(apps, period, selected_events):
             conn.commit()
             conn.close()
             
-            logger.info(f"[REPORT] Successfully completed report generation for period: {period}")
             return result
             
     except BrokenPipeError as e:
-        logger.error(f"[REPORT] BrokenPipeError (EPIPE) at outer level: {str(e)}. Returning empty result so frontend can proceed.")
+        print(f"[REPORT] BrokenPipeError (EPIPE) at outer level: {str(e)}. Returning empty result so frontend can proceed.")
         return {'apps': [], 'error': 'BrokenPipeError (EPIPE) occurred'}
     except Exception as e:
-        logger.error(f"[REPORT] Error in process_report_async: {str(e)}")
+        print(f"[REPORT] Error in process_report_async: {str(e)}")
         raise
     return {'apps': [], 'error': 'Failed to process report'}
 
 @app.route('/start-report', methods=['POST'])
 @login_required
 def start_report():
-    try:
-        data = request.get_json()
-        apps = data.get('apps', [])
-        period = 'last30'  # Force last 30 days period
-        selected_events = data.get('events', [])
+    data = request.get_json()
+    apps = data.get('apps', [])
+    period = data.get('period')
+    selected_events = data.get('selected_events', [])
 
-        if not apps:
-            logger.warning("[REPORT] No apps selected for report generation")
-            return jsonify({'error': 'No apps selected'}), 400
-
-        logger.info(f"[REPORT] Starting report generation for {len(apps)} apps")
-        # Start the report generation in the background
-        job = task_queue.enqueue(
-            process_report_async,
-            args=(apps, period, selected_events),
-            job_timeout='1h'
-        )
-
-        logger.info(f"[REPORT] Report generation job enqueued with ID: {job.id}")
-        return jsonify({
-            'job_id': job.id,
-            'status': 'started',
-            'message': 'Report generation started'
-        })
-    except Exception as e:
-        logger.error(f"[REPORT] Error starting report: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+    # Run synchronously (not as a background job)
+    result = process_report_async(apps, period, selected_events)
+    return jsonify({
+        'status': 'completed',
+        'result': result
+    })
 
 @app.route('/report-status/<job_id>')
 @login_required
