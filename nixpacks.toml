@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ['python3', 'nodejs', 'google-chrome', 'chromedriver']
+
+[phases.install]
+cmds = [
+    'pip install -r requirements.txt',
+    'which google-chrome',
+    'which chromedriver',
+    'google-chrome --version',
+    'chromedriver --version'
+]
+
+[start]
+cmd = 'gunicorn -w 4 -b 0.0.0.0:$PORT backend.app:app' 
