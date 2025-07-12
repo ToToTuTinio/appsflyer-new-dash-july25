@@ -46,13 +46,22 @@ RUN apt-get update && apt-get install -y \
     google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver
-RUN CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
-    wget -N http://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip -P ~/ && \
-    unzip ~/chromedriver_linux64.zip -d ~/ && \
-    rm ~/chromedriver_linux64.zip && \
-    mv ~/chromedriver /usr/local/bin/chromedriver && \
-    chmod +x /usr/local/bin/chromedriver
+# Install ChromeDriver compatible with Chrome 138
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1) && \
+    echo "Chrome version: $CHROME_VERSION" && \
+    if [ "$CHROME_VERSION" -ge "138" ]; then \
+        CHROMEDRIVER_VERSION="131.0.6778.108"; \
+    elif [ "$CHROME_VERSION" -ge "130" ]; then \
+        CHROMEDRIVER_VERSION="130.0.6723.116"; \
+    else \
+        CHROMEDRIVER_VERSION="114.0.5735.90"; \
+    fi && \
+    echo "Installing ChromeDriver version: $CHROMEDRIVER_VERSION" && \
+    wget -q "https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip" -O chromedriver.zip && \
+    unzip chromedriver.zip && \
+    mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+    chmod +x /usr/local/bin/chromedriver && \
+    rm -rf chromedriver.zip chromedriver-linux64
 
 # Copy requirements first for better caching
 COPY requirements.txt .
