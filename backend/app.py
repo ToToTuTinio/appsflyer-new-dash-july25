@@ -23,10 +23,35 @@ from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
 
-# Initialize Redis connection
-redis_conn = Redis(host='localhost', port=6379, db=0)
-# Initialize RQ queue
-task_queue = Queue(connection=redis_conn)
+# Initialize Redis connection for Railway (or localhost)
+import os
+from urllib.parse import urlparse
+
+# Get Redis URL from environment variable (Railway provides REDIS_URL)
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+
+try:
+    # Parse Redis URL to extract connection parameters
+    parsed_url = urlparse(redis_url)
+    redis_host = parsed_url.hostname or 'localhost'
+    redis_port = parsed_url.port or 6379
+    redis_db = int(parsed_url.path.lstrip('/')) if parsed_url.path and len(parsed_url.path) > 1 else 0
+    
+    # Initialize Redis connection
+    redis_conn = Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
+    
+    # Test Redis connection
+    redis_conn.ping()
+    print(f"✅ Redis connected successfully to {redis_host}:{redis_port}")
+    
+    # Initialize RQ queue
+    task_queue = Queue(connection=redis_conn)
+    
+except Exception as e:
+    print(f"⚠️  Redis connection failed: {e}")
+    print("📝 Background tasks will be disabled")
+    redis_conn = None
+    task_queue = None
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from appsflyer_login import get_apps_with_installs
@@ -1976,6 +2001,10 @@ def start_report():
 @app.route('/report-status/<job_id>')
 @login_required
 def report_status(job_id):
+    # Handle case where Redis/task_queue is not available
+    if task_queue is None:
+        return jsonify({'status': 'not_found', 'message': 'Background tasks disabled'})
+    
     job = task_queue.fetch_job(job_id)
     if job is None:
         return jsonify({'status': 'not_found'})
@@ -2058,4 +2087,6 @@ def get_active_app_ids():
     return active_apps
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Use PORT environment variable provided by Railway, default to 5000
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
