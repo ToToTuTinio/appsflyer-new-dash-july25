@@ -22,6 +22,17 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
 from rq import Queue
+import logging
+
+# Configure logging for Railway
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Initialize Redis connection for Railway (or localhost)
 import os
@@ -42,14 +53,14 @@ try:
     
     # Test Redis connection
     redis_conn.ping()
-    print(f"✅ Redis connected successfully to {redis_host}:{redis_port}")
+    logger.info(f"✅ Redis connected successfully to {redis_host}:{redis_port}")
     
     # Initialize RQ queue
     task_queue = Queue(connection=redis_conn)
     
 except Exception as e:
-    print(f"⚠️  Redis connection failed: {e}")
-    print("📝 Background tasks will be disabled")
+    logger.warning(f"⚠️  Redis connection failed: {e}")
+    logger.info("📝 Background tasks will be disabled")
     redis_conn = None
     task_queue = None
 
@@ -60,8 +71,8 @@ from appsflyer_login import get_apps_with_installs
 project_root = Path(__file__).parent.parent
 env_path = project_root / '.env.local'
 
-print(f"Looking for .env file at: {env_path}")
-print(f"File exists: {env_path.exists()}")
+logger.info(f"Looking for .env file at: {env_path}")
+logger.info(f"File exists: {env_path.exists()}")
 
 # Read the .env.local file directly
 if env_path.exists():
