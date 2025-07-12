@@ -49,10 +49,6 @@ Thumbs.db
 gunicorn.out
 server.pid
 
-# Chrome driver files
-bin/
-chromedriver*
-
 # Debugging files
 page_debug.html
 

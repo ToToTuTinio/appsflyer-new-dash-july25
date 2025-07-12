@@ -14,16 +14,23 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy everything
+# Set working directory
 WORKDIR /app
+
+# Copy requirements first (for better Docker layer caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy everything (including your working bin/ directory)
 COPY . .
 
-# Install Python packages
-RUN pip install -r requirements.txt
-
-# Make ChromeDriver executable
+# Make ChromeDriver executable and ensure proper permissions
 RUN chmod +x bin/chromedriver* 2>/dev/null || true
 
-# Run EXACTLY like your local setup
+# Set environment variables for Railway
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Change to backend directory and run exactly like your local setup
 WORKDIR /app/backend
 CMD ["python3", "app.py"] 
