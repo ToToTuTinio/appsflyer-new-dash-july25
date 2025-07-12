@@ -1,0 +1,7 @@
+# Force Railway to ignore everything except Dockerfile
+*
+!Dockerfile
+!requirements.txt
+!backend/
+!appsflyer_login.py
+!.env.local 

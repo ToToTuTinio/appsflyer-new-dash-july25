@@ -34,5 +34,6 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Run the Flask app directly (it handles PORT env var)
-CMD ["python", "backend/app.py"] 
+# Change to backend directory and run app (exactly like local)
+WORKDIR /app/backend
+CMD ["python", "app.py"] 
