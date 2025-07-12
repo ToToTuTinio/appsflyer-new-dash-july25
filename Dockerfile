@@ -30,5 +30,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Run the application
-CMD ["sh", "-c", "gunicorn -w 4 -b 0.0.0.0:${PORT:-8080} backend.app:app"] 
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Make start.py executable
+RUN chmod +x start.py
+
+# Run the application using Python script
+CMD ["python", "start.py"] 
