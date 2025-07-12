@@ -50,10 +50,27 @@ RUN echo "Installing Chrome 131 and matching ChromeDriver..." && \
     rm -rf chrome.zip chromedriver.zip chromedriver-linux64 && \
     echo "Chrome and ChromeDriver installation complete"
 
-# Create Chrome wrapper script for containerized environment
+# Create Chrome wrapper script with extensive debugging and containerized environment
 RUN echo '#!/bin/bash\n\
+echo "Chrome wrapper script starting..."\n\
+echo "Arguments: $@"\n\
 export DISPLAY=${DISPLAY:-:99}\n\
 export CHROME_DEVEL_SANDBOX=/opt/chrome/chrome_sandbox\n\
+export HOME=/tmp\n\
+export TMPDIR=/tmp\n\
+\n\
+# Create necessary directories\n\
+mkdir -p /tmp/.chrome\n\
+mkdir -p /tmp/.config/google-chrome\n\
+mkdir -p /tmp/.local/share/applications\n\
+mkdir -p /dev/shm\n\
+chmod 1777 /dev/shm\n\
+\n\
+echo "Chrome binary: /opt/chrome/chrome"\n\
+echo "Chrome binary exists: $(test -f /opt/chrome/chrome && echo yes || echo no)"\n\
+echo "Chrome binary executable: $(test -x /opt/chrome/chrome && echo yes || echo no)"\n\
+\n\
+# Start Chrome with extensive flags for containers\n\
 exec /opt/chrome/chrome \\\n\
   --no-sandbox \\\n\
   --disable-gpu \\\n\
@@ -81,6 +98,13 @@ exec /opt/chrome/chrome \\\n\
   --use-mock-keychain \\\n\
   --force-color-profile=srgb \\\n\
   --single-process \\\n\
+  --user-data-dir=/tmp/.chrome \\\n\
+  --data-path=/tmp/.chrome \\\n\
+  --disk-cache-dir=/tmp/.chrome/cache \\\n\
+  --remote-debugging-port=0 \\\n\
+  --disable-logging \\\n\
+  --log-level=3 \\\n\
+  --silent \\\n\
   "$@"' > /usr/bin/google-chrome && \
     chmod +x /usr/bin/google-chrome
 
@@ -101,8 +125,10 @@ ENV CHROME_OPTS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-se
 ENV CHROME_DEVEL_SANDBOX=/opt/chrome/chrome_sandbox
 ENV GOOGLE_CHROME_SHIM=/usr/bin/google-chrome
 
-# Create directories for Chrome
-RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+# Create directories for Chrome and ensure proper permissions
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix && \
+    mkdir -p /dev/shm && chmod 1777 /dev/shm && \
+    mkdir -p /tmp/.chrome && chmod 777 /tmp/.chrome
 
 # Change to backend directory
 WORKDIR /app/backend
