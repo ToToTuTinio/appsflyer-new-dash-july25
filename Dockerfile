@@ -1,7 +1,9 @@
 FROM python:3.12-slim
 
-# Install only essential system packages and Chrome (lightweight)
+# Install basic shell commands (including cd) + Chrome requirements
 RUN apt-get update && apt-get install -y \
+    bash \
+    coreutils \
     wget \
     unzip \
     curl \
@@ -12,26 +14,16 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a real 'cd' executable for Railway
-RUN echo '#!/bin/sh\nbuiltin cd "$@" 2>/dev/null || exit 0' > /usr/bin/cd && chmod +x /usr/bin/cd
-
-# Set working directory
+# Copy everything
 WORKDIR /app
-
-# Copy requirements and install Python packages
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the ENTIRE application including your working bin/ directory
 COPY . .
 
-# Make sure your local ChromeDriver is executable
+# Install Python packages
+RUN pip install -r requirements.txt
+
+# Make ChromeDriver executable
 RUN chmod +x bin/chromedriver* 2>/dev/null || true
 
-# Set environment variables exactly like local
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PATH=/usr/bin:$PATH
-
-# Run the app from the root directory but specify the backend module
-CMD ["python", "-m", "backend.app"] 
+# Run EXACTLY like your local setup
+WORKDIR /app/backend
+CMD ["python3", "app.py"] 
