@@ -1,30 +1,15 @@
 FROM python:3.12-slim
 
-# Install system dependencies, Chrome, and ALL shell utilities
+# Install only essential system packages and Chrome (lightweight)
 RUN apt-get update && apt-get install -y \
-    bash \
-    coreutils \
-    util-linux \
     wget \
-    gnupg \
     unzip \
     curl \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
-
-# Install ChromeDriver
-RUN CHROMEDRIVER_VERSION=`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE` && \
-    wget -N http://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip -P ~/ && \
-    unzip ~/chromedriver_linux64.zip -d ~/ && \
-    rm ~/chromedriver_linux64.zip && \
-    mv ~/chromedriver /usr/local/bin/chromedriver && \
-    chmod +x /usr/local/bin/chromedriver
-
-# Create a fake 'cd' command as backup
-RUN echo '#!/bin/bash' > /usr/local/bin/cd && echo 'builtin cd "$@"' >> /usr/local/bin/cd && chmod +x /usr/local/bin/cd
 
 # Set working directory
 WORKDIR /app
@@ -33,16 +18,16 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy the ENTIRE application including your working bin/ directory
 COPY . .
 
-# Set environment variables
+# Make sure your local ChromeDriver is executable
+RUN chmod +x bin/chromedriver* 2>/dev/null || true
+
+# Set environment variables exactly like local
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-ENV SHELL=/bin/bash
 
-# Create startup script with explicit bash
-RUN echo '#!/bin/bash\ncd /app/backend\nexec python app.py' > /start.sh && chmod +x /start.sh
-
-# Use bash to run the startup script
-CMD ["/bin/bash", "/start.sh"] 
+# Run exactly like your local development
+WORKDIR /app/backend
+CMD ["python", "app.py"] 

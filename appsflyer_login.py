@@ -22,9 +22,10 @@ def get_chrome_driver_service():
     """
     # Try different ChromeDriver paths for different environments
     possible_paths = [
+        "/app/bin/chromedriver",  # Your local bin directory in Docker
+        str(Path.home() / "bin" / "chromedriver"),  # Local development
         "/usr/local/bin/chromedriver",  # Docker installation
         "/usr/bin/chromedriver",  # System installation
-        str(Path.home() / "bin" / "chromedriver"),  # Local development
         "chromedriver",  # In PATH
     ]
     
