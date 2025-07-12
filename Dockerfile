@@ -42,17 +42,12 @@ COPY . .
 ENV CHROME_BIN=/usr/bin/google-chrome-stable
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 
-# Create a non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN chown -R appuser:appuser /app
-
-# Change to backend directory
-WORKDIR /app/backend
-
-USER appuser
+# Set environment variables for Chrome
+ENV CHROME_BIN=/usr/bin/google-chrome-stable
+ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 
 # Expose port
 EXPOSE $PORT
 
-# Start the application
-CMD ["python", "app.py"] 
+# Start the application directly with full path
+CMD ["python", "/app/backend/app.py"] 
