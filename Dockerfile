@@ -49,9 +49,7 @@ RUN echo "Installing Chrome 131 and matching ChromeDriver..." && \
     chmod +x /usr/local/bin/chromedriver && \
     ln -sf /opt/chrome/chrome /usr/bin/google-chrome && \
     rm -rf chrome.zip chromedriver.zip chromedriver-linux64 && \
-    echo "Chrome and ChromeDriver installation complete" && \
-    /opt/chrome/chrome --version && \
-    /usr/local/bin/chromedriver --version
+    echo "Chrome and ChromeDriver installation complete"
 
 # Copy requirements first for better caching
 COPY requirements.txt .
