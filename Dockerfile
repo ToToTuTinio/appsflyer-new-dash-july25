@@ -50,6 +50,8 @@ RUN apt-get update && apt-get install -y \
 RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1) && \
     echo "Chrome version: $CHROME_VERSION" && \
     if [ "$CHROME_VERSION" -ge "138" ]; then \
+        CHROMEDRIVER_VERSION="138.0.7204.87"; \
+    elif [ "$CHROME_VERSION" -ge "131" ]; then \
         CHROMEDRIVER_VERSION="131.0.6778.108"; \
     elif [ "$CHROME_VERSION" -ge "130" ]; then \
         CHROMEDRIVER_VERSION="130.0.6723.116"; \
