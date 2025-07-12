@@ -37,26 +37,20 @@ RUN apt-get update && apt-get install -y \
     libgconf-2-4 \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Google Chrome repository
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
-
-# Install Google Chrome
-RUN apt-get update && apt-get install -y \
-    google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ChromeDriver compatible with Chrome 138 - Force clean installation
-RUN rm -f /usr/local/bin/chromedriver* && \
-    CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    echo "Full Chrome version: $CHROME_VERSION" && \
-    echo "Installing ChromeDriver for Chrome 138..." && \
-    wget -q "https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.87/linux64/chromedriver-linux64.zip" -O chromedriver.zip && \
+# Install Chrome and ChromeDriver with exact version matching - avoid cache issues
+RUN echo "Installing Chrome 131 and matching ChromeDriver..." && \
+    wget -q "https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.108/linux64/chrome-linux64.zip" -O chrome.zip && \
+    wget -q "https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.108/linux64/chromedriver-linux64.zip" -O chromedriver.zip && \
+    unzip -o chrome.zip && \
     unzip -o chromedriver.zip && \
+    mv chrome-linux64 /opt/chrome && \
     mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+    chmod +x /opt/chrome/chrome && \
     chmod +x /usr/local/bin/chromedriver && \
-    rm -rf chromedriver.zip chromedriver-linux64 && \
-    echo "ChromeDriver installation complete" && \
+    ln -sf /opt/chrome/chrome /usr/bin/google-chrome && \
+    rm -rf chrome.zip chromedriver.zip chromedriver-linux64 && \
+    echo "Chrome and ChromeDriver installation complete" && \
+    /opt/chrome/chrome --version && \
     /usr/local/bin/chromedriver --version
 
 # Copy requirements first for better caching
@@ -69,7 +63,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Set environment variables for Chrome
-ENV CHROME_BIN=/usr/bin/google-chrome-stable
+ENV CHROME_BIN=/opt/chrome/chrome
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
 ENV CHROME_OPTS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox --headless"
