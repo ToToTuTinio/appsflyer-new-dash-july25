@@ -98,12 +98,46 @@ def get_apps_with_installs(email, password, max_retries=7):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1920,1080")
+    
+    # Optimal window size for AppsFlyer's responsive layout
+    # Narrow width forces single/double column layout for more predictable scrolling
+    chrome_options.add_argument("--window-size=800,1200")  # Narrow width, tall height
+    
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--disable-notifications")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # Additional options for better headless mode performance and lazy loading
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-ipc-flooding-protection")
+    chrome_options.add_argument("--enable-automation")
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--disable-features=TranslateUI")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--metrics-recording-only")
+    chrome_options.add_argument("--no-first-run")
+    chrome_options.add_argument("--enable-precise-memory-info")
+    chrome_options.add_argument("--disable-logging")
+    chrome_options.add_argument("--disable-plugins")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--aggressive-cache-discard")
+    
+    # Prefs for better performance and lazy loading
+    chrome_options.add_experimental_option("prefs", {
+        "profile.default_content_setting_values": {
+            "notifications": 2,
+            "media_stream": 2,
+        },
+        "profile.managed_default_content_settings": {
+            "images": 1
+        }
+    })
 
     driver = webdriver.Chrome(options=chrome_options)
     driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
@@ -114,7 +148,7 @@ def get_apps_with_installs(email, password, max_retries=7):
             print("Opening login page...")
             driver.get("https://hq1.appsflyer.com/auth/login")
             time.sleep(5)
-#this is a test
+            
             print("Waiting for email field...")
             try:
                 email_field = WebDriverWait(driver, 30).until(
@@ -161,23 +195,174 @@ def get_apps_with_installs(email, password, max_retries=7):
             print("Clicking login button...")
             login_button.click()
             print("Waiting for dashboard to load...")
-            time.sleep(5)
+            time.sleep(15)
 
             print("Navigating to the Apps page...")
             driver.get("https://hq1.appsflyer.com/apps/myapps")
-            time.sleep(15)
+            time.sleep(20)
+            
+            # Inject JavaScript to help with lazy loading in headless mode
+            driver.execute_script("""
+                // Force trigger scroll events for lazy loading
+                window.addEventListener('scroll', function() {
+                    // Dispatch custom events to ensure lazy loading triggers
+                    window.dispatchEvent(new Event('resize'));
+                    window.dispatchEvent(new Event('scroll'));
+                });
+                
+                // Override IntersectionObserver to be more aggressive in headless mode
+                if (window.IntersectionObserver) {
+                    const OriginalIntersectionObserver = window.IntersectionObserver;
+                    window.IntersectionObserver = function(callback, options) {
+                        // Make threshold more aggressive for headless mode
+                        const modifiedOptions = {
+                            ...options,
+                            threshold: 0,
+                            rootMargin: '100px'
+                        };
+                        return new OriginalIntersectionObserver(callback, modifiedOptions);
+                    };
+                }
+                
+                // Simulate user activity to prevent throttling
+                setInterval(() => {
+                    window.dispatchEvent(new Event('scroll'));
+                }, 1000);
+            """)
+            print("JavaScript injection complete for better lazy loading")
 
             print("Loading all apps via scrolling...")
-            app_elements = []
-            while True:
+            print("🎯 Using optimized scrolling for narrow layout (800px width)")
+            
+            # Enhanced scrolling approach for maximum app collection
+            last_height = driver.execute_script("return document.body.scrollHeight")
+            scroll_attempts = 0
+            max_scroll_attempts = 100  # Increased for thorough collection
+            stable_count = 0
+            max_stable_attempts = 5  # More strict stability check
+            last_app_count = 0
+            
+            # Track app discovery rate
+            app_counts_history = []
+            
+            while scroll_attempts < max_scroll_attempts:
+                # Get current app count
                 current_app_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
-
-                if len(current_app_elements) > len(app_elements):
-                    app_elements = current_app_elements
-                    driver.execute_script("arguments[0].scrollIntoView();", app_elements[-1])
-                    time.sleep(5)
+                current_count = len(current_app_elements)
+                app_counts_history.append(current_count)
+                
+                print(f"📊 Scroll attempt {scroll_attempts + 1}: Found {current_count} apps")
+                
+                # Multi-strategy aggressive scrolling
+                # Strategy 1: Scroll to absolute bottom with multiple attempts
+                for i in range(3):
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(1)
+                
+                # Strategy 2: Check height and app count changes
+                new_height = driver.execute_script("return document.body.scrollHeight")
+                height_changed = new_height > last_height
+                count_changed = current_count > last_app_count
+                
+                # Strategy 3: Incremental scrolling from current position
+                current_scroll = driver.execute_script("return window.pageYOffset;")
+                for step in [400, 800, 1200]:
+                    driver.execute_script(f"window.scrollTo(0, {current_scroll + step});")
+                    time.sleep(0.5)
+                
+                # Strategy 4: Force scroll to last visible element and beyond
+                if current_app_elements:
+                    try:
+                        last_element = current_app_elements[-1]
+                        # Scroll to last element
+                        driver.execute_script("arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});", last_element)
+                        time.sleep(1)
+                        # Scroll beyond it
+                        driver.execute_script("window.scrollBy(0, 1000);")
+                        time.sleep(1)
+                    except:
+                        pass
+                
+                # Strategy 5: Page End key simulation
+                driver.execute_script("document.body.focus(); window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(1)
+                
+                # Strategy 6: Force trigger scroll events
+                driver.execute_script("""
+                    window.dispatchEvent(new Event('scroll'));
+                    window.dispatchEvent(new Event('resize'));
+                    setTimeout(() => {
+                        window.scrollTo(0, document.body.scrollHeight);
+                    }, 500);
+                """)
+                time.sleep(2)
+                
+                # Re-check app count after all scrolling strategies
+                final_check_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
+                final_count = len(final_check_elements)
+                
+                # Update tracking variables
+                if height_changed or final_count > current_count:
+                    last_height = new_height
+                    last_app_count = max(current_count, final_count)
+                    stable_count = 0
+                    print(f"✅ Progress: height_changed={height_changed}, apps_found={final_count}")
                 else:
+                    stable_count += 1
+                    print(f"⏸️ No new content (stable_count: {stable_count}/{max_stable_attempts})")
+                
+                # Enhanced exit conditions
+                recent_counts = app_counts_history[-5:] if len(app_counts_history) >= 5 else app_counts_history
+                if len(recent_counts) >= 3 and len(set(recent_counts)) == 1:
+                    print(f"🔒 App count stable at {final_count} for last {len(recent_counts)} attempts")
+                    stable_count += 2  # Accelerate exit for truly stable counts
+                
+                # Exit conditions
+                if stable_count >= max_stable_attempts:
+                    print(f"🎯 Scrolling complete: {final_count} apps found after {scroll_attempts + 1} attempts")
                     break
+                
+                scroll_attempts += 1
+                
+                # Periodic deep wait for lazy loading
+                if scroll_attempts % 10 == 0:
+                    print("⏳ Deep wait for lazy loading...")
+                    time.sleep(5)
+                elif scroll_attempts % 5 == 0:
+                    print("⏳ Waiting for lazy loading...")
+                    time.sleep(3)
+            
+            # Final comprehensive verification
+            print("🔍 Final verification and cleanup...")
+            
+            # Multiple final scrolls to ensure everything is loaded
+            for i in range(5):
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(1)
+                driver.execute_script("window.scrollBy(0, 500);")
+                time.sleep(1)
+            
+            # Get final app count
+            final_app_elements = driver.find_elements(By.CSS_SELECTOR, '[data-qa-id="card-app-id"]')
+            final_total = len(final_app_elements)
+            
+            print(f"📈 Scrolling Statistics:")
+            print(f"   • Total scroll attempts: {scroll_attempts}")
+            print(f"   • Final apps found: {final_total}")
+            print(f"   • Apps per attempt: {final_total/max(1, scroll_attempts):.1f}")
+            
+            if final_total == 0:
+                print("❌ No apps found - this might indicate:")
+                print("   • Login issues or session timeout")
+                print("   • AppsFlyer interface changes")
+                print("   • Network connectivity problems")
+            elif final_total < 10:
+                print("⚠️  Warning: Found very few apps. This might indicate:")
+                print("   • Network issues during loading")
+                print("   • AppsFlyer interface changes")
+                print("   • Lazy loading configuration issues")
+            else:
+                print("🎉 Success: All apps loaded successfully!")
 
             print("Scrolling complete. Extracting apps...")
             apps_with_installs = []

@@ -503,6 +503,14 @@ def all_apps_stats():
     start_date, end_date = get_period_dates(period)
     print(f"[STATS] /all-apps-stats called for period: {period} ({start_date} to {end_date})")
     print(f"[STATS] Apps: {[app['app_id'] for app in active_apps]}")
+    
+    # Add comprehensive processing tracking
+    total_apps = len(active_apps)
+    processed_apps = 0
+    skipped_apps = 0
+    
+    print(f"[STATS] Starting stats data processing for {total_apps} apps...")
+    
     stats_list = []
     
     # Build a unique cache key for stats: period:event1:event2:app_ids
@@ -536,6 +544,9 @@ def all_apps_stats():
         app_name = app['app_name']
         print(f"[STATS] Fetching stats for app: {app_name} (App ID: {app_id})...")
         
+        timeout_count = 0
+        app_errors = []
+        
         # Use the aggregate daily report endpoint for main stats
         url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
         params = {"from": start_date, "to": end_date}
@@ -544,8 +555,9 @@ def all_apps_stats():
             print(f"[STATS] Calling daily_report API for {app_id}...")
             resp = make_api_request(url, params)
             if resp == 'timeout':
-                print(f"[STATS] Timeout detected for {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[STATS] Timeout detected for daily_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Daily Report API timeout")
             daily_stats = {}
             
             if resp and resp.status_code == 200:
@@ -621,8 +633,9 @@ def all_apps_stats():
             blocked_rt_params = {"from": start_date, "to": end_date}
             blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
             if blocked_rt_resp == 'timeout':
-                print(f"[STATS] Timeout detected for blocked_installs_report {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[STATS] Timeout detected for blocked_installs_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked Installs (RT) API timeout")
             
             # Process Blocked Installs (RT) data
             if blocked_rt_resp and blocked_rt_resp.status_code == 200:
@@ -643,8 +656,9 @@ def all_apps_stats():
             blocked_pa_params = {"from": start_date, "to": end_date}
             blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
             if blocked_pa_resp == 'timeout':
-                print(f"[STATS] Timeout detected for detection API {app_id}, returning processing status.")
-                return jsonify({'status': 'processing'})
+                print(f"[STATS] Timeout detected for detection API {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked Installs (PA) API timeout")
             
             # Process Blocked Installs (PA) data
             if blocked_pa_resp and blocked_pa_resp.status_code == 200:
@@ -726,15 +740,26 @@ def all_apps_stats():
                     for event in selected:
                         row[event] = event_data.get(event, {}).get(date, 0)
                 table.append(row)
+            # Determine if we should skip this app entirely
+            if timeout_count >= 3:  # All 3 main API calls timed out
+                print(f"[STATS] Skipping app {app_name} ({app_id}) - all API calls timed out")
+                skipped_apps += 1
+                continue
+                
+            print(f"[STATS] Successfully processed app {app_name} ({app_id}) with {timeout_count} timeouts")
+            processed_apps += 1
+            
             stats_list.append({
                 'app_id': app_id,
                 'app_name': app_name,
                 'table': table,
                 'selected_events': selected,
-                'traffic': sum(r['impressions'] + r['clicks'] for r in table)
+                'traffic': sum(r['impressions'] + r['clicks'] for r in table),
+                'errors': app_errors
             })
         except Exception as e:
             print(f"[STATS] Error for app {app_id}: {e}")
+            skipped_apps += 1
             stats_list.append({
                 'app_id': app_id,
                 'app_name': app_name,
@@ -743,13 +768,27 @@ def all_apps_stats():
                 'traffic': 0,
                 'error': str(e)
             })
-    print(f"[STATS] Done. Returning stats for {len(stats_list)} apps.")
     stats_list.sort(key=lambda x: x['traffic'], reverse=True)
+    
     # Save to cache ONLY if there is at least one app
     if len(stats_list) > 0:
         c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)', (cache_key, json.dumps({'apps': stats_list})))
         conn.commit()
+        print(f"[STATS] Saved {len(stats_list)} apps to cache with key: {cache_key}")
+    else:
+        print(f"[STATS] No apps to cache - stats_list is empty")
+        
     conn.close()
+    
+    # Final completion logging
+    print(f"[STATS] ===== STATS PROCESSING COMPLETED =====")
+    print(f"[STATS] Total apps requested: {total_apps}")
+    print(f"[STATS] Apps successfully processed: {processed_apps}")
+    print(f"[STATS] Apps skipped due to timeouts: {skipped_apps}")
+    print(f"[STATS] Apps included in response: {len(stats_list)}")
+    print(f"[STATS] Returning response with {len(stats_list)} apps")
+    print(f"[STATS] ==========================================")
+    
     return jsonify({'apps': stats_list})
 
 @app.route('/event-selections', methods=['GET'])
@@ -785,6 +824,8 @@ def save_event_selections():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
+        saved_count = 0
+        
         # Check if it's a single update or bulk update
         if isinstance(data, dict) and 'app_id' in data:
             # Single update
@@ -793,26 +834,35 @@ def save_event_selections():
             event2 = data.get('event2')
             is_active = data.get('is_active', False)
             
+            print(f"[SAVE] Single update for app {app_id}: event1={event1}, event2={event2}, active={is_active}")
+            
             c.execute('''INSERT OR REPLACE INTO app_event_selections 
                         (app_id, event1, event2, is_active) 
                         VALUES (?, ?, ?, ?)''', 
                      (app_id, event1, event2, 1 if is_active else 0))
+            saved_count = 1
         else:
             # Bulk update
+            print(f"[SAVE] Bulk update for {len(data)} apps")
             for app_id, app_data in data.items():
                 event1 = app_data.get('event1')
                 event2 = app_data.get('event2')
                 is_active = app_data.get('is_active', False)
+                app_name = app_data.get('app_name', app_id)
+                
+                print(f"[SAVE] - App {app_name} ({app_id}): event1={event1}, event2={event2}, active={is_active}")
                 
                 c.execute('''INSERT OR REPLACE INTO app_event_selections 
                             (app_id, event1, event2, is_active) 
                             VALUES (?, ?, ?, ?)''', 
                          (app_id, event1, event2, 1 if is_active else 0))
+                saved_count += 1
         
         conn.commit()
-        return jsonify({"success": True})
+        print(f"[SAVE] Successfully saved {saved_count} app configurations to database (permanent storage)")
+        return jsonify({"success": True, "saved_count": saved_count})
     except Exception as e:
-        print(f"Error saving event selections: {str(e)}")
+        print(f"[SAVE] Error saving event selections: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         conn.close()
@@ -889,10 +939,38 @@ def update_credential():
     data = request.get_json()
     key = data.get('key')
     value = data.get('value')
+    
+    # Validate input
+    if not key or not value:
+        return jsonify({'success': False, 'error': 'Key and value are required'}), 400
+    
     if key not in allowed_keys:
         return jsonify({'success': False, 'error': 'Invalid key'}), 400
+    
+    # Basic validation for specific keys
+    if key == 'EMAIL' and '@' not in value:
+        return jsonify({'success': False, 'error': 'Invalid email format'}), 400
+    
+    if key == 'APPSFLYER_API_KEY' and len(value.strip()) < 10:
+        return jsonify({'success': False, 'error': 'API key appears to be too short'}), 400
+    
+    if key == 'PASSWORD' and len(value.strip()) < 4:
+        return jsonify({'success': False, 'error': 'Password must be at least 4 characters'}), 400
+    
     env_path = Path(__file__).parent.parent / '.env.local'
+    backup_path = Path(__file__).parent.parent / '.env.backup'
+    
     try:
+        # Ensure parent directory exists
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create backup of current .env.local file
+        if env_path.exists():
+            with open(env_path, 'r') as original:
+                with open(backup_path, 'w') as backup:
+                    backup.write(original.read())
+            print(f"[CREDENTIAL] Created backup of .env.local at {backup_path}")
+        
         # Read all lines
         lines = []
         found = False
@@ -902,17 +980,57 @@ def update_credential():
                     if line.strip().startswith(f'{key}='):
                         lines.append(f'{key}="{value}"\n')
                         found = True
+                        print(f"[CREDENTIAL] Updated existing {key} in .env.local")
                     else:
                         lines.append(line)
+        
+        # If key not found, add it
         if not found:
             lines.append(f'{key}="{value}"\n')
+            print(f"[CREDENTIAL] Added new {key} to .env.local")
+        
+        # Write updated content
         with open(env_path, 'w') as f:
             f.writelines(lines)
+        
+        # Verify file was written correctly
+        if not env_path.exists():
+            raise Exception("Failed to write .env.local file")
+        
         # Update in-memory env var
         os.environ[key] = value
-        return jsonify({'success': True})
+        
+        print(f"[CREDENTIAL] Successfully updated {key} in .env.local and memory")
+        print(f"[CREDENTIAL] File location: {env_path.absolute()}")
+        print(f"[CREDENTIAL] File permissions: {oct(env_path.stat().st_mode)[-3:]}")
+        print(f"[CREDENTIAL] File size: {env_path.stat().st_size} bytes")
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{key} updated successfully',
+            'file_path': str(env_path.absolute()),
+            'backup_created': backup_path.exists()
+        })
+        
+    except PermissionError:
+        error_msg = f"Permission denied writing to {env_path}. Check file permissions."
+        print(f"[CREDENTIAL] ERROR: {error_msg}")
+        return jsonify({'success': False, 'error': error_msg}), 500
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        error_msg = f"Failed to update credential: {str(e)}"
+        print(f"[CREDENTIAL] ERROR: {error_msg}")
+        
+        # Try to restore from backup if it exists
+        if backup_path.exists() and env_path.exists():
+            try:
+                with open(backup_path, 'r') as backup:
+                    with open(env_path, 'w') as original:
+                        original.write(backup.read())
+                print(f"[CREDENTIAL] Restored .env.local from backup due to error")
+            except:
+                print(f"[CREDENTIAL] Failed to restore backup")
+        
+        return jsonify({'success': False, 'error': error_msg}), 500
 
 @app.route('/profile-info')
 @login_required
@@ -923,6 +1041,71 @@ def profile_info():
         'email': os.getenv('EMAIL', ''),
         'password': os.getenv('PASSWORD', '')
     })
+
+@app.route('/env-status')
+@login_required
+def env_status():
+    """Debug endpoint to check .env.local file status for deployment"""
+    env_path = Path(__file__).parent.parent / '.env.local'
+    backup_path = Path(__file__).parent.parent / '.env.backup'
+    
+    status = {
+        'env_file_exists': env_path.exists(),
+        'env_file_path': str(env_path.absolute()),
+        'env_file_readable': False,
+        'env_file_writable': False,
+        'env_file_size': 0,
+        'env_file_permissions': None,
+        'backup_exists': backup_path.exists(),
+        'credentials_loaded': {
+            'EMAIL': bool(os.getenv('EMAIL')),
+            'PASSWORD': bool(os.getenv('PASSWORD')),
+            'APPSFLYER_API_KEY': bool(os.getenv('APPSFLYER_API_KEY')),
+        },
+        'deployment_ready': False
+    }
+    
+    try:
+        if env_path.exists():
+            # Check file permissions and readability
+            stat_info = env_path.stat()
+            status['env_file_size'] = stat_info.st_size
+            status['env_file_permissions'] = oct(stat_info.st_mode)[-3:]
+            
+            # Test readability
+            try:
+                with open(env_path, 'r') as f:
+                    content = f.read()
+                    status['env_file_readable'] = True
+                    status['env_lines_count'] = len([line for line in content.split('\n') if line.strip()])
+            except:
+                status['env_file_readable'] = False
+            
+            # Test writability
+            try:
+                test_path = env_path.parent / '.env.test'
+                with open(test_path, 'w') as f:
+                    f.write('test')
+                test_path.unlink()  # Delete test file
+                status['env_file_writable'] = True
+            except:
+                status['env_file_writable'] = False
+        
+        # Check if deployment ready
+        status['deployment_ready'] = (
+            status['env_file_exists'] and 
+            status['env_file_readable'] and 
+            status['env_file_writable'] and
+            all(status['credentials_loaded'].values())
+        )
+        
+        print(f"[ENV-STATUS] Environment status check: {status}")
+        
+    except Exception as e:
+        print(f"[ENV-STATUS] Error checking environment status: {e}")
+        status['error'] = str(e)
+    
+    return jsonify(status)
 
 def find_media_source_idx(header):
     # More flexible matching for Media Source column
@@ -972,12 +1155,20 @@ def get_fraud():
                     conn.close()
                     return jsonify(result)
         fraud_list = []
+        total_apps = len(active_apps)
+        processed_apps = 0
+        skipped_apps = 0
+        
+        print(f"[FRAUD] Starting fraud data processing for {total_apps} apps...")
+        
         for app in active_apps:
             app_id = app['app_id']
             app_name = app['app_name']
             print(f"[FRAUD] Fetching fraud data for app: {app_name} (App ID: {app_id})...")
             table = []
             app_errors = []
+            timeout_count = 0
+            
             # Helper: aggregate by (date, media_source)
             agg = {}
             def add_metric(date, media_source, key):
@@ -999,8 +1190,9 @@ def get_fraud():
             blocked_rt_params = {"from": start_date, "to": end_date}
             blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
             if blocked_rt_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, skipping to next app.")
-                continue
+                print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked Installs (RT) API timeout")
             if blocked_rt_resp and blocked_rt_resp.status_code == 200:
                 rows = blocked_rt_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1022,8 +1214,9 @@ def get_fraud():
             blocked_pa_params = {"from": start_date, "to": end_date}
             blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
             if blocked_pa_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for detection API {app_id}, skipping to next app.")
-                continue
+                print(f"[FRAUD] Timeout detected for detection API {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked Installs (PA) API timeout")
             if blocked_pa_resp and blocked_pa_resp.status_code == 200:
                 rows = blocked_pa_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1045,8 +1238,9 @@ def get_fraud():
             blocked_events_params = {"from": start_date, "to": end_date}
             blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params)
             if blocked_events_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, skipping to next app.")
-                continue
+                print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked In-App Events API timeout")
             if blocked_events_resp and blocked_events_resp.status_code == 200:
                 rows = blocked_events_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1068,8 +1262,9 @@ def get_fraud():
             fraud_post_inapps_params = {"from": start_date, "to": end_date}
             fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params)
             if fraud_post_inapps_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, skipping to next app.")
-                continue
+                print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Fraud Post-InApps API timeout")
             if fraud_post_inapps_resp and fraud_post_inapps_resp.status_code == 200:
                 rows = fraud_post_inapps_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1091,8 +1286,9 @@ def get_fraud():
             blocked_clicks_params = {"from": start_date, "to": end_date}
             blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params)
             if blocked_clicks_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, skipping to next app.")
-                continue
+                print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked Clicks API timeout")
             if blocked_clicks_resp and blocked_clicks_resp.status_code == 200:
                 rows = blocked_clicks_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1114,8 +1310,9 @@ def get_fraud():
             blocked_postbacks_params = {"from": start_date, "to": end_date}
             blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params)
             if blocked_postbacks_resp == 'timeout':
-                print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, skipping to next app.")
-                continue
+                print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Blocked Install Postbacks API timeout")
             if blocked_postbacks_resp and blocked_postbacks_resp.status_code == 200:
                 rows = blocked_postbacks_resp.text.strip().split("\n")
                 if len(rows) > 1:
@@ -1140,6 +1337,16 @@ def get_fraud():
                 table.append(row)
             print(f"[FRAUD] Final table for {app_name} has {len(table)} rows")
             print(f"[FRAUD] Unique media sources: {sorted(set(row['media_source'] for row in table))}")
+            
+            # Determine if we should skip this app entirely
+            if timeout_count >= 6:  # All 6 API calls timed out
+                print(f"[FRAUD] Skipping app {app_name} ({app_id}) - all API calls timed out")
+                skipped_apps += 1
+                continue
+                
+            print(f"[FRAUD] Successfully processed app {app_name} ({app_id}) with {timeout_count} timeouts")
+            processed_apps += 1
+            
             fraud_list.append({
                 'app_id': app_id,
                 'app_name': app_name,
@@ -1151,10 +1358,29 @@ def get_fraud():
             c.execute('REPLACE INTO fraud_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
                       (cache_key, json.dumps({'apps': fraud_list})))
             conn.commit()
+            print(f"[FRAUD] Saved {len(fraud_list)} apps to cache with key: {cache_key}")
+        else:
+            print(f"[FRAUD] No apps to cache - fraud_list is empty")
+            
         conn.close()
+        
+        # Final completion logging
+        print(f"[FRAUD] ===== FRAUD PROCESSING COMPLETED =====")
+        print(f"[FRAUD] Total apps requested: {total_apps}")
+        print(f"[FRAUD] Apps successfully processed: {processed_apps}")
+        print(f"[FRAUD] Apps skipped due to timeouts: {skipped_apps}")
+        print(f"[FRAUD] Apps included in response: {len(fraud_list)}")
+        print(f"[FRAUD] Returning response with {len(fraud_list)} apps")
+        print(f"[FRAUD] ==========================================")
+        
         return jsonify({'apps': fraud_list})
     except Exception as e:
-        print(f"[FRAUD] Error: {e}")
+        print(f"[FRAUD] ===== FRAUD PROCESSING FAILED =====")
+        print(f"[FRAUD] Exception occurred: {e}")
+        print(f"[FRAUD] Exception type: {type(e).__name__}")
+        import traceback
+        print(f"[FRAUD] Full traceback: {traceback.format_exc()}")
+        print(f"[FRAUD] ===============================")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/overview')
@@ -1420,23 +1646,7 @@ def get_subpage_10d():
     app.logger.debug('GET /get_subpage_10d')
     return get_stats_for_range('10d')
 
-@app.route('/get_subpage_mtd')
-def get_subpage_mtd():
-    import logging
-    app.logger.debug('GET /get_subpage_mtd')
-    return get_stats_for_range('mtd')
 
-@app.route('/get_subpage_lastmonth')
-def get_subpage_lastmonth():
-    import logging
-    app.logger.debug('GET /get_subpage_lastmonth')
-    return get_stats_for_range('lastmonth')
-
-@app.route('/get_subpage_30d')
-def get_subpage_30d():
-    import logging
-    app.logger.debug('GET /get_subpage_30d')
-    return get_stats_for_range('30d')
 
 # --- Fraud Analytics endpoints ---
 @app.route('/get_fraud_subpage_10d')
@@ -1445,36 +1655,19 @@ def get_fraud_subpage_10d():
     app.logger.debug('GET /get_fraud_subpage_10d')
     return get_fraud_for_range('10d')
 
-@app.route('/get_fraud_subpage_mtd')
-def get_fraud_subpage_mtd():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_mtd')
-    return get_fraud_for_range('mtd')
 
-@app.route('/get_fraud_subpage_lastmonth')
-def get_fraud_subpage_lastmonth():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_lastmonth')
-    return get_fraud_for_range('lastmonth')
 
-@app.route('/get_fraud_subpage_30d')
-def get_fraud_subpage_30d():
-    import logging
-    app.logger.debug('GET /get_fraud_subpage_30d')
-    return get_fraud_for_range('30d')
-
-# Helper to fetch fraud for a given range
+# Helper to fetch fraud for a given range (10d only)
 def get_fraud_for_range(range_key):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        period_map = {
-            '10d': ['10d', 'last10'],
-            'mtd': ['mtd'],
-            'lastmonth': ['lastmonth'],
-            '30d': ['30d', 'last30']
-        }
-        keys = period_map.get(range_key, [range_key])
+        # Only support 10d range now
+        if range_key == '10d':
+            keys = ['10d', 'last10']
+        else:
+            keys = [range_key]
+        
         row = None
         for key in keys:
             c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{key}%",))
@@ -1527,6 +1720,13 @@ def process_report_async(apps, period, selected_events):
         print(f"[REPORT] Starting async report processing for period: {period}")
         print(f"[REPORT] Processing {len(apps)} apps")
         
+        # Add comprehensive processing tracking
+        total_apps = len(apps)
+        processed_apps = 0
+        skipped_apps = 0
+        
+        print(f"[REPORT] Starting report data processing for {total_apps} apps...")
+        
         start_date, end_date = get_period_dates(period)
         stats_list = []
         
@@ -1534,6 +1734,9 @@ def process_report_async(apps, period, selected_events):
             app_id = app['app_id']
             app_name = app['app_name']
             print(f"[REPORT] Processing app: {app_name} (App ID: {app_id})...")
+            
+            timeout_count = 0
+            app_errors = []
             
             # Use the aggregate daily report endpoint for main stats
             url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
@@ -1543,8 +1746,9 @@ def process_report_async(apps, period, selected_events):
                 print(f"[REPORT] Calling daily_report API for {app_id}...")
                 resp = make_api_request(url, params)
                 if resp == 'timeout':
-                    print(f"[REPORT] Timeout detected for {app_id}, skipping to next app.")
-                    continue
+                    print(f"[REPORT] Timeout detected for daily_report {app_id}, continuing with other APIs...")
+                    timeout_count += 1
+                    app_errors.append("Daily Report API timeout")
                 
                 daily_stats = {}
                 if resp and resp.status_code == 200:
@@ -1666,19 +1870,31 @@ def process_report_async(apps, period, selected_events):
                             
                     table.append(row)
                     
+                # Determine if we should skip this app entirely
+                if timeout_count >= 2:  # Multiple API calls timed out
+                    print(f"[REPORT] Skipping app {app_name} ({app_id}) - multiple API calls timed out")
+                    skipped_apps += 1
+                    continue
+                    
+                print(f"[REPORT] Successfully processed app {app_name} ({app_id}) with {timeout_count} timeouts")
+                processed_apps += 1
+                
                 stats_list.append({
                     'app_id': app_id,
                     'app_name': app_name,
                     'table': table,
                     'selected_events': selected,
-                    'traffic': sum(r['impressions'] + r['clicks'] for r in table)
+                    'traffic': sum(r['impressions'] + r['clicks'] for r in table),
+                    'errors': app_errors
                 })
                 
             except Exception as e:
                 print(f"[REPORT] Error processing app {app_id}: {str(e)}")
+                skipped_apps += 1
                 continue
             except BrokenPipeError as e:
                 print(f"[REPORT] BrokenPipeError (EPIPE) for app {app_id}: {str(e)}. Skipping to next app.")
+                skipped_apps += 1
                 continue
                 
         # Save to cache
@@ -1707,13 +1923,38 @@ def process_report_async(apps, period, selected_events):
             conn.commit()
             conn.close()
             
-            return result
+            print(f"[REPORT] Saved {len(stats_list)} apps to cache with key: {cache_key}")
+        else:
+            print(f"[REPORT] No apps to cache - stats_list is empty")
+            result = {
+                'apps': [],
+                'updated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        
+        # Final completion logging
+        print(f"[REPORT] ===== REPORT PROCESSING COMPLETED =====")
+        print(f"[REPORT] Total apps requested: {total_apps}")
+        print(f"[REPORT] Apps successfully processed: {processed_apps}")
+        print(f"[REPORT] Apps skipped due to timeouts: {skipped_apps}")
+        print(f"[REPORT] Apps included in response: {len(stats_list)}")
+        print(f"[REPORT] Returning response with {len(stats_list)} apps")
+        print(f"[REPORT] ==========================================")
+        
+        return result
             
     except BrokenPipeError as e:
-        print(f"[REPORT] BrokenPipeError (EPIPE) at outer level: {str(e)}. Returning empty result so frontend can proceed.")
+        print(f"[REPORT] ===== REPORT PROCESSING FAILED (BROKEN PIPE) =====")
+        print(f"[REPORT] BrokenPipeError at outer level: {str(e)}")
+        print(f"[REPORT] Returning empty result so frontend can proceed")
+        print(f"[REPORT] ==========================================")
         return {'apps': [], 'error': 'BrokenPipeError (EPIPE) occurred'}
     except Exception as e:
-        print(f"[REPORT] Error in process_report_async: {str(e)}")
+        print(f"[REPORT] ===== REPORT PROCESSING FAILED =====")
+        print(f"[REPORT] Exception occurred: {e}")
+        print(f"[REPORT] Exception type: {type(e).__name__}")
+        import traceback
+        print(f"[REPORT] Full traceback: {traceback.format_exc()}")
+        print(f"[REPORT] ==========================================")
         raise
     return {'apps': [], 'error': 'Failed to process report'}
 

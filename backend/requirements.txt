@@ -1,9 +1,11 @@
-flask==2.0.1
-flask-cors==3.0.10
+flask==2.3.3
+flask-cors==4.0.0
 selenium==4.1.0
 requests==2.26.0
 python-dotenv==0.19.0
-rq==1.9.0
-redis==4.0.2
+rq==1.16.1
+redis==5.0.1
 flask-limiter==3.3.0
 gunicorn
+werkzeug==2.3.7
+pytz
