@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-# Ensure we're in the correct directory
-cd /app/backend
+# Verify we're in the correct directory (should be /app/backend from Dockerfile WORKDIR)
+echo "Current directory: $(pwd)"
+echo "Directory contents: $(ls -la)"
 
 # Verify Python is available
 echo "Python version: $(python3 --version)"
@@ -16,6 +17,6 @@ if [ -z "$DASHBOARD_PASSWORD" ]; then
     echo "WARNING: DASHBOARD_PASSWORD not set"
 fi
 
-# Start the application
+# Start the application (no cd needed, we're already in the right directory)
 echo "Starting Flask application..."
 exec python3 app.py 

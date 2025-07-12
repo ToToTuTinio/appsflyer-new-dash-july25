@@ -27,12 +27,12 @@ COPY . .
 # Make ChromeDriver executable and ensure proper permissions
 RUN chmod +x bin/chromedriver* 2>/dev/null || true
 
-# Make the startup script executable
-RUN chmod +x docker-start.sh
-
 # Set environment variables for Railway
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Use the startup script to ensure proper environment setup
-CMD ["/app/docker-start.sh"] 
+# Set final working directory to backend (where app.py is located)
+WORKDIR /app/backend
+
+# Run Python directly - no shell commands needed
+CMD ["python3", "app.py"] 
