@@ -15,6 +15,44 @@ from pathlib import Path
 # Load environment variables
 load_dotenv()
 
+def get_chrome_driver_service():
+    """
+    Get ChromeDriver service with automatic path detection for different environments.
+    Returns Service object or None if ChromeDriver should be auto-detected.
+    """
+    # Try different ChromeDriver paths for different environments
+    possible_paths = [
+        str(Path.home() / "bin" / "chromedriver"),  # Local development
+        "/usr/bin/chromedriver",  # System installation
+        "/usr/local/bin/chromedriver",  # Alternative system path
+        "chromedriver",  # In PATH
+    ]
+    
+    chromedriver_path = None
+    for path in possible_paths:
+        if path == "chromedriver":
+            # Check if chromedriver is in PATH
+            import shutil
+            if shutil.which("chromedriver"):
+                chromedriver_path = "chromedriver"
+                break
+        elif os.path.exists(path):
+            chromedriver_path = path
+            break
+    
+    if chromedriver_path:
+        print(f"Found ChromeDriver at: {chromedriver_path}")
+        
+        if chromedriver_path != "chromedriver" and not os.access(chromedriver_path, os.X_OK):
+            print(f"ChromeDriver at {chromedriver_path} is not executable. Attempting to fix permissions...")
+            os.chmod(chromedriver_path, 0o755)
+        
+        print(f"Creating Chrome service with ChromeDriver at: {chromedriver_path}")
+        return Service(executable_path=chromedriver_path)
+    else:
+        print("ChromeDriver not found in common locations. Will try system PATH...")
+        return None
+
 def setup_driver():
     try:
         chrome_options = Options()
@@ -23,31 +61,37 @@ def setup_driver():
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-software-rasterizer")
+        chrome_options.add_argument("--remote-debugging-port=9222")
         
-        # Use absolute path to ChromeDriver
-        chromedriver_path = str(Path.home() / "bin" / "chromedriver")
-        
-        print(f"Attempting to use ChromeDriver at: {chromedriver_path}")
-        
-        if not os.path.exists(chromedriver_path):
-            raise FileNotFoundError(f"ChromeDriver not found at {chromedriver_path}. Please make sure it is installed.")
-        
-        if not os.access(chromedriver_path, os.X_OK):
-            print(f"ChromeDriver at {chromedriver_path} is not executable. Attempting to fix permissions...")
-            os.chmod(chromedriver_path, 0o755)
-        
-        print(f"Creating Chrome service with ChromeDriver at: {chromedriver_path}")
-        service = Service(executable_path=chromedriver_path)
+        # Get ChromeDriver service
+        service = get_chrome_driver_service()
         
         print("Initializing Chrome WebDriver...")
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        print("Chrome WebDriver initialized successfully!")
+        if service:
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        else:
+            # Try without specifying path (let Selenium find it)
+            print("Using system PATH to find ChromeDriver...")
+            driver = webdriver.Chrome(options=chrome_options)
         
+        print("Chrome WebDriver initialized successfully!")
         return driver
+            
     except Exception as e:
         print(f"Error in setup_driver: {str(e)}")
         print(f"Current working directory: {os.getcwd()}")
         print(f"PATH environment variable: {os.environ.get('PATH', '')}")
+        
+        # Try to find available executables
+        import shutil
+        chrome_path = shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+        chromedriver_path = shutil.which("chromedriver")
+        
+        print(f"Chrome executable found: {chrome_path}")
+        print(f"ChromeDriver executable found: {chromedriver_path}")
+        
         raise
 
 def login_to_appsflyer():
@@ -139,7 +183,15 @@ def get_apps_with_installs(email, password, max_retries=7):
         }
     })
 
-    driver = webdriver.Chrome(options=chrome_options)
+    # Get ChromeDriver service
+    service = get_chrome_driver_service()
+    
+    # Initialize Chrome WebDriver
+    if service:
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+    else:
+        driver = webdriver.Chrome(options=chrome_options)
+    
     driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
 
     retries = 0
@@ -416,7 +468,15 @@ def get_all_apps_with_status(email, password, max_retries=7):
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    driver = webdriver.Chrome(options=chrome_options)
+    # Get ChromeDriver service
+    service = get_chrome_driver_service()
+    
+    # Initialize Chrome WebDriver
+    if service:
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+    else:
+        driver = webdriver.Chrome(options=chrome_options)
+    
     driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
 
     retries = 0
