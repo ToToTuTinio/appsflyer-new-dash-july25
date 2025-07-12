@@ -40,6 +40,7 @@ from urllib.parse import urlparse
 
 # Get Redis URL from environment variable (Railway provides REDIS_URL)
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+logger.info(f"🔍 Redis URL: {redis_url}")
 
 try:
     # Parse Redis URL to extract connection parameters
@@ -47,6 +48,8 @@ try:
     redis_host = parsed_url.hostname or 'localhost'
     redis_port = parsed_url.port or 6379
     redis_db = int(parsed_url.path.lstrip('/')) if parsed_url.path and len(parsed_url.path) > 1 else 0
+    
+    logger.info(f"🔍 Connecting to Redis at {redis_host}:{redis_port} (db: {redis_db})")
     
     # Initialize Redis connection
     redis_conn = Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
@@ -86,12 +89,22 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 's3cr3t_k3y_4g3ncy_d4sh_2025_!@#%$^&*()_+')
 
-# Initialize rate limiter
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["10000 per day", "5000 per hour"]
-)
+# Initialize rate limiter with Redis if available
+if redis_conn:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["10000 per day", "5000 per hour"],
+        storage_uri=redis_url
+    )
+    logger.info("✅ Rate limiter using Redis backend")
+else:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["10000 per day", "5000 per hour"]
+    )
+    logger.info("⚠️  Rate limiter using in-memory storage (not recommended for production)")
 
 # --- GLOBAL JSON ERROR HANDLER ---
 from werkzeug.exceptions import HTTPException
