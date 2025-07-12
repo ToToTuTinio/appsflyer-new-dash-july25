@@ -22,9 +22,9 @@ def get_chrome_driver_service():
     """
     # Try different ChromeDriver paths for different environments
     possible_paths = [
-        str(Path.home() / "bin" / "chromedriver"),  # Local development
+        "/usr/local/bin/chromedriver",  # Docker installation
         "/usr/bin/chromedriver",  # System installation
-        "/usr/local/bin/chromedriver",  # Alternative system path
+        str(Path.home() / "bin" / "chromedriver"),  # Local development
         "chromedriver",  # In PATH
     ]
     
@@ -67,7 +67,12 @@ def setup_driver():
         
         # Set Chrome binary location for Railway/Linux environments
         import shutil
-        chrome_path = shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+        chrome_path = (
+            shutil.which("google-chrome-stable") or 
+            shutil.which("google-chrome") or 
+            shutil.which("chrome") or 
+            shutil.which("chromium")
+        )
         if chrome_path:
             chrome_options.binary_location = chrome_path
             print(f"Using Chrome binary at: {chrome_path}")
@@ -93,7 +98,12 @@ def setup_driver():
         
         # Try to find available executables
         import shutil
-        chrome_path = shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+        chrome_path = (
+            shutil.which("google-chrome-stable") or 
+            shutil.which("google-chrome") or 
+            shutil.which("chrome") or 
+            shutil.which("chromium")
+        )
         chromedriver_path = shutil.which("chromedriver")
         
         print(f"Chrome executable found: {chrome_path}")
@@ -181,7 +191,12 @@ def get_apps_with_installs(email, password, max_retries=7):
     
     # Set Chrome binary location for Railway/Linux environments
     import shutil
-    chrome_path = shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+    chrome_path = (
+        shutil.which("google-chrome-stable") or 
+        shutil.which("google-chrome") or 
+        shutil.which("chrome") or 
+        shutil.which("chromium")
+    )
     if chrome_path:
         chrome_options.binary_location = chrome_path
         print(f"Using Chrome binary at: {chrome_path}")
@@ -484,7 +499,12 @@ def get_all_apps_with_status(email, password, max_retries=7):
 
     # Set Chrome binary location for Railway/Linux environments
     import shutil
-    chrome_path = shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+    chrome_path = (
+        shutil.which("google-chrome-stable") or 
+        shutil.which("google-chrome") or 
+        shutil.which("chrome") or 
+        shutil.which("chromium")
+    )
     if chrome_path:
         chrome_options.binary_location = chrome_path
         print(f"Using Chrome binary at: {chrome_path}")
