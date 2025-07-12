@@ -1,7 +1,10 @@
 FROM python:3.12-slim
 
-# Install system dependencies and Chrome
+# Install system dependencies, Chrome, and ALL shell utilities
 RUN apt-get update && apt-get install -y \
+    bash \
+    coreutils \
+    util-linux \
     wget \
     gnupg \
     unzip \
@@ -20,6 +23,9 @@ RUN CHROMEDRIVER_VERSION=`curl -sS chromedriver.storage.googleapis.com/LATEST_RE
     mv ~/chromedriver /usr/local/bin/chromedriver && \
     chmod +x /usr/local/bin/chromedriver
 
+# Create a fake 'cd' command as backup
+RUN echo '#!/bin/bash' > /usr/local/bin/cd && echo 'builtin cd "$@"' >> /usr/local/bin/cd && chmod +x /usr/local/bin/cd
+
 # Set working directory
 WORKDIR /app
 
@@ -33,7 +39,10 @@ COPY . .
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV SHELL=/bin/bash
 
-# Change to backend directory and run app (exactly like local)
-WORKDIR /app/backend
-CMD ["python", "app.py"] 
+# Create startup script with explicit bash
+RUN echo '#!/bin/bash\ncd /app/backend\nexec python app.py' > /start.sh && chmod +x /start.sh
+
+# Use bash to run the startup script
+CMD ["/bin/bash", "/start.sh"] 
