@@ -47,9 +47,42 @@ RUN echo "Installing Chrome 131 and matching ChromeDriver..." && \
     mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
     chmod +x /opt/chrome/chrome && \
     chmod +x /usr/local/bin/chromedriver && \
-    ln -sf /opt/chrome/chrome /usr/bin/google-chrome && \
     rm -rf chrome.zip chromedriver.zip chromedriver-linux64 && \
     echo "Chrome and ChromeDriver installation complete"
+
+# Create Chrome wrapper script for containerized environment
+RUN echo '#!/bin/bash\n\
+export DISPLAY=${DISPLAY:-:99}\n\
+export CHROME_DEVEL_SANDBOX=/opt/chrome/chrome_sandbox\n\
+exec /opt/chrome/chrome \\\n\
+  --no-sandbox \\\n\
+  --disable-gpu \\\n\
+  --disable-dev-shm-usage \\\n\
+  --disable-setuid-sandbox \\\n\
+  --disable-extensions \\\n\
+  --disable-default-apps \\\n\
+  --disable-background-networking \\\n\
+  --disable-background-timer-throttling \\\n\
+  --disable-renderer-backgrounding \\\n\
+  --disable-backgrounding-occluded-windows \\\n\
+  --disable-ipc-flooding-protection \\\n\
+  --disable-hang-monitor \\\n\
+  --disable-prompt-on-repost \\\n\
+  --disable-translate \\\n\
+  --disable-crash-reporter \\\n\
+  --disable-domain-reliability \\\n\
+  --disable-component-update \\\n\
+  --disable-client-side-phishing-detection \\\n\
+  --disable-back-forward-cache \\\n\
+  --disable-field-trial-config \\\n\
+  --metrics-recording-only \\\n\
+  --disable-background-mode \\\n\
+  --password-store=basic \\\n\
+  --use-mock-keychain \\\n\
+  --force-color-profile=srgb \\\n\
+  --single-process \\\n\
+  "$@"' > /usr/bin/google-chrome && \
+    chmod +x /usr/bin/google-chrome
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -61,10 +94,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Set environment variables for Chrome
-ENV CHROME_BIN=/opt/chrome/chrome
+ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
 ENV CHROME_OPTS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox --headless"
+ENV CHROME_DEVEL_SANDBOX=/opt/chrome/chrome_sandbox
+ENV GOOGLE_CHROME_SHIM=/usr/bin/google-chrome
 
 # Create directories for Chrome
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
