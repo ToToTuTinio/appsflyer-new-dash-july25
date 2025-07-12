@@ -1,5 +1,5 @@
 
-[2025-05-18 16:05:52 +0300] [45892] [DEBUG] Current configuration:
+[2025-07-10 15:03:50 +0300] [66271] [DEBUG] Current configuration:
   config: ./gunicorn.conf.py
   wsgi_app: None
   bind: ['0.0.0.0:5000']
@@ -11,8 +11,8 @@
   max_requests: 0
   max_requests_jitter: 0
   timeout: 3600
-  graceful_timeout: 30
-  keepalive: 2
+  graceful_timeout: 3600
+  keepalive: 5
   limit_request_line: 4094
   limit_request_fields: 100
   limit_request_field_size: 8190
@@ -22,7 +22,7 @@
   spew: False
   check_config: False
   print_config: False
-  preload_app: False
+  preload_app: True
   sendfile: None
   reuse_port: False
   chdir: /Users/oramitai/Desktop/appsflyer-dash-2025/backend
@@ -37,10 +37,10 @@
   tmp_upload_dir: None
   secure_scheme_headers: {'X-FORWARDED-PROTOCOL': 'ssl', 'X-FORWARDED-PROTO': 'https', 'X-FORWARDED-SSL': 'on'}
   forwarded_allow_ips: ['127.0.0.1', '::1']
-  accesslog: /dev/null
+  accesslog: None
   disable_redirect_access_to_syslog: False
   access_log_format: %(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"
-  errorlog: ../gunicorn.out
+  errorlog: -
   loglevel: debug
   capture_output: True
   logger_class: gunicorn.glogging.Logger
@@ -59,22 +59,22 @@
   default_proc_name: app:app
   pythonpath: None
   paste: None
-  on_starting: <function OnStarting.on_starting at 0x10328c540>
-  on_reload: <function OnReload.on_reload at 0x10328c680>
-  when_ready: <function WhenReady.when_ready at 0x10328c7c0>
-  pre_fork: <function Prefork.pre_fork at 0x10328c9a0>
-  post_fork: <function Postfork.post_fork at 0x10328cae0>
-  post_worker_init: <function PostWorkerInit.post_worker_init at 0x10328cc20>
-  worker_int: <function WorkerInt.worker_int at 0x10328cd60>
-  worker_abort: <function WorkerAbort.worker_abort at 0x10328cea0>
-  pre_exec: <function PreExec.pre_exec at 0x10328cfe0>
-  pre_request: <function PreRequest.pre_request at 0x10328d120>
-  post_request: <function PostRequest.post_request at 0x10328d1c0>
-  child_exit: <function ChildExit.child_exit at 0x10328d300>
-  worker_exit: <function WorkerExit.worker_exit at 0x10328d440>
-  nworkers_changed: <function NumWorkersChanged.nworkers_changed at 0x10328d580>
-  on_exit: <function OnExit.on_exit at 0x10328d6c0>
-  ssl_context: <function NewSSLContext.ssl_context at 0x10328d8a0>
+  on_starting: <function OnStarting.on_starting at 0x1012f2c00>
+  on_reload: <function OnReload.on_reload at 0x1012f2d40>
+  when_ready: <function WhenReady.when_ready at 0x1012f2e80>
+  pre_fork: <function Prefork.pre_fork at 0x1012f3060>
+  post_fork: <function Postfork.post_fork at 0x1012f31a0>
+  post_worker_init: <function PostWorkerInit.post_worker_init at 0x1012f32e0>
+  worker_int: <function WorkerInt.worker_int at 0x1012f3420>
+  worker_abort: <function WorkerAbort.worker_abort at 0x1012f3560>
+  pre_exec: <function PreExec.pre_exec at 0x1012f36a0>
+  pre_request: <function PreRequest.pre_request at 0x1012f37e0>
+  post_request: <function PostRequest.post_request at 0x1012f3880>
+  child_exit: <function ChildExit.child_exit at 0x1012f39c0>
+  worker_exit: <function WorkerExit.worker_exit at 0x1012f3b00>
+  nworkers_changed: <function NumWorkersChanged.nworkers_changed at 0x1012f3c40>
+  on_exit: <function OnExit.on_exit at 0x1012f3d80>
+  ssl_context: <function NewSSLContext.ssl_context at 0x1012f3f60>
   proxy_protocol: False
   proxy_allow_ips: ['127.0.0.1', '::1']
   keyfile: None
@@ -93,20 +93,34 @@
   casefold_http_method: False
   forwarder_headers: ['SCRIPT_NAME', 'PATH_INFO']
   header_map: drop
-[2025-05-18 16:05:52 +0300] [45892] [INFO] Starting gunicorn 23.0.0
-[2025-05-18 16:05:52 +0300] [45892] [ERROR] Connection in use: ('0.0.0.0', 5000)
-[2025-05-18 16:05:52 +0300] [45892] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 48] Address already in use
-[2025-05-18 16:05:52 +0300] [45892] [DEBUG] Retrying in 1 second.
-[2025-05-18 16:05:53 +0300] [45892] [ERROR] Connection in use: ('0.0.0.0', 5000)
-[2025-05-18 16:05:53 +0300] [45892] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 48] Address already in use
-[2025-05-18 16:05:53 +0300] [45892] [DEBUG] Retrying in 1 second.
-[2025-05-18 16:05:54 +0300] [45892] [ERROR] Connection in use: ('0.0.0.0', 5000)
-[2025-05-18 16:05:54 +0300] [45892] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 48] Address already in use
-[2025-05-18 16:05:54 +0300] [45892] [DEBUG] Retrying in 1 second.
-[2025-05-18 16:05:55 +0300] [45892] [ERROR] Connection in use: ('0.0.0.0', 5000)
-[2025-05-18 16:05:55 +0300] [45892] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 48] Address already in use
-[2025-05-18 16:05:55 +0300] [45892] [DEBUG] Retrying in 1 second.
-[2025-05-18 16:05:56 +0300] [45892] [ERROR] Connection in use: ('0.0.0.0', 5000)
-[2025-05-18 16:05:56 +0300] [45892] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 48] Address already in use
-[2025-05-18 16:05:56 +0300] [45892] [DEBUG] Retrying in 1 second.
-[2025-05-18 16:05:57 +0300] [45892] [ERROR] Can't connect to ('0.0.0.0', 5000)
+Looking for .env file at: /Users/oramitai/Desktop/appsflyer-dash-2025/.env.local
+File exists: True
+/Users/oramitai/Desktop/appsflyer-dash-2025/venv/lib/python3.13/site-packages/flask_limiter/extension.py:293: UserWarning: Using the in-memory storage for tracking rate limits as no storage was explicitly specified. This is not recommended for production use. See: https://flask-limiter.readthedocs.io#configuring-a-storage-backend for documentation about configuring the storage backend.
+  warnings.warn(
+[2025-07-10 15:03:50 +0300] [66271] [INFO] Starting gunicorn 23.0.0
+[2025-07-10 15:03:50 +0300] [66271] [DEBUG] Arbiter booted
+[2025-07-10 15:03:50 +0300] [66271] [INFO] Listening at: http://0.0.0.0:5000 (66271)
+[2025-07-10 15:03:50 +0300] [66271] [INFO] Using worker: sync
+[2025-07-10 15:03:50 +0300] [66273] [INFO] Booting worker with pid: 66273
+[2025-07-10 15:03:50 +0300] [66274] [INFO] Booting worker with pid: 66274
+[2025-07-10 15:03:50 +0300] [66275] [INFO] Booting worker with pid: 66275
+[2025-07-10 15:03:50 +0300] [66276] [INFO] Booting worker with pid: 66276
+[2025-07-10 15:03:50 +0300] [66271] [DEBUG] 4 workers
+[2025-07-10 15:04:51 +0300] [66276] [DEBUG] GET /dashboard
+[2025-07-10 15:04:51 +0300] [66276] [DEBUG] GET /get_fraud_subpage_10d
+[2025-07-10 15:04:51 +0300] [66273] [DEBUG] GET /check-auth
+[2025-07-10 15:04:51,858] DEBUG in app: GET /get_fraud_subpage_10d
+[2025-07-10 15:04:51 +0300] [66275] [DEBUG] GET /get_subpage_10d
+[2025-07-10 15:04:51,866] DEBUG in app: GET /get_subpage_10d
+[2025-07-10 15:04:51 +0300] [66273] [DEBUG] GET /event-selections
+[2025-07-10 15:04:51 +0300] [66276] [DEBUG] GET /api/overview
+[2025-07-10 15:04:51 +0300] [66275] [DEBUG] GET /get_subpage_10d
+[2025-07-10 15:04:51 +0300] [66274] [DEBUG] GET /get_stats
+[2025-07-10 15:04:51,982] DEBUG in app: GET /get_subpage_10d
+[2025-07-10 15:04:52 +0300] [66276] [DEBUG] GET /api/overview
+[2025-07-10 15:04:57 +0300] [66273] [INFO] Worker exiting (pid: 66273)
+[2025-07-10 15:04:57 +0300] [66271] [INFO] Handling signal: term
+[2025-07-10 15:04:57 +0300] [66275] [INFO] Worker exiting (pid: 66275)
+[2025-07-10 15:04:57 +0300] [66276] [INFO] Worker exiting (pid: 66276)
+[2025-07-10 15:04:57 +0300] [66274] [INFO] Worker exiting (pid: 66274)
+[2025-07-10 15:04:57 +0300] [66271] [INFO] Shutting down: Master
