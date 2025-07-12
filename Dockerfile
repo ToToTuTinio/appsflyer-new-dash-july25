@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a real 'cd' executable for Railway
+RUN echo '#!/bin/sh\nbuiltin cd "$@" 2>/dev/null || exit 0' > /usr/bin/cd && chmod +x /usr/bin/cd
+
 # Set working directory
 WORKDIR /app
 
@@ -28,7 +31,7 @@ RUN chmod +x bin/chromedriver* 2>/dev/null || true
 # Set environment variables exactly like local
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV PATH=/usr/bin:$PATH
 
-# Run exactly like your local development
-WORKDIR /app/backend
-CMD ["python", "app.py"] 
+# Run the app from the root directory but specify the backend module
+CMD ["python", "-m", "backend.app"] 
