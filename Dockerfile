@@ -45,10 +45,14 @@ ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 # Create a non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 RUN chown -R appuser:appuser /app
+
+# Change to backend directory
+WORKDIR /app/backend
+
 USER appuser
 
 # Expose port
 EXPOSE $PORT
 
 # Start the application
-CMD ["sh", "-c", "cd backend && python app.py"] 
+CMD ["python", "app.py"] 
