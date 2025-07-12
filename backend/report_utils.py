@@ -7,46 +7,20 @@ import time
 from rq import Queue
 from redis import Redis
 import logging
-from urllib.parse import urlparse
-import os
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get Redis URL from environment variable (Railway provides REDIS_URL)
-redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-
-try:
-    # Parse Redis URL to extract connection parameters
-    parsed_url = urlparse(redis_url)
-    redis_host = parsed_url.hostname or 'localhost'
-    redis_port = parsed_url.port or 6379
-    redis_db = int(parsed_url.path.lstrip('/')) if parsed_url.path and len(parsed_url.path) > 1 else 0
-    
-    # Initialize Redis connection
-    redis_conn = Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
-    
-    # Test Redis connection
-    redis_conn.ping()
-    print(f"✅ Report Utils Redis connected successfully to {redis_host}:{redis_port}")
-    
-    # Initialize RQ queue
-    task_queue = Queue(connection=redis_conn)
-    
-except Exception as e:
-    print(f"⚠️  Report Utils Redis connection failed: {e}")
-    redis_conn = None
-    task_queue = None
+# Initialize Redis connection
+redis_conn = Redis(host='localhost', port=6379, db=0)
+# Initialize RQ queue
+task_queue = Queue(connection=redis_conn)
 
 DB_PATH = 'event_selections.db'
 
 def process_report_async(apps, period, selected_events):
     """Process report asynchronously using RQ"""
-    if task_queue is None:
-        logger.error("Cannot process report - Redis/task_queue not available")
-        return None
-        
     logger.info(f"Starting report generation for period: {period}")
     logger.info(f"Number of apps to process: {len(apps) if apps else 'all active apps'}")
     
