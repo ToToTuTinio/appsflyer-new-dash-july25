@@ -1022,6 +1022,15 @@
                 </div>
                 </div>
 
+                <!-- Export Overview Data Button -->
+                <div class="flex justify-center mt-8">
+                    <button id="export-overview-btn" onclick="exportOverviewData()" class="bg-green-50 hover:bg-green-100 border border-green-200 text-green-600 px-8 py-4 rounded-2xl text-base font-semibold transition duration-200 flex items-center space-x-3 hover:border-green-300 shadow-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Export Overview Data</span>
+                    </button>
+                </div>
 
             </div>
         </div>
@@ -1331,7 +1340,12 @@
                     <span id="apps-timestamp" class="font-medium">Never</span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <!-- Export and Clear Cache buttons have been removed -->
+                    <button id="export-apps-btn" onclick="exportAppsData()" class="bg-green-50 hover:bg-green-100 border border-green-200 text-green-600 px-6 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center space-x-2 hover:border-green-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Export Apps</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1492,7 +1506,13 @@
                         <div class="text-red-500 text-sm">Please try again or contact support if the issue persists.</div>
                     </div>
                 </div>
-                <div class="flex justify-center mt-10">
+                <div class="flex justify-center space-x-4 mt-10">
+                    <button id="export-stats-btn" onclick="exportStatsData()" class="bg-green-50 hover:bg-green-100 border border-green-200 text-green-600 px-6 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center space-x-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Export Stats</span>
+                    </button>
                     <button id="clear-stats-cache-btn" class="bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 px-6 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center space-x-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -1528,12 +1548,18 @@
                             <!-- Action Controls (context-aware) -->
                             <div class="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
                                 <!-- Analytics Controls (shown only on Analytics tab) -->
-                                <div id="fraud-analytics-controls" class="flex">
+                                <div id="fraud-analytics-controls" class="flex space-x-3">
                                     <button id="run-fraud-10d-btn" class="bg-white/20 hover:bg-white/30 text-white px-8 py-4 rounded-2xl font-bold text-base shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 border border-white/30 backdrop-blur-sm flex items-center space-x-3">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                                         </svg>
                                         <span>Generate Report</span>
+                                    </button>
+                                    <button id="force-refresh-fraud-btn" class="bg-red-500/20 hover:bg-red-500/30 text-white px-6 py-4 rounded-2xl font-bold text-base shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 border border-red-400/30 backdrop-blur-sm flex items-center space-x-3">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        <span>Force Refresh</span>
                                     </button>
                 </div>
                                                         
@@ -1730,8 +1756,14 @@
                         </div>
                     </div>
                     
-                    <!-- Clear Cache Button -->
-                    <div class="flex justify-center mt-10">
+                    <!-- Export and Clear Cache Buttons -->
+                    <div class="flex justify-center space-x-4 mt-10">
+                        <button id="export-fraud-btn" onclick="exportFraudData()" class="bg-green-50 hover:bg-green-100 border border-green-200 text-green-600 px-6 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>Export Fraud Data</span>
+                        </button>
                         <button id="clear-fraud-cache-btn" class="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 px-6 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center space-x-2 hover:border-indigo-300 hover:text-indigo-600">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -2055,6 +2087,250 @@
                                                     <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                                                     Auto-run every 6 hours
                                                 </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Raw Data Export Section -->
+                                <div class="max-w-4xl mx-auto mb-8">
+                                    <div class="bg-white rounded-2xl shadow-xl p-8 border border-blue-100">
+                                        <div class="text-center mb-8">
+                                            <div class="flex justify-center mb-4">
+                                                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-2xl shadow-lg">
+                                                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <h3 class="text-3xl font-bold text-gray-900 mb-3">
+                                                <span class="bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
+                                                    📊 Raw Data Export
+                                                </span>
+                                            </h3>
+                                            <p class="text-gray-600 mb-6">Export complete raw data reports from your AppsFlyer cache</p>
+                                            <div class="text-sm text-gray-500 bg-gray-50 rounded-lg p-3 mb-6">
+                                                <strong>Note:</strong> These exports contain the complete raw data from your last report generation (last 10 days). 
+                                                If you need fresh data, please run "Get All Stats" first.
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <!-- Stats Raw Data Export -->
+                                            <div class="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                                                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-xl font-bold text-gray-800 mb-2">Stats Raw Data</h4>
+                                                    <p class="text-gray-600 text-sm mb-4">Complete stats report with impressions, clicks, installs, and events</p>
+                                                    <button onclick="exportRawStatsData()" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export Stats</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Fraud Raw Data Export -->
+                                            <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-16 h-16 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                                                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-xl font-bold text-gray-800 mb-2">Fraud Raw Data</h4>
+                                                    <p class="text-gray-600 text-sm mb-4">Complete fraud report with blocked installs, clicks, and sources</p>
+                                                    <button onclick="exportRawFraudData()" class="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export Fraud</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- AppsFlyer Original Raw Data Export -->
+                                <div class="max-w-7xl mx-auto mb-12">
+                                    <div class="bg-white rounded-2xl shadow-xl p-8 border border-purple-100">
+                                        <div class="text-center mb-8">
+                                            <div class="flex justify-center mb-4">
+                                                <div class="bg-gradient-to-r from-purple-500 to-violet-600 p-4 rounded-2xl shadow-lg">
+                                                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <h3 class="text-3xl font-bold text-gray-900 mb-3">
+                                                <span class="bg-gradient-to-r from-purple-700 to-violet-700 bg-clip-text text-transparent">
+                                                    🔧 Original AppsFlyer Raw Data
+                                                </span>
+                                            </h3>
+                                            <p class="text-gray-600 mb-6">Export original, unmodified CSV data directly from AppsFlyer API endpoints</p>
+                                            <div class="text-sm text-gray-500 bg-gray-50 rounded-lg p-3 mb-6">
+                                                <strong>Note:</strong> These exports contain the original raw CSV data from AppsFlyer APIs before any processing by our system. 
+                                                Data is available after running "Get All Stats" or generating fraud reports.
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <!-- Daily Report -->
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Daily Report</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Impressions, clicks, installs by date</p>
+                                                    <button onclick="exportRawDailyReport()" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Blocked Installs RT -->
+                                            <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Installs RT</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Real-time blocked installs</p>
+                                                    <button onclick="exportRawBlockedInstalls()" class="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Detection (PA) -->
+                                            <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Detection (PA)</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Post-attribution detection</p>
+                                                    <button onclick="exportRawDetection()" class="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Blocked In-App Events -->
+                                            <div class="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Events</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Blocked in-app events</p>
+                                                    <button onclick="exportRawBlockedEvents()" class="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Fraud Post-InApps -->
+                                            <div class="bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.882-.833-2.652 0L4.162 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Fraud Post-InApps</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Fraud post-install events</p>
+                                                    <button onclick="exportRawFraudPostInApps()" class="bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Blocked Clicks -->
+                                            <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Clicks</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Blocked clicks report</p>
+                                                    <button onclick="exportRawBlockedClicks()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Blocked Install Postbacks -->
+                                            <div class="bg-gradient-to-br from-teal-50 to-green-50 border border-teal-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-teal-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Postbacks</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Blocked install postbacks</p>
+                                                    <button onclick="exportRawBlockedPostbacks()" class="bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- In-App Events -->
+                                            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V1a1 1 0 011-1h2a1 1 0 011 1v3"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">In-App Events</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">In-app events report</p>
+                                                    <button onclick="exportRawInAppEvents()" class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -3262,8 +3538,10 @@
                     }
                     
                     metrics.push(
-                        { key: 'blocked_rt_rate', label: 'Blocked Installs (RT)', percent: true, icon: '🛡️' },
-                        { key: 'blocked_pa_rate', label: 'Blocked Installs (PA)', percent: true, icon: '🚫' }
+                        { key: 'blocked_installs_rt', label: 'Blocked Installs RT (Count)', isNumber: true, icon: '🛡️' },
+                        { key: 'blocked_rt_rate', label: 'Blocked Installs RT (%)', percent: true, icon: '🛡️' },
+                        { key: 'blocked_installs_pa', label: 'Blocked Installs PA (Count)', isNumber: true, icon: '🚫' },
+                        { key: 'blocked_pa_rate', label: 'Blocked Installs PA (%)', percent: true, icon: '🚫' }
                     );
 
                     // Compute extra % columns
@@ -3370,8 +3648,10 @@
                     }
                     
                     const fraudMetrics = [
-                        { key: 'blocked_rt_rate', label: 'Blocked RT', percent: true, icon: '🛡️' },
-                        { key: 'blocked_pa_rate', label: 'Blocked PA', percent: true, icon: '🚫' }
+                        { key: 'blocked_installs_rt', label: 'Blocked RT (Count)', isNumber: true, icon: '🛡️' },
+                        { key: 'blocked_rt_rate', label: 'Blocked RT (%)', percent: true, icon: '🛡️' },
+                        { key: 'blocked_installs_pa', label: 'Blocked PA (Count)', isNumber: true, icon: '🚫' },
+                        { key: 'blocked_pa_rate', label: 'Blocked PA (%)', percent: true, icon: '🚫' }
                     ];
                     
                     // Compute extra % columns
@@ -4983,6 +5263,32 @@
             };
         
         // Analytics filter removed - no longer needed
+        // Force refresh fraud data by clearing cache and fetching fresh data
+        function forceRefreshFraudData() {
+            showToast('info', 'Force refreshing fraud data...');
+            
+            // Clear the fraud cache on the backend
+            fetch('/clear-fraud-cache', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(() => {
+                // Clear local cache
+                fraudDataCache = { '10d': null };
+                fraudSourceDataCache = { '10d': null };
+                
+                // Trigger fresh data fetch
+                setTimeout(() => {
+                    document.getElementById('run-fraud-10d-btn').click();
+                    showToast('success', 'Fraud cache cleared. Fetching fresh data...');
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error clearing fraud cache:', error);
+                showToast('error', 'Error clearing cache. Please try again.');
+            });
+        }
+        
         function renderFraudAll(data, range) {
             const container = document.getElementById(`fraud-data-${range}`);
             container.innerHTML = '';
@@ -5067,7 +5373,37 @@
             });
             });
             
-            const dates = Object.keys(dateMap).sort();
+            // Debug: Log the calculated totals
+            console.log('🔍 Fraud Analytics - Calculated Totals:');
+            console.log('📊 Blocked Installs (RT):', totals.blocked_installs_rt || 0);
+            console.log('📊 Blocked Installs (PA):', totals.blocked_installs_pa || 0);
+            console.log('📊 Blocked In-App Events:', totals.blocked_in_app_events || 0);
+            console.log('📊 Fraud Post-InApps:', totals.fraud_post_inapps || 0);
+            console.log('📊 Blocked Clicks:', totals.blocked_clicks || 0);
+            console.log('📊 Install Postbacks:', totals.blocked_install_postbacks || 0);
+            console.log('📊 Total apps processed:', data.apps.length);
+            console.log('📊 Total data rows:', data.apps.reduce((sum, app) => sum + (app.table || []).length, 0));
+            
+            // Generate complete date range for last 10 days to include dates with 0 data
+            const today = new Date();
+            const allDates = [];
+            for (let i = 9; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                allDates.push(date.toISOString().split('T')[0]);
+            }
+            
+            // Fill in missing dates with zero values
+            allDates.forEach(date => {
+                if (!dateMap[date]) {
+                    dateMap[date] = {
+                        blocked_installs_rt: 0, blocked_installs_pa: 0, blocked_in_app_events: 0,
+                        fraud_post_inapps: 0, blocked_clicks: 0, blocked_install_postbacks: 0
+                    };
+                }
+            });
+            
+            const dates = allDates;
             
             // Enhanced charts grid with modern design
             const chartsGrid = document.createElement('div');
@@ -5334,8 +5670,19 @@
                             if (!dateSums[row.date]) dateSums[row.date] = 0;
                             dateSums[row.date] += row[metric.key] || 0;
                         });
-                        const sortedDates = Object.keys(dateSums).sort();
-                        const summedData = sortedDates.map(date => dateSums[date]);
+                        
+                        // Generate complete date range for last 10 days to include dates with 0 data
+                        const today = new Date();
+                        const allDates = [];
+                        for (let i = 9; i >= 0; i--) {
+                            const date = new Date(today);
+                            date.setDate(today.getDate() - i);
+                            allDates.push(date.toISOString().split('T')[0]);
+                        }
+                        
+                        // Use complete date range and fill missing dates with 0
+                        const sortedDates = allDates;
+                        const summedData = sortedDates.map(date => dateSums[date] || 0);
                         // Enhanced chart rendering
                         setTimeout(() => {
                             const ctx = document.getElementById(`fraudTrendChart${range}-${idx}-${midx}`);
@@ -5677,7 +6024,17 @@
                          setTimeout(() => {
                          const ctx = document.getElementById(`fraudSourceChart_${idx}_${sidx}_${range}`);
                              if (ctx && window.Chart) {
-                                 const dates = [...new Set(grouped[source].rows.map(r => r.date))].sort();
+                                 // Generate complete date range for last 10 days to include dates with 0 data
+                                 const today = new Date();
+                                 const allDates = [];
+                                 for (let i = 9; i >= 0; i--) {
+                                     const date = new Date(today);
+                                     date.setDate(today.getDate() - i);
+                                     allDates.push(date.toISOString().split('T')[0]);
+                                 }
+                                 
+                                 // Use complete date range instead of just dates with data
+                                 const dates = allDates;
                              
                              // Create enhanced datasets for better visibility
                              const datasets = metrics.map((metric, index) => ({
@@ -7279,10 +7636,17 @@
         // Auto-run system for Get All Stats
         let autoRunTimer = null;
         let countdownTimer = null;
+        let isAutoRunExecuting = false; // Flag to prevent concurrent executions
         const AUTO_RUN_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
         
         // Function to execute Get All Stats
         async function executeGetAllStats(isAutoRun = false) {
+            // Prevent concurrent executions
+            if (isAutoRunExecuting) {
+                console.log('Auto-run already executing, skipping...');
+                return;
+            }
+            
             // Try to load cached apps if not already loaded
             if (!window.fetchedApps || !window.fetchedApps.length) {
                 console.log('Attempting to load cached apps...');
@@ -7318,6 +7682,9 @@
                 return;
                 }
             }
+            
+            // Set execution flag
+            isAutoRunExecuting = true;
             
             button.disabled = true;
             button.textContent = isAutoRun ? 'Auto-Generating Reports...' : 'Generating Reports...';
@@ -7530,9 +7897,6 @@
                 // Update last run time
                 updateLastRunTime();
                 
-                // Reset auto-run timer
-                resetAutoRunTimer();
-                
                 // Show completion alert and final status
                 console.log('🎉 =================================');
                 console.log('🎉 GET ALL STATS COMPLETED SUCCESSFULLY');
@@ -7557,6 +7921,14 @@
                     button.disabled = false;
                     progressContainer.remove();
                     
+                    // Clear execution flag
+                    isAutoRunExecuting = false;
+                    
+                    // Only reset timer if this was an auto-run
+                    if (isAutoRun) {
+                        resetAutoRunTimer();
+                    }
+                    
                     // Show final success toast
                     const finalMessage = isAutoRun ? 
                         'Auto-reports completed! All pages updated with fresh data.' : 
@@ -7571,11 +7943,21 @@
                 errorMessage.textContent = 'Error: ' + error.message;
                 button.parentNode.appendChild(errorMessage);
                 button.textContent = 'Error Generating Reports';
+                
+                // Clear execution flag on error
+                isAutoRunExecuting = false;
+                
                 setTimeout(() => {
                     button.textContent = originalText;
                     button.disabled = false;
                     errorMessage.remove();
-                }, 2000);
+                    progressContainer.remove();
+                    
+                    // Reset timer even on error to prevent getting stuck
+                    if (isAutoRun) {
+                        resetAutoRunTimer();
+                    }
+                }, 5000);
             }
         }
         
@@ -7585,18 +7967,51 @@
             const timeString = now.toLocaleString();
             document.getElementById('last-run-time').textContent = timeString;
             localStorage.setItem('lastRunTime', now.toISOString());
+            console.log('✅ Last run time updated:', timeString);
         }
         
         // Function to reset auto-run timer
         function resetAutoRunTimer() {
+            // Clear existing timers
             if (autoRunTimer) {
                 clearTimeout(autoRunTimer);
+                autoRunTimer = null;
+            }
+            
+            // Don't restart timer if execution is in progress
+            if (isAutoRunExecuting) {
+                console.log('⏸️ Auto-run timer reset skipped - execution in progress');
+                return;
+            }
+            
+            // Calculate remaining time based on last run
+            const lastRunTime = localStorage.getItem('lastRunTime');
+            let remainingTime;
+            
+            if (lastRunTime) {
+                const lastRun = new Date(lastRunTime);
+                const timeSinceLastRun = Date.now() - lastRun.getTime();
+                remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
+            } else {
+                remainingTime = AUTO_RUN_INTERVAL;
+            }
+            
+            const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
+            const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+            
+            console.log(`🔄 Setting auto-run timer for ${remainingHours}h ${remainingMinutes}m...`);
+            
+            if (remainingTime <= 0) {
+                // Should run immediately
+                console.log('⏰ Auto-run overdue - executing immediately...');
+                executeGetAllStats(true);
+                return;
             }
             
             autoRunTimer = setTimeout(() => {
-                console.log('Auto-running Get All Stats...');
+                console.log('⏰ Auto-run timer triggered - executing Get All Stats...');
                 executeGetAllStats(true);
-            }, AUTO_RUN_INTERVAL);
+            }, remainingTime);
             
             // Reset countdown
             startCountdown();
@@ -7606,10 +8021,20 @@
         function startCountdown() {
             if (countdownTimer) {
                 clearInterval(countdownTimer);
+                countdownTimer = null;
             }
             
-            const startTime = Date.now();
-            const endTime = startTime + AUTO_RUN_INTERVAL;
+            // Calculate end time based on last run time, not current time
+            const lastRunTime = localStorage.getItem('lastRunTime');
+            let endTime;
+            
+            if (lastRunTime) {
+                const lastRun = new Date(lastRunTime);
+                endTime = lastRun.getTime() + AUTO_RUN_INTERVAL;
+            } else {
+                // If no last run time, use current time + interval
+                endTime = Date.now() + AUTO_RUN_INTERVAL;
+            }
             
             countdownTimer = setInterval(() => {
                 const now = Date.now();
@@ -7617,6 +8042,7 @@
                 
                 if (remaining <= 0) {
                     clearInterval(countdownTimer);
+                    countdownTimer = null;
                     document.getElementById('next-run-countdown').textContent = '00:00:00';
                     return;
                 }
@@ -7632,6 +8058,8 @@
         
         // Function to initialize auto-run system
         function initializeAutoRunSystem() {
+            console.log('🚀 Initializing auto-run system...');
+            
             // Load last run time from localStorage
             const lastRunTime = localStorage.getItem('lastRunTime');
             if (lastRunTime) {
@@ -7640,18 +8068,57 @@
                 
                 // Check if we should run immediately based on last run time
                 const timeSinceLastRun = Date.now() - lastRun.getTime();
-                if (timeSinceLastRun >= AUTO_RUN_INTERVAL) {
+                const remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
+                
+                const hoursAgo = Math.floor(timeSinceLastRun / (1000 * 60 * 60));
+                const minutesAgo = Math.floor((timeSinceLastRun % (1000 * 60 * 60)) / (1000 * 60));
+                const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
+                const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+                
+                console.log(`⏰ Last run was ${hoursAgo}h ${minutesAgo}m ago`);
+                console.log(`⏰ Time until next run: ${remainingHours}h ${remainingMinutes}m`);
+                
+                if (remainingTime <= 0) {
+                    console.log('📅 Auto-run is overdue, scheduling immediate execution...');
                     // It's been more than 6 hours, run immediately
                     setTimeout(() => {
-                        console.log('Auto-running Get All Stats (overdue)...');
+                        console.log('🚀 Auto-running Get All Stats (overdue)...');
                         executeGetAllStats(true);
-                    }, 5000); // Give 5 seconds delay to ensure page is loaded
+                    }, 10000); // Give 10 seconds delay to ensure page is fully loaded
                     return;
+                } else {
+                    console.log('✅ Auto-run is not overdue, starting normal timer...');
                 }
+            } else {
+                console.log('📝 No previous run time found, starting fresh timer...');
             }
             
             // Start the auto-run timer
             resetAutoRunTimer();
+            
+            // Update countdown display immediately
+            updateCountdownDisplay();
+        }
+        
+        // Function to update countdown display immediately
+        function updateCountdownDisplay() {
+            const lastRunTime = localStorage.getItem('lastRunTime');
+            if (!lastRunTime) {
+                document.getElementById('next-run-countdown').textContent = '06:00:00';
+                return;
+            }
+            
+            const lastRun = new Date(lastRunTime);
+            const endTime = lastRun.getTime() + AUTO_RUN_INTERVAL;
+            const now = Date.now();
+            const remaining = Math.max(0, endTime - now);
+            
+            const hours = Math.floor(remaining / (1000 * 60 * 60));
+            const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+            
+            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('next-run-countdown').textContent = timeString;
         }
         
         // Add event listener for Get All Stats button (manual execution)
@@ -7664,34 +8131,75 @@
             console.log('=== Auto-Run System Status ===');
             console.log('Auto-run timer active:', autoRunTimer !== null);
             console.log('Countdown timer active:', countdownTimer !== null);
-            console.log('Last run time:', localStorage.getItem('lastRunTime'));
+            console.log('Execution in progress:', isAutoRunExecuting);
+            
+            const lastRunTime = localStorage.getItem('lastRunTime');
+            console.log('Last run time:', lastRunTime);
+            
+            if (lastRunTime) {
+                const lastRun = new Date(lastRunTime);
+                const timeSinceLastRun = Date.now() - lastRun.getTime();
+                const remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
+                
+                const hoursAgo = Math.floor(timeSinceLastRun / (1000 * 60 * 60));
+                const minutesAgo = Math.floor((timeSinceLastRun % (1000 * 60 * 60)) / (1000 * 60));
+                const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
+                const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+                
+                console.log(`Time since last run: ${hoursAgo}h ${minutesAgo}m`);
+                console.log(`Time until next run: ${remainingHours}h ${remainingMinutes}m`);
+                console.log('Next run overdue:', remainingTime <= 0);
+            }
+            
             console.log('Fetched apps:', window.fetchedApps ? window.fetchedApps.length : 'None');
             if (window.fetchedApps) {
                 const activeApps = window.fetchedApps.filter(app => app.is_active === true);
                 console.log('Active apps:', activeApps.length);
                 console.log('Active apps list:', activeApps.map(app => app.app_name));
             }
-            console.log('Auto-run interval (ms):', AUTO_RUN_INTERVAL);
             console.log('Auto-run interval (hours):', AUTO_RUN_INTERVAL / (1000 * 60 * 60));
             console.log('Current time:', new Date().toLocaleString());
             console.log('================================');
         };
         
+        // Function to manually stop auto-run system
+        window.stopAutoRunSystem = function() {
+            console.log('🛑 Stopping auto-run system...');
+            if (autoRunTimer) {
+                clearTimeout(autoRunTimer);
+                autoRunTimer = null;
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            isAutoRunExecuting = false;
+            document.getElementById('next-run-countdown').textContent = 'STOPPED';
+            console.log('✅ Auto-run system stopped');
+        };
+        
+        // Function to manually start auto-run system
+        window.startAutoRunSystem = function() {
+            console.log('▶️ Starting auto-run system...');
+            initializeAutoRunSystem();
+            console.log('✅ Auto-run system started');
+        };
+        
         // Function to manually trigger auto-run for testing
         window.testAutoRun = function() {
-            console.log('Manually triggering auto-run for testing...');
+            console.log('🧪 Manually triggering auto-run for testing...');
             executeGetAllStats(true);
         };
         
         // Function to manually test Get All Stats
         window.testGetAllStats = function() {
-            console.log('Manually triggering Get All Stats for testing...');
+            console.log('🧪 Manually triggering Get All Stats for testing...');
             executeGetAllStats(false);
         };
         
         // Function to manually refresh fraud source from backend
         window.refreshFraudSourceFromBackend = function() {
-            console.log('Manually refreshing fraud source from backend...');
+            console.log('🔄 Manually refreshing fraud source from backend...');
             initializeFraudSource();
         };
         
@@ -8081,29 +8589,435 @@
             }, 5000);
         }
         
-        // Initialize auto-run system when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            // Small delay to ensure all elements are ready
-            setTimeout(() => {
-                initializeAutoRunSystem();
-                console.log('Auto-run system initialized');
-            }, 1000);
-        });
-        
-        // Also initialize if DOM is already loaded
+        // Initialize auto-run system when page loads (single initialization)
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     initializeAutoRunSystem();
-                    console.log('Auto-run system initialized (DOM ready)');
-                }, 1000);
+                    console.log('✅ Auto-run system initialized (DOM ready)');
+                }, 2000);
             });
         } else {
             // DOM is already loaded
             setTimeout(() => {
                 initializeAutoRunSystem();
-                console.log('Auto-run system initialized (DOM already ready)');
-            }, 1000);
+                console.log('✅ Auto-run system initialized (DOM already ready)');
+            }, 2000);
+        }
+        
+        // ========================================
+        // EXPORT FUNCTIONS
+        // ========================================
+        
+        // Utility function to download data as CSV
+        function downloadCSV(data, filename) {
+            const csv = convertToCSV(data);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Show success toast
+            showToast('success', `Data exported successfully as ${filename}`);
+        }
+        
+        // Utility function to convert array of objects to CSV
+        function convertToCSV(data) {
+            if (!data || data.length === 0) {
+                return 'No data available';
+            }
+            
+            const headers = Object.keys(data[0]);
+            const csvContent = [
+                headers.join(','),
+                ...data.map(row => 
+                    headers.map(header => {
+                        const value = row[header];
+                        // Handle values that might contain commas or quotes
+                        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                            return `"${value.replace(/"/g, '""')}"`;
+                        }
+                        return value;
+                    }).join(',')
+                )
+            ].join('\n');
+            
+            return csvContent;
+        }
+        
+        // Export Overview Data
+        function exportOverviewData() {
+            try {
+                const data = [];
+                
+                // Get summary metrics
+                const impressions = document.getElementById('overview-total-impressions')?.textContent || '0';
+                const clicks = document.getElementById('overview-total-clicks')?.textContent || '0';
+                const installs = document.getElementById('overview-total-installs')?.textContent || '0';
+                const conversionRate = document.getElementById('overview-conversion-rate')?.textContent || '0%';
+                
+                // Add summary data
+                data.push({
+                    'Metric': 'Total Impressions',
+                    'Value': impressions,
+                    'Type': 'Summary'
+                });
+                data.push({
+                    'Metric': 'Total Clicks',
+                    'Value': clicks,
+                    'Type': 'Summary'
+                });
+                data.push({
+                    'Metric': 'Total Installs',
+                    'Value': installs,
+                    'Type': 'Summary'
+                });
+                data.push({
+                    'Metric': 'Conversion Rate',
+                    'Value': conversionRate,
+                    'Type': 'Summary'
+                });
+                
+                // Get top performing apps
+                const topAppsTable = document.getElementById('top-apps-list');
+                if (topAppsTable) {
+                    const rows = topAppsTable.querySelectorAll('tr');
+                    rows.forEach((row, index) => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 4) {
+                            data.push({
+                                'Metric': `Top App ${index + 1}`,
+                                'App Name': cells[0]?.textContent?.trim() || '',
+                                'Event 1': cells[1]?.textContent?.trim() || '0',
+                                'Event 2': cells[2]?.textContent?.trim() || '0',
+                                'Total Events': cells[3]?.textContent?.trim() || '0',
+                                'Type': 'Top Performing Apps'
+                            });
+                        }
+                    });
+                }
+                
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                downloadCSV(data, `AppsFlyer_Overview_${timestamp}.csv`);
+                
+            } catch (error) {
+                console.error('Error exporting overview data:', error);
+                showToast('error', 'Error exporting overview data. Please try again.');
+            }
+        }
+        
+        // Export Apps Data
+        function exportAppsData() {
+            try {
+                if (!window.fetchedApps || window.fetchedApps.length === 0) {
+                    showToast('error', 'No apps data available. Please sync apps first.');
+                    return;
+                }
+                
+                const data = window.fetchedApps.map(app => ({
+                    'App ID': app.app_id || '',
+                    'App Name': app.app_name || '',
+                    'Platform': app.platform || '',
+                    'Status': app.is_active ? 'Active' : 'Inactive',
+                    'Bundle ID': app.bundle_id || '',
+                    'Creation Date': app.creation_date || '',
+                    'Last Updated': app.last_updated || '',
+                    'Time Zone': app.time_zone || '',
+                    'Event 1': app.event1 || '',
+                    'Event 2': app.event2 || ''
+                }));
+                
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                downloadCSV(data, `AppsFlyer_Apps_${timestamp}.csv`);
+                
+            } catch (error) {
+                console.error('Error exporting apps data:', error);
+                showToast('error', 'Error exporting apps data. Please try again.');
+            }
+        }
+        
+        // Export Stats Data
+        function exportStatsData() {
+            try {
+                showToast('info', 'Preparing stats data for export...');
+                
+                // Fetch raw data from the new endpoint
+                fetch('/export/stats/raw?range=last10')
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.error) {
+                            showToast('error', result.error);
+                            return;
+                        }
+                        
+                        if (!result.data || result.data.length === 0) {
+                            showToast('error', 'No stats data found to export.');
+                            return;
+                        }
+                        
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        downloadCSV(result.data, `AppsFlyer_Stats_RAW_${timestamp}.csv`);
+                        
+                        showToast('success', `Stats data exported successfully! (${result.total_records} records from ${result.apps_count} apps)`);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching raw stats data:', error);
+                        showToast('error', 'Error fetching stats data. Please try again.');
+                    });
+                
+            } catch (error) {
+                console.error('Error exporting stats data:', error);
+                showToast('error', 'Error exporting stats data. Please try again.');
+            }
+        }
+        
+        // Export Fraud Data
+        function exportFraudData() {
+            try {
+                showToast('info', 'Preparing fraud data for export...');
+                
+                // Fetch raw data from the new endpoint
+                fetch('/export/fraud/raw?range=last10')
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.error) {
+                            showToast('error', result.error);
+                            return;
+                        }
+                        
+                        if (!result.data || result.data.length === 0) {
+                            showToast('error', 'No fraud data found to export.');
+                            return;
+                        }
+                        
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        downloadCSV(result.data, `AppsFlyer_Fraud_RAW_${timestamp}.csv`);
+                        
+                        showToast('success', `Fraud data exported successfully! (${result.total_records} records from ${result.apps_count} apps)`);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching raw fraud data:', error);
+                        showToast('error', 'Error fetching fraud data. Please try again.');
+                    });
+                
+            } catch (error) {
+                console.error('Error exporting fraud data:', error);
+                showToast('error', 'Error exporting fraud data. Please try again.');
+            }
+        }
+        
+        // Show toast notification
+        function showToast(type, message) {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
+            const icon = type === 'success' ? 
+                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
+                type === 'error' ? 
+                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' :
+                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            
+            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-4 rounded-xl shadow-2xl z-50 transform transition-all duration-300 flex items-center gap-3`;
+            toast.innerHTML = `
+                <div class="flex-shrink-0">${icon}</div>
+                <div class="flex-1">
+                    <div class="font-semibold">${type === 'success' ? 'Success!' : type === 'error' ? 'Error!' : 'Info'}</div>
+                    <div class="text-sm opacity-90">${message}</div>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Auto-close after delay
+            setTimeout(() => {
+                toast.style.transform = 'translateY(100%)';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // Profile Page Raw Data Export Functions
+        function exportRawStatsData() {
+            try {
+                showToast('info', 'Preparing raw stats data for export...');
+                
+                fetch('/export/stats/raw?range=last10')
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.error) {
+                            showToast('error', result.error);
+                            return;
+                        }
+                        
+                        if (!result.data || result.data.length === 0) {
+                            showToast('error', 'No raw stats data found. Please run "Get All Stats" first.');
+                            return;
+                        }
+                        
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        downloadCSV(result.data, `AppsFlyer_Stats_RAW_DATA_${timestamp}.csv`);
+                        
+                        showToast('success', `Raw stats data exported successfully! (${result.total_records} records from ${result.apps_count} apps)`);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching raw stats data:', error);
+                        showToast('error', 'Error fetching raw stats data. Please try again.');
+                    });
+                
+            } catch (error) {
+                console.error('Error exporting raw stats data:', error);
+                showToast('error', 'Error exporting raw stats data. Please try again.');
+            }
+        }
+
+        function exportRawFraudData() {
+            try {
+                showToast('info', 'Preparing raw fraud data for export...');
+                
+                fetch('/export/fraud/raw?range=last10')
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.error) {
+                            showToast('error', result.error);
+                            return;
+                        }
+                        
+                        if (!result.data || result.data.length === 0) {
+                            showToast('error', 'No raw fraud data found. Please run "Get All Stats" first.');
+                            return;
+                        }
+                        
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        downloadCSV(result.data, `AppsFlyer_Fraud_RAW_DATA_${timestamp}.csv`);
+                        
+                        showToast('success', `Raw fraud data exported successfully! (${result.total_records} records from ${result.apps_count} apps)`);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching raw fraud data:', error);
+                        showToast('error', 'Error fetching raw fraud data. Please try again.');
+                    });
+                
+            } catch (error) {
+                console.error('Error exporting raw fraud data:', error);
+                showToast('error', 'Error exporting raw fraud data. Please try again.');
+            }
+        }
+
+        // Original AppsFlyer Raw Data Export Functions
+        function exportRawDailyReport() {
+            try {
+                showToast('info', 'Preparing original daily report data for export...');
+                
+                const url = '/export/raw/daily_report?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Daily report export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting daily report:', error);
+                showToast('error', 'Error exporting daily report. Please try again.');
+            }
+        }
+
+        function exportRawBlockedInstalls() {
+            try {
+                showToast('info', 'Preparing original blocked installs data for export...');
+                
+                const url = '/export/raw/blocked_installs_report?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Blocked installs export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting blocked installs:', error);
+                showToast('error', 'Error exporting blocked installs. Please try again.');
+            }
+        }
+
+        function exportRawDetection() {
+            try {
+                showToast('info', 'Preparing original detection (PA) data for export...');
+                
+                const url = '/export/raw/detection?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Detection (PA) export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting detection data:', error);
+                showToast('error', 'Error exporting detection data. Please try again.');
+            }
+        }
+
+        function exportRawBlockedEvents() {
+            try {
+                showToast('info', 'Preparing original blocked in-app events data for export...');
+                
+                const url = '/export/raw/blocked_in_app_events_report?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Blocked in-app events export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting blocked events:', error);
+                showToast('error', 'Error exporting blocked events. Please try again.');
+            }
+        }
+
+        function exportRawFraudPostInApps() {
+            try {
+                showToast('info', 'Preparing original fraud post-inapps data for export...');
+                
+                const url = '/export/raw/fraud_post_inapps?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Fraud post-inapps export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting fraud post-inapps:', error);
+                showToast('error', 'Error exporting fraud post-inapps. Please try again.');
+            }
+        }
+
+        function exportRawBlockedClicks() {
+            try {
+                showToast('info', 'Preparing original blocked clicks data for export...');
+                
+                const url = '/export/raw/blocked_clicks_report?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Blocked clicks export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting blocked clicks:', error);
+                showToast('error', 'Error exporting blocked clicks. Please try again.');
+            }
+        }
+
+        function exportRawBlockedPostbacks() {
+            try {
+                showToast('info', 'Preparing original blocked install postbacks data for export...');
+                
+                const url = '/export/raw/blocked_install_postbacks?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Blocked install postbacks export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting blocked postbacks:', error);
+                showToast('error', 'Error exporting blocked postbacks. Please try again.');
+            }
+        }
+
+        function exportRawInAppEvents() {
+            try {
+                showToast('info', 'Preparing original in-app events data for export...');
+                
+                const url = '/export/raw/in_app_events_report?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'In-app events export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting in-app events:', error);
+                showToast('error', 'Error exporting in-app events. Please try again.');
+            }
         }
     </script>
 

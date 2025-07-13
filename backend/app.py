@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for, Response
 from flask_cors import CORS
 import os
 from pathlib import Path
@@ -50,8 +50,8 @@ try:
     redis_db = int(parsed_url.path.lstrip('/')) if parsed_url.path and len(parsed_url.path) > 1 else 0
     
     logger.info(f"🔍 Connecting to Redis at {redis_host}:{redis_port} (db: {redis_db})")
-    
-    # Initialize Redis connection
+
+# Initialize Redis connection
     redis_conn = Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
     
     # Test Redis connection
@@ -170,6 +170,21 @@ def init_db():
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
+    
+    # Create table for storing original raw AppsFlyer CSV data
+    c.execute('''CREATE TABLE IF NOT EXISTS raw_appsflyer_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        app_id TEXT NOT NULL,
+        app_name TEXT NOT NULL,
+        endpoint_type TEXT NOT NULL,
+        period TEXT NOT NULL,
+        raw_csv_data TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(app_id, endpoint_type, period, start_date, end_date)
+    )''')
+    
     conn.commit()
     conn.close()
 
@@ -490,16 +505,76 @@ def app_events(app_id):
         "error": "Max retries reached"
     })
 
-def make_api_request(url, params, max_retries=7, retry_delay=30):
+def save_raw_appsflyer_data(app_id, app_name, endpoint_type, period, raw_csv_data, start_date, end_date):
+    """Save original raw AppsFlyer CSV data to database"""
+    try:
+        if not raw_csv_data or len(raw_csv_data.strip()) == 0:
+            print(f"[RAW_DATA] Skipping save - no data for {app_id} {endpoint_type}")
+            return
+            
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Replace existing data for the same app/endpoint/period/date range
+        c.execute('''INSERT OR REPLACE INTO raw_appsflyer_data 
+                     (app_id, app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''',
+                  (app_id, app_name, endpoint_type, period, raw_csv_data, start_date, end_date))
+        
+        conn.commit()
+        conn.close()
+        
+        # Get data size in a readable format
+        data_size = len(raw_csv_data)
+        if data_size < 1024:
+            size_str = f"{data_size} bytes"
+        elif data_size < 1024 * 1024:
+            size_str = f"{data_size / 1024:.1f} KB"
+        else:
+            size_str = f"{data_size / (1024 * 1024):.1f} MB"
+            
+        print(f"[RAW_DATA] Saved {endpoint_type} data for {app_name} ({app_id}) - {size_str}")
+        
+    except Exception as e:
+        print(f"[RAW_DATA] Error saving raw data for {app_id} {endpoint_type}: {str(e)}")
+
+def make_api_request(url, params, max_retries=7, retry_delay=30, app_id=None, app_name=None, period=None):
+    """Make API request to AppsFlyer and optionally save raw data"""
     headers = {
         "Authorization": f"Bearer {APPSFLYER_API_KEY}",
         "accept": "text/csv"
     }
+    
+    # Extract endpoint type from URL for saving raw data
+    endpoint_type = None
+    if app_id and app_name and period:
+        if "daily_report" in url:
+            endpoint_type = "daily_report"
+        elif "blocked_installs_report" in url:
+            endpoint_type = "blocked_installs_report"
+        elif "detection" in url:
+            endpoint_type = "detection"
+        elif "blocked_in_app_events_report" in url:
+            endpoint_type = "blocked_in_app_events_report"
+        elif "fraud-post-inapps" in url:
+            endpoint_type = "fraud_post_inapps"
+        elif "blocked_clicks_report" in url:
+            endpoint_type = "blocked_clicks_report"
+        elif "blocked_install_postbacks" in url:
+            endpoint_type = "blocked_install_postbacks"
+        elif "in_app_events_report" in url:
+            endpoint_type = "in_app_events_report"
+    
     for attempt in range(max_retries):
         try:
             print(f"[API] Making request to {url} (attempt {attempt + 1}/{max_retries})")
             resp = requests.get(url, headers=headers, params=params, timeout=90)
             if resp.status_code == 200:
+                # Save raw data if we have all required info
+                if endpoint_type and app_id and app_name and period:
+                    start_date = params.get('from', '')
+                    end_date = params.get('to', '')
+                    save_raw_appsflyer_data(app_id, app_name, endpoint_type, period, resp.text, start_date, end_date)
                 return resp
             print(f"[API] Request failed with status {resp.status_code}")
             print(f"[API] Response headers: {dict(resp.headers)}")
@@ -602,7 +677,7 @@ def all_apps_stats():
         
         try:
             print(f"[STATS] Calling daily_report API for {app_id}...")
-            resp = make_api_request(url, params)
+            resp = make_api_request(url, params, app_id=app_id, app_name=app_name, period=period)
             if resp == 'timeout':
                 print(f"[STATS] Timeout detected for daily_report {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -680,7 +755,7 @@ def all_apps_stats():
             print(f"[STATS] Calling blocked_installs_report API for {app_id}...")
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
             blocked_rt_params = {"from": start_date, "to": end_date}
-            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
+            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_rt_resp == 'timeout':
                 print(f"[STATS] Timeout detected for blocked_installs_report {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -703,7 +778,7 @@ def all_apps_stats():
             print(f"[STATS] Calling detection API for {app_id}...")
             blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
             blocked_pa_params = {"from": start_date, "to": end_date}
-            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
+            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_pa_resp == 'timeout':
                 print(f"[STATS] Timeout detected for detection API {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -744,7 +819,7 @@ def all_apps_stats():
                 print(f"[STATS] Calling in_app_events_report API for {app_id} (events: {real_events})...")
                 events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
                 events_params = {"from": start_date, "to": end_date}
-                events_resp = make_api_request(events_url, events_params)
+                events_resp = make_api_request(events_url, events_params, app_id=app_id, app_name=app_name, period=period)
                 if events_resp and events_resp.status_code == 200:
                     event_rows = events_resp.text.strip().split("\n")
                     event_header = event_rows[0].split(",")
@@ -1237,31 +1312,42 @@ def get_fraud():
             # Blocked Installs (RT)
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
             blocked_rt_params = {"from": start_date, "to": end_date}
-            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params)
+            blocked_rt_resp = make_api_request(blocked_rt_url, blocked_rt_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_rt_resp == 'timeout':
                 print(f"[FRAUD] Timeout detected for blocked_installs_report {app_id}, continuing with other APIs...")
                 timeout_count += 1
                 app_errors.append("Blocked Installs (RT) API timeout")
             if blocked_rt_resp and blocked_rt_resp.status_code == 200:
                 rows = blocked_rt_resp.text.strip().split("\n")
+                print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: {len(rows)} rows received")
                 if len(rows) > 1:
                     header = rows[0].split(",")
+                    print(f"[FRAUD] Blocked Installs (RT) header: {header}")
                     date_idx = header.index("Install Time") if "Install Time" in header else None
                     ms_idx = find_media_source_idx(header)
+                    print(f"[FRAUD] Blocked Installs (RT) indices - date_idx: {date_idx}, ms_idx: {ms_idx}")
                     if ms_idx is None:
                         print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (RT) for app {app_id}. Header: {header}")
+                    rt_count = 0
                     for row in rows[1:]:
                         cols = row.split(",")
                         if date_idx is not None and len(cols) > date_idx:
                             install_date = cols[date_idx].split(" ")[0]
                             media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
                             add_metric(install_date, media_source, "blocked_installs_rt")
+                            rt_count += 1
+                    print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: {rt_count} records processed")
+                else:
+                    print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: No data rows (header only)")
             elif blocked_rt_resp is not None:
+                print(f"[FRAUD] Blocked Installs (RT) API error for app {app_id}: {blocked_rt_resp.status_code} {blocked_rt_resp.text[:200]}")
                 app_errors.append(f"Blocked Installs (RT) API error: {blocked_rt_resp.status_code} {blocked_rt_resp.text[:200]}")
+            else:
+                print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: No response received")
             # Blocked Installs (PA)
             blocked_pa_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/detection/v5"
             blocked_pa_params = {"from": start_date, "to": end_date}
-            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params)
+            blocked_pa_resp = make_api_request(blocked_pa_url, blocked_pa_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_pa_resp == 'timeout':
                 print(f"[FRAUD] Timeout detected for detection API {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -1285,7 +1371,7 @@ def get_fraud():
             # Blocked In-App Events
             blocked_events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_in_app_events_report/v5"
             blocked_events_params = {"from": start_date, "to": end_date}
-            blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params)
+            blocked_events_resp = make_api_request(blocked_events_url, blocked_events_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_events_resp == 'timeout':
                 print(f"[FRAUD] Timeout detected for blocked_in_app_events_report {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -1309,7 +1395,7 @@ def get_fraud():
             # Fraud Post Inapps
             fraud_post_inapps_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/fraud-post-inapps/v5"
             fraud_post_inapps_params = {"from": start_date, "to": end_date}
-            fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params)
+            fraud_post_inapps_resp = make_api_request(fraud_post_inapps_url, fraud_post_inapps_params, app_id=app_id, app_name=app_name, period=period)
             if fraud_post_inapps_resp == 'timeout':
                 print(f"[FRAUD] Timeout detected for fraud-post-inapps {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -1333,7 +1419,7 @@ def get_fraud():
             # Blocked Clicks
             blocked_clicks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_clicks_report/v5"
             blocked_clicks_params = {"from": start_date, "to": end_date}
-            blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params)
+            blocked_clicks_resp = make_api_request(blocked_clicks_url, blocked_clicks_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_clicks_resp == 'timeout':
                 print(f"[FRAUD] Timeout detected for blocked_clicks_report {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -1357,7 +1443,7 @@ def get_fraud():
             # Blocked Install Postbacks
             blocked_postbacks_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_install_postbacks/v5"
             blocked_postbacks_params = {"from": start_date, "to": end_date}
-            blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params)
+            blocked_postbacks_resp = make_api_request(blocked_postbacks_url, blocked_postbacks_params, app_id=app_id, app_name=app_name, period=period)
             if blocked_postbacks_resp == 'timeout':
                 print(f"[FRAUD] Timeout detected for blocked_install_postbacks {app_id}, continuing with other APIs...")
                 timeout_count += 1
@@ -1384,6 +1470,17 @@ def get_fraud():
                 print(f"[FRAUD] Adding row for media source: {media_source} on date: {date}")
                 print(f"[FRAUD] Row metrics: {row}")
                 table.append(row)
+                
+            # Debug: Print app totals
+            app_totals = {
+                'blocked_installs_rt': sum(row.get('blocked_installs_rt', 0) for row in table),
+                'blocked_installs_pa': sum(row.get('blocked_installs_pa', 0) for row in table),
+                'blocked_in_app_events': sum(row.get('blocked_in_app_events', 0) for row in table),
+                'fraud_post_inapps': sum(row.get('fraud_post_inapps', 0) for row in table),
+                'blocked_clicks': sum(row.get('blocked_clicks', 0) for row in table),
+                'blocked_install_postbacks': sum(row.get('blocked_install_postbacks', 0) for row in table)
+            }
+            print(f"[FRAUD] App {app_name} totals: {app_totals}")
             print(f"[FRAUD] Final table for {app_name} has {len(table)} rows")
             print(f"[FRAUD] Unique media sources: {sorted(set(row['media_source'] for row in table))}")
             
@@ -1641,11 +1738,19 @@ def clear_fraud_cache():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        
+        # Count rows before deletion
+        c.execute('SELECT COUNT(*) FROM fraud_cache')
+        count_before = c.fetchone()[0]
+        
         c.execute('DELETE FROM fraud_cache')
         conn.commit()
         conn.close()
-        return jsonify({'success': True})
+        
+        print(f"[CACHE] Cleared {count_before} fraud cache entries")
+        return jsonify({'success': True, 'message': f'Fraud cache cleared ({count_before} entries)'})
     except Exception as e:
+        print(f"[CACHE] Error clearing fraud cache: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/apps-page')
@@ -1793,7 +1898,7 @@ def process_report_async(apps, period, selected_events):
             
             try:
                 print(f"[REPORT] Calling daily_report API for {app_id}...")
-                resp = make_api_request(url, params)
+                resp = make_api_request(url, params, app_id=app_id, app_name=app_name, period=period)
                 if resp == 'timeout':
                     print(f"[REPORT] Timeout detected for daily_report {app_id}, continuing with other APIs...")
                     timeout_count += 1
@@ -1857,7 +1962,7 @@ def process_report_async(apps, period, selected_events):
                 # Process additional data (blocked installs, events)
                 # Add blocked installs data
                 blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
-                blocked_rt_resp = make_api_request(blocked_rt_url, params)
+                blocked_rt_resp = make_api_request(blocked_rt_url, params, app_id=app_id, app_name=app_name, period=period)
                 if blocked_rt_resp and blocked_rt_resp.status_code == 200:
                     rows = blocked_rt_resp.text.strip().split("\n")
                     if len(rows) > 1:
@@ -1875,7 +1980,7 @@ def process_report_async(apps, period, selected_events):
                 selected = selected_events.get(app_id, [])
                 if selected:
                     events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
-                    events_resp = make_api_request(events_url, params)
+                    events_resp = make_api_request(events_url, params, app_id=app_id, app_name=app_name, period=period)
                     if events_resp and events_resp.status_code == 200:
                         rows = events_resp.text.strip().split("\n")
                         if len(rows) > 1:
@@ -2110,7 +2215,583 @@ def get_active_app_ids():
     conn.close()
     return active_apps
 
+# Raw Data Export Endpoints
+@app.route('/export/stats/raw', methods=['GET'])
+@login_required
+def export_stats_raw():
+    """Export raw stats data for CSV export"""
+    try:
+        range_key = request.args.get('range', 'last10')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Get the most recent stats data for the range
+        c.execute("SELECT data, updated_at FROM stats_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
+        row = c.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({'error': 'No stats data available. Please generate a report first.'}), 404
+            
+        data, updated_at = row
+        stats = json.loads(data)
+        
+        # Convert the cached data to raw format for CSV export
+        raw_data = []
+        for app in stats.get('apps', []):
+            app_name = app.get('app_name', 'Unknown App')
+            app_id = app.get('app_id', 'Unknown ID')
+            
+            for entry in app.get('table', []):
+                row_data = {
+                    'App Name': app_name,
+                    'App ID': app_id,
+                    'Date': entry.get('date', ''),
+                    'Impressions': entry.get('impressions', 0),
+                    'Clicks': entry.get('clicks', 0),
+                    'Installs': entry.get('installs', 0),
+                    'Blocked Installs RT': entry.get('blocked_installs_rt', 0),
+                    'Blocked Installs PA': entry.get('blocked_installs_pa', 0),
+                    'Imp to Click Rate': entry.get('imp_to_click', 0),
+                    'Click to Install Rate': entry.get('click_to_install', 0),
+                    'Blocked RT Rate': entry.get('blocked_rt_rate', 0),
+                    'Blocked PA Rate': entry.get('blocked_pa_rate', 0),
+                    'Period': f'Last 10 Days',
+                    'Data Type': 'Stats Report',
+                    'Updated At': updated_at
+                }
+                
+                # Add event data if available
+                selected_events = app.get('selected_events', [])
+                for event in selected_events:
+                    if event in entry:
+                        row_data[f'Event: {event}'] = entry.get(event, 0)
+                
+                raw_data.append(row_data)
+        
+        return jsonify({
+            'data': raw_data,
+            'total_records': len(raw_data),
+            'apps_count': len(stats.get('apps', [])),
+            'updated_at': updated_at
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/fraud/raw', methods=['GET'])
+@login_required
+def export_fraud_raw():
+    """Export raw fraud data for CSV export"""
+    try:
+        range_key = request.args.get('range', 'last10')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Get the most recent fraud data for the range
+        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{range_key}%",))
+        row = c.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({'error': 'No fraud data available. Please generate a report first.'}), 404
+            
+        data, updated_at = row
+        fraud_data = json.loads(data)
+        
+        # Convert the cached data to raw format for CSV export
+        raw_data = []
+        for app in fraud_data.get('apps', []):
+            app_name = app.get('app_name', 'Unknown App')
+            app_id = app.get('app_id', 'Unknown ID')
+            
+            for entry in app.get('table', []):
+                row_data = {
+                    'App Name': app_name,
+                    'App ID': app_id,
+                    'Date': entry.get('date', ''),
+                    'Media Source': entry.get('media_source', ''),
+                    'Blocked Installs RT': entry.get('blocked_installs_rt', 0),
+                    'Blocked Installs PA': entry.get('blocked_installs_pa', 0),
+                    'Blocked In-App Events': entry.get('blocked_in_app_events', 0),
+                    'Fraud Post In-Apps': entry.get('fraud_post_inapps', 0),
+                    'Blocked Clicks': entry.get('blocked_clicks', 0),
+                    'Blocked Install Postbacks': entry.get('blocked_install_postbacks', 0),
+                    'Period': f'Last 10 Days',
+                    'Data Type': 'Fraud Report',
+                    'Updated At': updated_at
+                }
+                
+                raw_data.append(row_data)
+        
+        return jsonify({
+            'data': raw_data,
+            'total_records': len(raw_data),
+            'apps_count': len(fraud_data.get('apps', [])),
+            'updated_at': updated_at
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Raw AppsFlyer Data Export Endpoints
+@app.route('/export/raw/daily_report', methods=['GET'])
+@login_required
+def export_raw_daily_report():
+    """Export raw daily report data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            # Export for specific app
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'daily_report' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            # Export for all apps
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'daily_report' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No daily report data found'}), 404
+        
+        # Combine all CSV data
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                # Add header with app info
+                combined_csv += f"# Daily Report Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"  # Add App_Name column
+                header_added = True
+            
+            # Add data rows with app name
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        # Return as downloadable CSV
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Daily_Report_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/blocked_installs_report', methods=['GET'])
+@login_required
+def export_raw_blocked_installs_report():
+    """Export raw blocked installs report data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'blocked_installs_report' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'blocked_installs_report' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No blocked installs report data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# Blocked Installs Report Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Blocked_Installs_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/detection', methods=['GET'])
+@login_required
+def export_raw_detection():
+    """Export raw detection (PA) data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'detection' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'detection' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No detection data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# Detection (PA) Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Detection_PA_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/blocked_in_app_events_report', methods=['GET'])
+@login_required
+def export_raw_blocked_in_app_events():
+    """Export raw blocked in-app events data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'blocked_in_app_events_report' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'blocked_in_app_events_report' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No blocked in-app events data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# Blocked In-App Events Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Blocked_InApp_Events_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/fraud_post_inapps', methods=['GET'])
+@login_required
+def export_raw_fraud_post_inapps():
+    """Export raw fraud post-inapps data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'fraud_post_inapps' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'fraud_post_inapps' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No fraud post-inapps data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# Fraud Post-InApps Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Fraud_Post_InApps_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/blocked_clicks_report', methods=['GET'])
+@login_required
+def export_raw_blocked_clicks():
+    """Export raw blocked clicks data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'blocked_clicks_report' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'blocked_clicks_report' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No blocked clicks data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# Blocked Clicks Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Blocked_Clicks_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/blocked_install_postbacks', methods=['GET'])
+@login_required
+def export_raw_blocked_install_postbacks():
+    """Export raw blocked install postbacks data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'blocked_install_postbacks' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'blocked_install_postbacks' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No blocked install postbacks data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# Blocked Install Postbacks Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Blocked_Install_Postbacks_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/in_app_events_report', methods=['GET'])
+@login_required
+def export_raw_in_app_events():
+    """Export raw in-app events data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'in_app_events_report' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'in_app_events_report' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No in-app events data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            lines = raw_csv_data.strip().split('\n')
+            if not header_added and lines:
+                combined_csv += f"# In-App Events Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# App: {app_name}\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                combined_csv += lines[0] + ",App_Name\n"
+                header_added = True
+            
+            for line in lines[1:]:
+                if line.strip():
+                    combined_csv += line + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_InApp_Events_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Use PORT environment variable provided by Railway, default to 5000
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
