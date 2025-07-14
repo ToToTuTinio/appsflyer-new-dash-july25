@@ -767,6 +767,12 @@
                         </svg>
                         <span class="hidden sm:inline">Fraud</span>
                     </button>
+                    <button class="nav-tab tab-button px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center space-x-1 sm:space-x-2 min-w-0" onclick="switchTab('events-source')">
+                        <svg class="nav-icon w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <span class="hidden sm:inline">Events</span>
+                    </button>
                     <button class="nav-tab tab-button px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center space-x-1 sm:space-x-2 min-w-0" onclick="switchTab('profile')">
                         <svg class="nav-icon w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -1064,6 +1070,13 @@
                             <div id="get-events-spinner" class="loading-spinner ml-2" style="display:none;"></div>
                             <span id="get-events-timer" class="ml-2 text-xs text-emerald-200"></span>
                         </button>
+                        <button id="add-manual-app-btn" onclick="openAddManualAppModal()" 
+                                class="bg-yellow-500 hover:bg-yellow-600 text-white px-8 py-3 rounded-2xl flex items-center shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            <span>Add App</span>
+                        </button>
                     </div>
                 </div>
                 </div>
@@ -1346,7 +1359,80 @@
                         </svg>
                         <span>Export Apps</span>
                     </button>
+                    <button id="clear-apps-cache-btn" class="bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 px-6 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center space-x-2 hover:border-red-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        <span>Clear Apps Cache</span>
+                    </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Add Manual App Modal -->
+        <div id="add-manual-app-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-6 transform transition-all duration-300 scale-100">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-900">Add Manual App</h3>
+                    <button onclick="closeAddManualAppModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="add-manual-app-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">App ID *</label>
+                        <input type="text" id="manual-app-id" name="app_id" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                               placeholder="Enter app ID">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">App Name *</label>
+                        <input type="text" id="manual-app-name" name="app_name" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                               placeholder="Enter app name">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select id="manual-app-status" name="status" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event 1 (Optional)</label>
+                        <input type="text" id="manual-app-event1" name="event1" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                               placeholder="Enter event 1">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event 2 (Optional)</label>
+                        <input type="text" id="manual-app-event2" name="event2" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                               placeholder="Enter event 2">
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="closeAddManualAppModal()" 
+                                class="px-6 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-all duration-300">
+                            Cancel
+                        </button>
+                        <button type="submit" id="save-manual-app-btn" 
+                                class="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-medium transition-all duration-300 flex items-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span>Save App</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -1775,6 +1861,100 @@
             </div>
         </div>
 
+        <!-- Events Per Source Tab Content -->
+        <div id="events-source-tab" class="tab-content px-4 sm:px-6 lg:px-8 xl:px-20">
+            <div class="bg-gradient-to-br from-green-50 via-white to-blue-50 rounded-3xl shadow-2xl border border-green-100 overflow-hidden">
+                <!-- Events Source Header -->
+                <div class="bg-gradient-to-r from-green-600 via-emerald-700 to-blue-700 px-12 py-8">
+                    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between space-y-6 xl:space-y-0">
+                        <!-- Left: Title & Action Button -->
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:space-x-8 space-y-4 lg:space-y-0">
+                            <!-- Title Section -->
+                            <div class="flex items-center space-x-6">
+                                <div class="bg-white/20 backdrop-blur-sm p-4 rounded-2xl border border-white/30">
+                                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h1 class="text-4xl lg:text-5xl font-bold text-white mb-3">Events Per Source</h1>
+                                    <p class="text-white/80 text-lg font-medium">Analyze event performance by media source</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Controls -->
+                            <div class="flex flex-col lg:flex-row items-stretch lg:items-center space-y-3 lg:space-y-0 lg:space-x-4">
+                                <!-- Campaign Filter -->
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
+                                        <svg class="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </div>
+                                    <select id="events-source-app-filter" class="w-80 lg:w-96 pl-12 pr-4 py-4 border-2 border-white/60 rounded-2xl bg-white/98 backdrop-blur-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-white/80 focus:border-white/80 focus:bg-white text-sm font-semibold shadow-2xl hover:bg-white hover:shadow-3xl transition-all duration-300 cursor-pointer appearance-none">
+                                        <option value="" style="color: #1f2937; background-color: white; font-weight: 600; padding: 8px 12px;">🎯 Choose a campaign to analyze events</option>
+                                    </select>
+                                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-500 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                
+                                <!-- Analyze Button -->
+                                <button id="run-events-source-10d-btn" class="bg-white/20 hover:bg-white/30 text-white px-8 py-4 rounded-2xl font-bold text-base shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 border border-white/30 backdrop-blur-sm flex items-center space-x-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    <span>Analyze Events</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Content Area -->
+                <div class="px-12 py-8">
+                    <!-- Loading State -->
+                    <div id="events-source-loading-10d" class="text-center py-20" style="display:none;">
+                        <div class="inline-flex items-center px-8 py-6 bg-gradient-to-r from-green-100 to-blue-100 rounded-3xl shadow-lg border border-green-200">
+                            <svg class="animate-spin h-8 w-8 text-green-600 mr-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <div>
+                                <div class="text-green-700 text-xl font-bold mb-2">📊 Analyzing Events by Source</div>
+                                <div class="text-green-600 text-base">Processing event data for selected campaign...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Error State -->
+                    <div id="events-source-error-10d" class="text-center py-20" style="display:none;">
+                        <div class="bg-red-50 border border-red-200 rounded-3xl p-8 max-w-md mx-auto">
+                            <div class="text-red-600 text-xl font-bold mb-3">⚠️ Analysis Error</div>
+                            <div class="text-red-500 text-base">Unable to load events data. Please try again.</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Content -->
+                    <div id="events-source-data-10d">
+                        <div class="text-center py-20">
+                            <div class="bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-3xl p-6 max-w-lg mx-auto shadow-lg">
+                                <div class="text-green-400 mb-6">
+                                    <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-green-700 text-xl font-bold mb-3">📊 Select a Campaign</div>
+                                <div class="text-green-600 text-base leading-relaxed">Choose a campaign from the filter above to analyze event performance by media source.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Profile Tab Content -->
         <div id="profile-tab" class="tab-content px-4 sm:px-6 lg:px-8 xl:px-20">
             <!-- Enhanced Profile Container -->
@@ -2062,6 +2242,14 @@
                                                 </svg>
                                                 <span class="text-lg">Get All Stats</span>
                                             </button>
+                                            
+                                            <!-- Initialize Timer Button (shown only when no last run time) -->
+                                            <button id="init-timer-btn" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-8 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto mt-3 transform hover:scale-105" style="display: none;">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                <span>Start Auto-Run Timer</span>
+                                            </button>
                                         </div>
                                         
                                         <!-- Auto-run Status Info -->
@@ -2184,14 +2372,14 @@
                                             <!-- Daily Report -->
                                             <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Daily Report</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Impressions, clicks, installs by date</p>
-                                                    <button onclick="exportRawDailyReport()" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawDailyReport()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2201,16 +2389,16 @@
                                             </div>
                                             
                                             <!-- Blocked Installs RT -->
-                                            <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Installs RT</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Real-time blocked installs</p>
-                                                    <button onclick="exportRawBlockedInstalls()" class="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawBlockedInstalls()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2220,16 +2408,16 @@
                                             </div>
                                             
                                             <!-- Detection (PA) -->
-                                            <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Detection (PA)</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Post-attribution detection</p>
-                                                    <button onclick="exportRawDetection()" class="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawDetection()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2239,16 +2427,16 @@
                                             </div>
                                             
                                             <!-- Blocked In-App Events -->
-                                            <div class="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Events</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Blocked in-app events</p>
-                                                    <button onclick="exportRawBlockedEvents()" class="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawBlockedEvents()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2258,16 +2446,16 @@
                                             </div>
                                             
                                             <!-- Fraud Post-InApps -->
-                                            <div class="bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.882-.833-2.652 0L4.162 16.5c-.77.833.192 2.5 1.732 2.5z"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Fraud Post-InApps</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Fraud post-install events</p>
-                                                    <button onclick="exportRawFraudPostInApps()" class="bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawFraudPostInApps()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2277,16 +2465,16 @@
                                             </div>
                                             
                                             <!-- Blocked Clicks -->
-                                            <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Clicks</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Blocked clicks report</p>
-                                                    <button onclick="exportRawBlockedClicks()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawBlockedClicks()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2296,16 +2484,16 @@
                                             </div>
                                             
                                             <!-- Blocked Install Postbacks -->
-                                            <div class="bg-gradient-to-br from-teal-50 to-green-50 border border-teal-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-teal-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">Blocked Postbacks</h4>
                                                     <p class="text-gray-600 text-xs mb-3">Blocked install postbacks</p>
-                                                    <button onclick="exportRawBlockedPostbacks()" class="bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawBlockedPostbacks()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2315,16 +2503,16 @@
                                             </div>
                                             
                                             <!-- In-App Events -->
-                                            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
                                                 <div class="text-center">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V1a1 1 0 011-1h2a1 1 0 011 1v3"/>
                                                         </svg>
                                                     </div>
                                                     <h4 class="text-lg font-bold text-gray-800 mb-2">In-App Events</h4>
                                                     <p class="text-gray-600 text-xs mb-3">In-app events report</p>
-                                                    <button onclick="exportRawInAppEvents()" class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                    <button onclick="exportRawInAppEvents()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                         </svg>
@@ -2352,12 +2540,12 @@
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                 </svg>
-                                                <span class="text-sm">Clear Backend Data</span>
+                                                <span class="text-sm">Clear ALL Data</span>
                                             </button>
-                                            <div class="mt-3 text-xs text-red-600 bg-red-50 rounded-lg p-2">
-                                                <div class="font-medium">⚠️ WARNING</div>
-                                                <div>This action cannot be undone</div>
-                                            </div>
+                                                                        <div class="mt-3 text-xs text-red-600 bg-red-50 rounded-lg p-2">
+                                <div class="font-medium">⚠️ WARNING</div>
+                                <div>This will permanently delete ALL data: apps, stats, fraud data, CSV exports, and event selections. This action cannot be undone.</div>
+                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2761,6 +2949,112 @@
             }
             
             console.log('Dashboard refresh completed');
+        }
+
+        // Manual App Functions
+        function openAddManualAppModal() {
+            document.getElementById('add-manual-app-modal').classList.remove('hidden');
+            document.getElementById('manual-app-id').focus();
+        }
+
+        function closeAddManualAppModal() {
+            document.getElementById('add-manual-app-modal').classList.add('hidden');
+            document.getElementById('add-manual-app-form').reset();
+        }
+
+        // Add manual app form submission
+        document.getElementById('add-manual-app-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const appData = {
+                app_id: formData.get('app_id').trim(),
+                app_name: formData.get('app_name').trim(),
+                status: formData.get('status'),
+                event1: formData.get('event1').trim() || null,
+                event2: formData.get('event2').trim() || null
+            };
+            
+            // Validate required fields
+            if (!appData.app_id || !appData.app_name) {
+                showErrorToast('App ID and App Name are required');
+                return;
+            }
+            
+            const saveBtn = document.getElementById('save-manual-app-btn');
+            const originalText = saveBtn.innerHTML;
+            
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Saving...';
+            
+            fetch('/api/manual-apps', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(appData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showInfoToast('Manual app added successfully!');
+                    closeAddManualAppModal();
+                    
+                    // Just refresh the apps list from cache/database without API calls
+                    refreshAppsListFromDatabase();
+                } else {
+                    showErrorToast(data.error || 'Failed to add manual app');
+                }
+            })
+            .catch(error => {
+                console.error('Error adding manual app:', error);
+                showErrorToast('Error adding manual app. Please try again.');
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            });
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('add-manual-app-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAddManualAppModal();
+            }
+        });
+
+        // Refresh apps list from database/cache without AppsFlyer API calls
+        function refreshAppsListFromDatabase() {
+            fetch('/api/apps-database-only')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showErrorToast('Error refreshing apps: ' + data.error);
+                        return;
+                    }
+                    
+                    // Update the apps list display
+                    window.fetchedApps = data.apps.map(app => ({
+                        ...app,
+                        is_active: typeof app.is_active === 'boolean' ? app.is_active : true
+                    }));
+                    
+                    // Update localStorage with the latest data
+                    localStorage.setItem('fetchedApps', JSON.stringify(window.fetchedApps));
+                    
+                    // Render the apps list
+                    renderAppsList(window.fetchedApps);
+                    
+                    // Update UI elements
+                    document.getElementById('app-count').textContent = data.count;
+                    document.getElementById('apps-last-updated').textContent = data.fetch_time ? `(Last updated: ${data.fetch_time})` : '';
+                    
+                    console.log('Apps list refreshed from database without API calls - Source:', data.source);
+                })
+                .catch(error => {
+                    console.error('Error refreshing apps from database:', error);
+                    showErrorToast('Error refreshing apps list');
+                });
         }
 
         // Stats Report Loading state management functions
@@ -3284,18 +3578,8 @@
             
             setFetchButtonsDisabled(true);
             
-            let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
-            
-            // Failsafe timer to ensure loading state is always hidden
-            const failsafeTimer = setTimeout(() => {
-                console.warn('Stats report failsafe timer triggered - forcing loading state to close');
-                completeStatsReport(null, 'Timeout - please try again');
-            }, 900000); // 15 minutes failsafe
-            
             // Helper function to complete the stats report
             function completeStatsReport(result, error) {
-                clearTimeout(failsafeTimer);
-                
                 if (result) {
                     // Success - complete the progress
                     updateStatsReportProgress(100, 'Complete!', 'Report generated successfully!');
@@ -3330,37 +3614,72 @@
                 }
             }
             
-            // Start the report generation
-            fetch('/start-report', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    apps: window.fetchedApps,
-                    period: 'last10',
-                    selected_events: eventSelections
+            // Fetch current event selections from database to ensure manual apps are included
+            fetch('/event-selections')
+                .then(response => response.json())
+                .then(eventSelectionsData => {
+                    let eventSelections = {};
+                    
+                    if (eventSelectionsData.success) {
+                        // Convert database format to expected format for stats generation
+                        Object.keys(eventSelectionsData.selections).forEach(appId => {
+                            const selection = eventSelectionsData.selections[appId];
+                            eventSelections[appId] = [
+                                selection.event1 || '',
+                                selection.event2 || ''
+                            ];
+                        });
+                        console.log('Using event selections from database for stats generation:', eventSelections);
+                    } else {
+                        console.warn('Failed to fetch event selections from database, using localStorage fallback');
+                        eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                    }
+                    
+                    // Failsafe timer to ensure loading state is always hidden
+                    const failsafeTimer = setTimeout(() => {
+                        console.warn('Stats report failsafe timer triggered - forcing loading state to close');
+                        completeStatsReport(null, 'Timeout - please try again');
+                    }, 900000); // 15 minutes failsafe
+                    
+                    // Start the report generation
+                    fetch('/start-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            apps: window.fetchedApps,
+                            period: 'last10',
+                            selected_events: eventSelections
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        clearTimeout(failsafeTimer);
+                        
+                        if (data.status === 'processing') {
+                            // Start polling for status (legacy async mode)
+                            pollReportStatus(data.job_id, range, completeStatsReport);
+                        } else if (data.status === 'completed' && data.result) {
+                            // Direct completion (new synchronous mode)
+                            completeStatsReport(data.result);
+                        } else if (data.error) {
+                            // Error occurred
+                            completeStatsReport(null, `Error: ${data.error}`);
+                        } else {
+                            // Unknown response format
+                            console.log('Unknown response format:', data);
+                            completeStatsReport(null, 'Unexpected response format. Please try again.');
+                        }
+                    })
+                    .catch(error => {
+                        clearTimeout(failsafeTimer);
+                        console.error('Error in stats report:', error);
+                        completeStatsReport(null, 'Error starting report generation. Please try again.');
+                    });
                 })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'processing') {
-                    // Start polling for status (legacy async mode)
-                    pollReportStatus(data.job_id, range, completeStatsReport);
-                } else if (data.status === 'completed' && data.result) {
-                    // Direct completion (new synchronous mode)
-                    completeStatsReport(data.result);
-                } else if (data.error) {
-                    // Error occurred
-                    completeStatsReport(null, `Error: ${data.error}`);
-                } else {
-                    // Unknown response format
-                    console.log('Unknown response format:', data);
-                    completeStatsReport(null, 'Unexpected response format. Please try again.');
-                }
-            })
-            .catch(error => {
-                console.error('Error in stats report:', error);
-                completeStatsReport(null, 'Error starting report generation. Please try again.');
-            });
+                .catch(error => {
+                    console.error('Error fetching event selections:', error);
+                    completeStatsReport(null, 'Error fetching event selections. Please try again.');
+                });
         }
 
         function pollReportStatus(jobId, range, completeCallback) {
@@ -4127,8 +4446,7 @@
             error.style.display = 'none';
             statsList.style.display = 'none';
             
-            let eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
-            let timer = 0;
+                        let timer = 0;
             const timerElem = document.createElement('div');
             timerElem.className = 'text-center text-gray-400 mt-2';
             timerElem.textContent = 'Thinking... 0s';
@@ -4139,31 +4457,59 @@
                 timerElem.textContent = `Thinking... ${timer}s`;
             }, 1000);
             
-            fetch('/all-apps-stats', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    apps: fetchedApps, 
-                    period: period, 
-                    selected_events: eventSelections 
-                })
-            })
-                .then(r => r.json())
-                .then(data => {
-                    clearInterval(timerInterval);
-                    loading.style.display = 'none';
-                    if (data && data.apps && data.apps.length > 0) {
-                        statsList.style.display = 'block';
-                        renderStatsApps(data.apps);
+            // Fetch current event selections from database to ensure manual apps are included
+            fetch('/event-selections')
+                .then(response => response.json())
+                .then(eventSelectionsData => {
+                    let eventSelections = {};
+                    
+                    if (eventSelectionsData.success) {
+                        // Convert database format to expected format for stats generation
+                        Object.keys(eventSelectionsData.selections).forEach(appId => {
+                            const selection = eventSelectionsData.selections[appId];
+                            eventSelections[appId] = [
+                                selection.event1 || '',
+                                selection.event2 || ''
+                            ];
+                        });
+                        console.log('Using event selections from database for stats generation:', eventSelections);
                     } else {
-                        error.textContent = 'No stats found.';
-                        error.style.display = 'block';
+                        console.warn('Failed to fetch event selections from database, using localStorage fallback');
+                        eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
                     }
+                    
+                    fetch('/all-apps-stats', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            apps: fetchedApps, 
+                            period: period, 
+                            selected_events: eventSelections 
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        clearInterval(timerInterval);
+                        loading.style.display = 'none';
+                        if (data && data.apps && data.apps.length > 0) {
+                            statsList.style.display = 'block';
+                            renderStatsApps(data.apps);
+                        } else {
+                            error.textContent = 'No stats found.';
+                            error.style.display = 'block';
+                        }
+                    })
+                    .catch(e => {
+                        clearInterval(timerInterval);
+                        loading.style.display = 'none';
+                        error.textContent = 'Error loading stats.';
+                        error.style.display = 'block';
+                    });
                 })
-                .catch(e => {
+                .catch(error => {
                     clearInterval(timerInterval);
                     loading.style.display = 'none';
-                    error.textContent = 'Error loading stats.';
+                    error.textContent = 'Error loading event selections.';
                     error.style.display = 'block';
                 });
         }
@@ -4596,6 +4942,11 @@
                             '<span class="text-emerald-600 font-semibold">✓ Configured</span>' : 
                             '<span class="text-amber-600 font-semibold">⚠ Partial</span>';
                         
+                        // Add manual app indicator
+                        const manualAppBadge = app.is_manual ? 
+                            '<span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">Manual</span>' : 
+                            '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">Synced</span>';
+                        
                         tr.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
@@ -4606,7 +4957,10 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900">${app.app_name}</div>
+                                        <div class="flex items-center">
+                                            <div class="text-sm font-medium text-gray-900">${app.app_name}</div>
+                                            ${manualAppBadge}
+                                        </div>
                                         <div class="text-sm text-gray-500">${eventIndicator}</div>
                                     </div>
                                 </div>
@@ -5870,6 +6224,8 @@
                         fraud_post_inapps: 0,
                         blocked_clicks: 0,
                         blocked_install_postbacks: 0,
+                        event1: 0,
+                        event2: 0,
                         dates: [],
                         rows: []
                     };
@@ -5880,6 +6236,8 @@
                 grouped[source].fraud_post_inapps += parseInt(row.fraud_post_inapps || 0);
                 grouped[source].blocked_clicks += parseInt(row.blocked_clicks || 0);
                 grouped[source].blocked_install_postbacks += parseInt(row.blocked_install_postbacks || 0);
+                grouped[source].event1 += parseInt(row.event1 || 0);
+                grouped[source].event2 += parseInt(row.event2 || 0);
                 grouped[source].dates.push(row.date);
                 grouped[source].rows.push(row);
             });
@@ -5933,6 +6291,7 @@
                     return sumB - sumA;
                 });
                 console.log(`[DEBUG] Sorted media sources for ${app.app_name}: ${sortedSources.join(', ')}`);
+                console.log(`[DEBUG] Event names for ${app.app_name}: event1="${app.event1_name}", event2="${app.event2_name}"`);
                 const appSection = document.createElement('div');
                 appSection.className = 'mb-12 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden';
                 
@@ -6026,7 +6385,7 @@
                      
                      // Bottom row - Secondary metrics
                      const secondaryMetrics = document.createElement('div');
-                     secondaryMetrics.className = 'grid grid-cols-2 md:grid-cols-3 gap-4';
+                     secondaryMetrics.className = 'grid grid-cols-2 md:grid-cols-3 gap-4 mb-4';
                      secondaryMetrics.innerHTML = `
                          <div class="bg-teal-50 p-3 rounded-lg border border-teal-200 text-center">
                              <div class="text-teal-600 font-medium text-xs mb-1">🔍 Fraud Post-InApps</div>
@@ -6042,6 +6401,23 @@
                          </div>
                      `;
                      metricsSection.appendChild(secondaryMetrics);
+                     
+                     // Event metrics row - use actual event names (with fallbacks)
+                     const event1Name = (app.event1_name && app.event1_name.trim()) ? app.event1_name : 'Event 1';
+                     const event2Name = (app.event2_name && app.event2_name.trim()) ? app.event2_name : 'Event 2';
+                     const eventMetrics = document.createElement('div');
+                     eventMetrics.className = 'grid grid-cols-2 gap-4';
+                     eventMetrics.innerHTML = `
+                         <div class="bg-green-50 p-3 rounded-lg border border-green-200 text-center">
+                             <div class="text-green-600 font-medium text-xs mb-1">⚡ ${event1Name}</div>
+                             <div class="text-green-700 text-lg font-bold">${grouped[source].event1}</div>
+                         </div>
+                         <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200 text-center">
+                             <div class="text-indigo-600 font-medium text-xs mb-1">⚡ ${event2Name}</div>
+                             <div class="text-indigo-700 text-lg font-bold">${grouped[source].event2}</div>
+                         </div>
+                     `;
+                     metricsSection.appendChild(eventMetrics);
                      contentContainer.appendChild(metricsSection);
 
                      // Enhanced chart section with better visibility
@@ -6050,7 +6426,7 @@
                      
                      const chartTitle = document.createElement('h4');
                      chartTitle.className = 'text-base font-semibold text-gray-700 mb-4 flex items-center';
-                     chartTitle.innerHTML = '<span class="mr-2">📈</span>Fraud Trends Over Time - Daily Breakdown';
+                     chartTitle.innerHTML = '<span class="mr-2">📈</span>Fraud & Event Trends Over Time - Daily Breakdown';
                      chartSection.appendChild(chartTitle);
                      
                      // Enhanced chart container with better height
@@ -6065,14 +6441,18 @@
                      chartContainer.appendChild(canvas);
                      chartSection.appendChild(chartContainer);
 
-                     // Metrics for the comprehensive chart
+                     // Metrics for the comprehensive chart - use actual event names (with fallbacks)
+                     const event1Label = (app.event1_name && app.event1_name.trim()) ? app.event1_name : 'Event 1';
+                     const event2Label = (app.event2_name && app.event2_name.trim()) ? app.event2_name : 'Event 2';
                      const metrics = [
                          { key: 'blocked_installs_rt', label: 'Blocked Installs (RT)', color: '#ef4444' },
                          { key: 'blocked_installs_pa', label: 'Blocked Installs (PA)', color: '#3b82f6' },
                          { key: 'blocked_in_app_events', label: 'Blocked In-App Events', color: '#f59e0b' },
                          { key: 'fraud_post_inapps', label: 'Fraud Post-InApps', color: '#14b8a6' },
                          { key: 'blocked_clicks', label: 'Blocked Clicks', color: '#a21caf' },
-                         { key: 'blocked_install_postbacks', label: 'Install Postbacks', color: '#f97316' }
+                         { key: 'blocked_install_postbacks', label: 'Install Postbacks', color: '#f97316' },
+                         { key: 'event1', label: event1Label, color: '#10b981' },
+                         { key: 'event2', label: event2Label, color: '#6366f1' }
                      ];
                      // Render comprehensive chart
                          setTimeout(() => {
@@ -6902,7 +7282,7 @@
             const clearBtn = document.getElementById('clear-backend-cache-btn');
             if (clearBtn) {
                 clearBtn.onclick = function() {
-                    if (!confirm('Are you sure you want to clear all backend cached data? This action cannot be undone.')) {
+                    if (!confirm('Are you sure you want to clear ALL backend data? This will permanently delete:\n\n• All apps (synced and manual)\n• All cached stats and fraud data\n• All saved CSV export data\n• All app event selections\n\nThis action cannot be undone!')) {
                         return;
                     }
                     clearBtn.disabled = true;
@@ -6910,21 +7290,39 @@
                     fetch('/clear-backend-cache', { method: 'POST' })
                         .then(r => r.json())
                         .then(data => {
-                            clearBtn.textContent = data.success ? 'Cache Cleared!' : 'Failed to Clear';
+                            if (data.success) {
+                                clearBtn.textContent = 'All Data Cleared!';
+                                
+                                // Show detailed success message
+                                const toast = document.createElement('div');
+                                toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
+                                toast.innerHTML = `
+                                    <div class="font-medium">All Backend Data Cleared Successfully</div>
+                                    <div class="text-sm mt-1">
+                                        Cleared: ${data.cleared_tables.join(', ')}<br>
+                                        Preserved: ${data.preserved_tables.join(', ')}
+                                    </div>
+                                `;
+                                document.body.appendChild(toast);
+                                setTimeout(() => toast.remove(), 6000);
+                            } else {
+                                clearBtn.textContent = 'Failed to Clear';
+                            }
+                            
                             // Clear all UI and JS variables/localStorage
                             clearAppsUI();
                             clearStatsUI();
                             clearFraudUI();
                             clearOverviewUI();
                             setTimeout(() => {
-                                clearBtn.textContent = 'Clear Backend Data';
+                                clearBtn.textContent = 'Clear ALL Data';
                                 clearBtn.disabled = false;
                             }, 1500);
                         })
                         .catch(() => {
                             clearBtn.textContent = 'Error';
                             setTimeout(() => {
-                                clearBtn.textContent = 'Clear Backend Data';
+                                clearBtn.textContent = 'Clear ALL Data';
                                 clearBtn.disabled = false;
                             }, 1500);
                         });
@@ -7214,6 +7612,10 @@
                     // Fraud Protection sub-page will handle showing the data
                 });
             }
+            if (tabName === 'events-source') {
+                // Initialize Events Per Source tab
+                initializeEventsSource();
+            }
             if (tabName === 'profile') loadProfile();
         };
 
@@ -7455,7 +7857,7 @@
             }
         });
 
-        // Helper to load cached apps from localStorage
+        // Helper to load cached apps from localStorage or database
         function loadCachedApps() {
             const cached = localStorage.getItem('fetchedApps');
             if (cached) {
@@ -7464,10 +7866,41 @@
                     if (Array.isArray(window.fetchedApps) && window.fetchedApps.length > 0) {
                         renderAppsList(window.fetchedApps);
                         document.getElementById('app-count').textContent = window.fetchedApps.length;
+                        
+                        // Check if localStorage data might be missing manual apps by fetching from database
+                        fetch('/api/apps-database-only')
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.apps && data.apps.length > window.fetchedApps.length) {
+                                    // Database has more apps (likely manual apps), update localStorage and UI
+                                    window.fetchedApps = data.apps;
+                                    localStorage.setItem('fetchedApps', JSON.stringify(window.fetchedApps));
+                                    renderAppsList(window.fetchedApps);
+                                    document.getElementById('app-count').textContent = data.count;
+                                    console.log('Updated apps list with manual apps from database');
+                                }
+                            })
+                            .catch(e => console.warn('Could not check for manual apps:', e));
+                        
                         return true;
                     }
                 } catch (e) { window.fetchedApps = []; }
             }
+            
+            // If no localStorage cache, try to load from database
+            fetch('/api/apps-database-only')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.apps && data.apps.length > 0) {
+                        window.fetchedApps = data.apps;
+                        localStorage.setItem('fetchedApps', JSON.stringify(window.fetchedApps));
+                        renderAppsList(window.fetchedApps);
+                        document.getElementById('app-count').textContent = data.count;
+                        console.log('Loaded apps from database including manual apps');
+                    }
+                })
+                .catch(e => console.warn('Could not load apps from database:', e));
+            
             return false;
         }
 
@@ -7642,7 +8075,7 @@
         document.head.appendChild(style);
 
         function clearAppsCache() {
-            if (!confirm('Are you sure you want to clear the apps cache? This will remove cache for all "Not Active" apps while preserving "Active" apps and their events.')) {
+            if (!confirm('Are you sure you want to clear the apps cache? This will permanently delete ALL apps (both synced and manual apps) from the database. No new API calls will be made to AppsFlyer.')) {
                 return;
             }
 
@@ -7650,6 +8083,10 @@
             const originalText = button.textContent;
             button.disabled = true;
             button.textContent = 'Clearing...';
+
+            // Clear localStorage first
+            localStorage.removeItem('fetchedApps');
+            window.fetchedApps = [];
 
             fetch('/clear-apps-cache', {
                 method: 'POST'
@@ -7661,18 +8098,18 @@
                     const toast = document.createElement('div');
                     toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50';
                     toast.innerHTML = `
-                        <div class="font-medium">Cache Status</div>
+                        <div class="font-medium">All Apps Cleared Successfully</div>
                         <div class="text-sm mt-1">
-                            • Preserved cache for ${data.active_apps_count} apps with "Active" status<br>
-                            • Preserved events for ${data.events_preserved} active apps<br>
-                            • Cleared cache and events for all "Not Active" apps
+                            • All apps permanently deleted (synced and manual)<br>
+                            • localStorage cleared<br>
+                            • No API calls made to AppsFlyer
                         </div>
                     `;
                     document.body.appendChild(toast);
                     setTimeout(() => toast.remove(), 5000);
                     
-                    // Refresh the apps list
-                    fetchApps();
+                    // Refresh the apps list from database only (NO API CALLS)
+                    refreshAppsListFromDatabase();
                 } else {
                     alert('Error clearing cache: ' + (data.error || 'Unknown error'));
                 }
@@ -7687,11 +8124,13 @@
             });
         }
 
-        // Auto-run system for Get All Stats
+        // Auto-run system for Get All Stats (Server-side synchronized)
         let autoRunTimer = null;
         let countdownTimer = null;
         let isAutoRunExecuting = false; // Flag to prevent concurrent executions
+        let autoRunSyncTimer = null; // Timer to sync with server
         const AUTO_RUN_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+        const SYNC_INTERVAL = 30 * 1000; // Sync with server every 30 seconds
         
         // Function to execute Get All Stats
         async function executeGetAllStats(isAutoRun = false) {
@@ -7802,13 +8241,38 @@
                     updateProgress(`Starting stats report for ${period}...`);
                         
                         try {
+                                        // Fetch current event selections from database for auto-run
+                    let eventSelections = {};
+                    try {
+                        const eventSelectionsResponse = await fetch('/event-selections');
+                        const eventSelectionsData = await eventSelectionsResponse.json();
+                        
+                        if (eventSelectionsData.success) {
+                            // Convert database format to expected format for stats generation
+                            Object.keys(eventSelectionsData.selections).forEach(appId => {
+                                const selection = eventSelectionsData.selections[appId];
+                                eventSelections[appId] = [
+                                    selection.event1 || '',
+                                    selection.event2 || ''
+                                ];
+                            });
+                            console.log('Auto-run: Using event selections from database:', eventSelections);
+                        } else {
+                            console.warn('Auto-run: Failed to fetch event selections from database, using localStorage fallback');
+                            eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                        }
+                    } catch (error) {
+                        console.error('Auto-run: Error fetching event selections:', error);
+                        eventSelections = JSON.parse(localStorage.getItem('eventSelections') || '{}');
+                    }
+                    
                     const response = await fetch('/start-report', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                                    apps: activeApps,
+                            apps: activeApps,
                             period: period,
-                            selected_events: JSON.parse(localStorage.getItem('eventSelections') || '{}')
+                            selected_events: eventSelections
                         })
                     });
                             
@@ -8015,16 +8479,38 @@
             }
         }
         
-        // Function to update last run time
+        // Function to update last run time (Server-side)
         function updateLastRunTime() {
             const now = new Date();
             const timeString = now.toLocaleString();
             document.getElementById('last-run-time').textContent = timeString;
-            localStorage.setItem('lastRunTime', now.toISOString());
-            console.log('✅ Last run time updated:', timeString);
+            
+            // Hide initialize timer button since we now have a last run time
+            const initTimerBtn = document.getElementById('init-timer-btn');
+            if (initTimerBtn) {
+                initTimerBtn.style.display = 'none';
+            }
+            
+            // Update server-side timing
+            fetch('/api/auto-run-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ last_run_time: now.toISOString() })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Last run time updated on server:', timeString);
+                } else {
+                    console.error('❌ Failed to update last run time on server:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error updating last run time on server:', error);
+            });
         }
         
-        // Function to reset auto-run timer
+        // Function to reset auto-run timer (Server-side)
         function resetAutoRunTimer() {
             // Clear existing timers
             if (autoRunTimer) {
@@ -8038,66 +8524,112 @@
                 return;
             }
             
-            // Calculate remaining time based on last run
-            const lastRunTime = localStorage.getItem('lastRunTime');
-            let remainingTime;
-            
-            if (lastRunTime) {
-                const lastRun = new Date(lastRunTime);
-                const timeSinceLastRun = Date.now() - lastRun.getTime();
-                remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
-            } else {
-                remainingTime = AUTO_RUN_INTERVAL;
-            }
-            
-            const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
-            const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-            
-            console.log(`🔄 Setting auto-run timer for ${remainingHours}h ${remainingMinutes}m...`);
-            
-            if (remainingTime <= 0) {
-                // Should run immediately
-                console.log('⏰ Auto-run overdue - executing immediately...');
-                executeGetAllStats(true);
-                return;
-            }
-            
-            autoRunTimer = setTimeout(() => {
-                console.log('⏰ Auto-run timer triggered - executing Get All Stats...');
-                executeGetAllStats(true);
-            }, remainingTime);
-            
-            // Reset countdown
-            startCountdown();
+            // Get timing from server
+            fetch('/api/auto-run-status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.auto_run_enabled) {
+                        let remainingTime;
+                        
+                        if (data.last_run_time) {
+                            const lastRun = new Date(data.last_run_time);
+                            const timeSinceLastRun = Date.now() - lastRun.getTime();
+                            remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
+                        } else {
+                            remainingTime = AUTO_RUN_INTERVAL;
+                        }
+                        
+                        const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
+                        const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+                        
+                        console.log(`🔄 Setting auto-run timer for ${remainingHours}h ${remainingMinutes}m...`);
+                        
+                        if (remainingTime <= 0) {
+                            // Should run immediately
+                            console.log('⏰ Auto-run overdue - executing immediately...');
+                            executeGetAllStats(true);
+                            return;
+                        }
+                        
+                        autoRunTimer = setTimeout(() => {
+                            console.log('⏰ Auto-run timer triggered - executing Get All Stats...');
+                            executeGetAllStats(true);
+                        }, remainingTime);
+                        
+                        // Reset countdown
+                        startCountdown();
+                    } else {
+                        console.log('⏸️ Auto-run disabled on server');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Error getting auto-run status from server:', error);
+                    // Fallback to local timer
+                    startCountdown();
+                });
         }
         
-        // Function to start countdown timer
+        // Function to start countdown timer (Server-side synchronized)
         function startCountdown() {
             if (countdownTimer) {
                 clearInterval(countdownTimer);
                 countdownTimer = null;
             }
             
-            // Calculate end time based on last run time, not current time
-            const lastRunTime = localStorage.getItem('lastRunTime');
-            let endTime;
-            
-            if (lastRunTime) {
-                const lastRun = new Date(lastRunTime);
-                endTime = lastRun.getTime() + AUTO_RUN_INTERVAL;
-            } else {
-                // If no last run time, use current time + interval
-                endTime = Date.now() + AUTO_RUN_INTERVAL;
-            }
-            
+            // Start countdown that syncs with server
             countdownTimer = setInterval(() => {
+                updateCountdownFromServer();
+            }, 1000);
+            
+            // Update immediately
+            updateCountdownFromServer();
+        }
+        
+        // Cache server data to reduce API calls
+        let cachedAutoRunData = null;
+        let lastDataFetch = 0;
+        const COUNTDOWN_SYNC_INTERVAL = 10000; // Fetch from server every 10 seconds instead of every second
+        
+        // Function to update countdown from server data (optimized with caching)
+        function updateCountdownFromServer() {
+            const now = Date.now();
+            
+            // Only fetch from server every 10 seconds, calculate locally otherwise
+            if (!cachedAutoRunData || (now - lastDataFetch) > COUNTDOWN_SYNC_INTERVAL) {
+                console.log('🔄 Fetching fresh auto-run status from server...');
+                fetch('/api/auto-run-status')
+                    .then(response => response.json())
+                    .then(data => {
+                        cachedAutoRunData = data;
+                        lastDataFetch = now;
+                        calculateCountdown(data);
+                    })
+                    .catch(error => {
+                        console.error('❌ Error updating countdown from server:', error);
+                        document.getElementById('next-run-countdown').textContent = '--:--:--';
+                    });
+            } else {
+                // Use cached data for local countdown calculation (no API call needed)
+                calculateCountdown(cachedAutoRunData);
+            }
+        }
+        
+        // Separated countdown calculation logic
+        function calculateCountdown(data) {
+            if (data.auto_run_enabled && data.last_run_time) {
+                const lastRun = new Date(data.last_run_time);
+                const endTime = lastRun.getTime() + AUTO_RUN_INTERVAL;
                 const now = Date.now();
-                const remaining = endTime - now;
+                const remaining = Math.max(0, endTime - now);
                 
                 if (remaining <= 0) {
-                    clearInterval(countdownTimer);
-                    countdownTimer = null;
                     document.getElementById('next-run-countdown').textContent = '00:00:00';
+                    
+                    // Check if auto-run should be triggered
+                    if (!isAutoRunExecuting && data.auto_run_enabled) {
+                        console.log('⏰ Countdown reached zero - triggering server-side auto-run...');
+                        triggerServerAutoRun();
+                    }
                     return;
                 }
                 
@@ -8107,72 +8639,174 @@
                 
                 const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 document.getElementById('next-run-countdown').textContent = timeString;
-            }, 1000);
+            } else {
+                document.getElementById('next-run-countdown').textContent = '06:00:00';
+            }
         }
         
-        // Function to initialize auto-run system
+        // Function to initialize auto-run system (Server-side synchronized)
         function initializeAutoRunSystem() {
             console.log('🚀 Initializing auto-run system...');
             
-            // Load last run time from localStorage
-            const lastRunTime = localStorage.getItem('lastRunTime');
-            if (lastRunTime) {
-                const lastRun = new Date(lastRunTime);
-                document.getElementById('last-run-time').textContent = lastRun.toLocaleString();
-                
-                // Check if we should run immediately based on last run time
-                const timeSinceLastRun = Date.now() - lastRun.getTime();
-                const remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
-                
-                const hoursAgo = Math.floor(timeSinceLastRun / (1000 * 60 * 60));
-                const minutesAgo = Math.floor((timeSinceLastRun % (1000 * 60 * 60)) / (1000 * 60));
-                const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
-                const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-                
-                console.log(`⏰ Last run was ${hoursAgo}h ${minutesAgo}m ago`);
-                console.log(`⏰ Time until next run: ${remainingHours}h ${remainingMinutes}m`);
-                
-                if (remainingTime <= 0) {
-                    console.log('📅 Auto-run is overdue, scheduling immediate execution...');
-                    // It's been more than 6 hours, run immediately
-                    setTimeout(() => {
-                        console.log('🚀 Auto-running Get All Stats (overdue)...');
-                        executeGetAllStats(true);
-                    }, 10000); // Give 10 seconds delay to ensure page is fully loaded
-                    return;
-                } else {
-                    console.log('✅ Auto-run is not overdue, starting normal timer...');
-                }
-            } else {
-                console.log('📝 No previous run time found, starting fresh timer...');
-            }
-            
-            // Start the auto-run timer
-            resetAutoRunTimer();
-            
-            // Update countdown display immediately
-            updateCountdownDisplay();
+            // Get initial status from server
+            fetch('/api/auto-run-status')
+                .then(response => response.json())
+                .then(data => {
+                    const initTimerBtn = document.getElementById('init-timer-btn');
+                    
+                    if (data.last_run_time) {
+                        const lastRun = new Date(data.last_run_time);
+                        document.getElementById('last-run-time').textContent = lastRun.toLocaleString();
+                        
+                        // Hide initialize timer button since we have a last run time
+                        if (initTimerBtn) {
+                            initTimerBtn.style.display = 'none';
+                        }
+                        
+                        // Check if we should run immediately based on last run time
+                        const timeSinceLastRun = Date.now() - lastRun.getTime();
+                        const remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
+                        
+                        const hoursAgo = Math.floor(timeSinceLastRun / (1000 * 60 * 60));
+                        const minutesAgo = Math.floor((timeSinceLastRun % (1000 * 60 * 60)) / (1000 * 60));
+                        const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
+                        const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+                        
+                        console.log(`⏰ Last run was ${hoursAgo}h ${minutesAgo}m ago`);
+                        console.log(`⏰ Time until next run: ${remainingHours}h ${remainingMinutes}m`);
+                        
+                        if (remainingTime <= 0 && data.auto_run_enabled) {
+                            console.log('📅 Auto-run is overdue, scheduling immediate execution...');
+                            // It's been more than 6 hours, run immediately
+                            setTimeout(() => {
+                                console.log('🚀 Auto-running Get All Stats (overdue)...');
+                                executeGetAllStats(true);
+                            }, 10000); // Give 10 seconds delay to ensure page is fully loaded
+                            return;
+                        } else {
+                            console.log('✅ Auto-run is not overdue, starting normal timer...');
+                        }
+                    } else {
+                        console.log('📝 No previous run time found, showing initialize button...');
+                        document.getElementById('last-run-time').textContent = 'Never';
+                        
+                        // Show initialize timer button since we don't have a last run time
+                        if (initTimerBtn) {
+                            initTimerBtn.style.display = 'flex';
+                        }
+                    }
+                    
+                    // Start the auto-run timer
+                    resetAutoRunTimer();
+                    
+                    // Start periodic sync with server
+                    startServerSync();
+                })
+                .catch(error => {
+                    console.error('❌ Error initializing auto-run system:', error);
+                    // Fallback to local display
+                    document.getElementById('last-run-time').textContent = 'Error';
+                    document.getElementById('next-run-countdown').textContent = '--:--:--';
+                });
         }
         
-        // Function to update countdown display immediately
-        function updateCountdownDisplay() {
-            const lastRunTime = localStorage.getItem('lastRunTime');
-            if (!lastRunTime) {
-                document.getElementById('next-run-countdown').textContent = '06:00:00';
-                return;
+        // Function to start periodic server synchronization
+        function startServerSync() {
+            // Clear existing sync timer
+            if (autoRunSyncTimer) {
+                clearInterval(autoRunSyncTimer);
             }
             
-            const lastRun = new Date(lastRunTime);
-            const endTime = lastRun.getTime() + AUTO_RUN_INTERVAL;
-            const now = Date.now();
-            const remaining = Math.max(0, endTime - now);
+            // Sync with server every 30 seconds
+            autoRunSyncTimer = setInterval(() => {
+                syncWithServer();
+            }, SYNC_INTERVAL);
             
-            const hours = Math.floor(remaining / (1000 * 60 * 60));
-            const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+            console.log('🔄 Started server synchronization (every 30 seconds)');
+        }
+        
+        // Function to sync with server
+        function syncWithServer() {
+            fetch('/api/auto-run-status')
+                .then(response => response.json())
+                .then(data => {
+                    const initTimerBtn = document.getElementById('init-timer-btn');
+                    
+                    if (data.last_run_time) {
+                        const lastRun = new Date(data.last_run_time);
+                        const currentDisplayTime = document.getElementById('last-run-time').textContent;
+                        const serverTime = lastRun.toLocaleString();
+                        
+                        // Update display if server time is different
+                        if (currentDisplayTime !== serverTime && currentDisplayTime !== 'Never') {
+                            document.getElementById('last-run-time').textContent = serverTime;
+                            console.log('🔄 Synced last run time from server:', serverTime);
+                        } else if (currentDisplayTime === 'Never') {
+                            document.getElementById('last-run-time').textContent = serverTime;
+                        }
+                        
+                        // Hide initialize timer button since we have a last run time
+                        if (initTimerBtn) {
+                            initTimerBtn.style.display = 'none';
+                        }
+                    } else {
+                        // Show initialize timer button since we don't have a last run time
+                        if (initTimerBtn) {
+                            initTimerBtn.style.display = 'flex';
+                        }
+                    }
+                    
+                    // Check if server is running something
+                    if (data.is_running && !isAutoRunExecuting) {
+                        console.log('🔄 Server reports auto-run is executing...');
+                        isAutoRunExecuting = true;
+                        
+                        // Update UI to show running state
+                        const button = document.getElementById('get-all-stats-btn');
+                        button.disabled = true;
+                        button.textContent = 'Auto-Running...';
+                    } else if (!data.is_running && isAutoRunExecuting) {
+                        console.log('🔄 Server reports auto-run completed...');
+                        isAutoRunExecuting = false;
+                        
+                        // Update UI to show completed state
+                        const button = document.getElementById('get-all-stats-btn');
+                        button.disabled = false;
+                        button.textContent = 'Get All Stats';
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Error syncing with server:', error);
+                });
+        }
+        
+        // Function to trigger server-side auto-run execution
+        function triggerServerAutoRun() {
+            console.log('🚀 Triggering server-side auto-run...');
             
-            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            document.getElementById('next-run-countdown').textContent = timeString;
+            fetch('/api/auto-run-execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Server-side auto-run completed successfully:', data);
+                    
+                    // Update UI
+                    const button = document.getElementById('get-all-stats-btn');
+                    button.disabled = false;
+                    button.textContent = 'Get All Stats';
+                    
+                    // Trigger comprehensive refresh
+                    refreshAllDashboardData();
+                } else {
+                    console.error('❌ Server-side auto-run failed:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error triggering server-side auto-run:', error);
+            });
         }
         
         // Add event listener for Get All Stats button (manual execution)
@@ -8180,40 +8814,102 @@
             await executeGetAllStats(false);
         });
         
-        // Debug function to check auto-run system status
+        // Add event listener for Initialize Timer button
+        document.getElementById('init-timer-btn').addEventListener('click', function() {
+            initializeAutoRunTimer();
+        });
+        
+        // Function to initialize auto-run timer without running the full process
+        function initializeAutoRunTimer() {
+            const button = document.getElementById('init-timer-btn');
+            const originalText = button.textContent;
+            
+            button.disabled = true;
+            button.textContent = 'Initializing...';
+            
+            // Set the current time as the "last run time" to start the 6-hour countdown
+            const currentTime = new Date().toISOString();
+            
+            fetch('/api/auto-run-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    last_run_time: currentTime,
+                    auto_run_enabled: true 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Auto-run timer initialized successfully');
+                    
+                    // Update UI
+                    document.getElementById('last-run-time').textContent = new Date(currentTime).toLocaleString();
+                    button.style.display = 'none';
+                    
+                    // Restart the countdown system
+                    resetAutoRunTimer();
+                    
+                    // Show success message
+                    showToast('success', 'Auto-run timer started! Next run in 6 hours.');
+                } else {
+                    console.error('❌ Failed to initialize auto-run timer:', data.error);
+                    showToast('error', 'Failed to initialize timer. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error initializing auto-run timer:', error);
+                showToast('error', 'Error initializing timer. Please try again.');
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = originalText;
+            });
+        }
+        
+        // Debug function to check auto-run system status (Server-side)
         window.debugAutoRunSystem = function() {
             console.log('=== Auto-Run System Status ===');
             console.log('Auto-run timer active:', autoRunTimer !== null);
             console.log('Countdown timer active:', countdownTimer !== null);
             console.log('Execution in progress:', isAutoRunExecuting);
+            console.log('Server sync timer active:', autoRunSyncTimer !== null);
             
-            const lastRunTime = localStorage.getItem('lastRunTime');
-            console.log('Last run time:', lastRunTime);
-            
-            if (lastRunTime) {
-                const lastRun = new Date(lastRunTime);
-                const timeSinceLastRun = Date.now() - lastRun.getTime();
-                const remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
-                
-                const hoursAgo = Math.floor(timeSinceLastRun / (1000 * 60 * 60));
-                const minutesAgo = Math.floor((timeSinceLastRun % (1000 * 60 * 60)) / (1000 * 60));
-                const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
-                const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-                
-                console.log(`Time since last run: ${hoursAgo}h ${minutesAgo}m`);
-                console.log(`Time until next run: ${remainingHours}h ${remainingMinutes}m`);
-                console.log('Next run overdue:', remainingTime <= 0);
-            }
-            
-            console.log('Fetched apps:', window.fetchedApps ? window.fetchedApps.length : 'None');
-            if (window.fetchedApps) {
-                const activeApps = window.fetchedApps.filter(app => app.is_active === true);
-                console.log('Active apps:', activeApps.length);
-                console.log('Active apps list:', activeApps.map(app => app.app_name));
-            }
-            console.log('Auto-run interval (hours):', AUTO_RUN_INTERVAL / (1000 * 60 * 60));
-            console.log('Current time:', new Date().toLocaleString());
-            console.log('================================');
+            // Get status from server
+            fetch('/api/auto-run-status')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Server auto-run status:', data);
+                    
+                    if (data.last_run_time) {
+                        const lastRun = new Date(data.last_run_time);
+                        const timeSinceLastRun = Date.now() - lastRun.getTime();
+                        const remainingTime = Math.max(0, AUTO_RUN_INTERVAL - timeSinceLastRun);
+                        
+                        const hoursAgo = Math.floor(timeSinceLastRun / (1000 * 60 * 60));
+                        const minutesAgo = Math.floor((timeSinceLastRun % (1000 * 60 * 60)) / (1000 * 60));
+                        const remainingHours = Math.floor(remainingTime / (1000 * 60 * 60));
+                        const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+                        
+                        console.log(`Time since last run: ${hoursAgo}h ${minutesAgo}m`);
+                        console.log(`Time until next run: ${remainingHours}h ${remainingMinutes}m`);
+                        console.log('Next run overdue:', remainingTime <= 0);
+                    }
+                    
+                    console.log('Fetched apps:', window.fetchedApps ? window.fetchedApps.length : 'None');
+                    if (window.fetchedApps) {
+                        const activeApps = window.fetchedApps.filter(app => app.is_active === true);
+                        console.log('Active apps:', activeApps.length);
+                        console.log('Active apps list:', activeApps.map(app => app.app_name));
+                    }
+                    console.log('Auto-run interval (hours):', AUTO_RUN_INTERVAL / (1000 * 60 * 60));
+                    console.log('Current time:', new Date().toLocaleString());
+                    console.log('Sync interval (seconds):', SYNC_INTERVAL / 1000);
+                    console.log('================================');
+                })
+                .catch(error => {
+                    console.error('Error getting server status:', error);
+                });
         };
         
         // Function to manually stop auto-run system
@@ -8411,6 +9107,446 @@
                 });
             console.log('=====================================');
         };
+        
+        // ===== EVENTS PER SOURCE TAB FUNCTIONALITY =====
+        
+        let eventsSourceDataCache = { '10d': null };
+        window.selectedEventsSourceAppId = window.selectedEventsSourceAppId || '';
+        
+        function initializeEventsSource() {
+            // Populate filter with apps
+            populateEventsSourceFilters();
+            
+            // Load cached data on page load
+            console.log('🔄 Loading events source data from backend cache...');
+            fetch('/get_events_source_subpage_10d')
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.apps && data.apps.length > 0) {
+                        // Cache the data
+                        eventsSourceDataCache['10d'] = data;
+                        console.log('✅ Events source data loaded from backend cache:', data.apps.length, 'apps');
+                        
+                        // Auto-select first app if none selected
+                        if (!window.selectedEventsSourceAppId) {
+                            const firstAppWithData = data.apps.find(app => app.table && app.table.length > 0) || data.apps[0];
+                            if (firstAppWithData) {
+                                window.selectedEventsSourceAppId = firstAppWithData.app_id;
+                                
+                                // Update the dropdown if it exists
+                                const sourceFilter = document.getElementById('events-source-app-filter');
+                                if (sourceFilter) {
+                                    sourceFilter.value = firstAppWithData.app_id;
+                                }
+                                
+                                console.log('✅ Auto-selected events source app:', firstAppWithData.app_name, '(', firstAppWithData.app_id, ')');
+                            }
+                        }
+                        
+                        // Render the data
+                        renderEventsSource(data, '10d');
+                        document.getElementById('events-source-error-10d').style.display = 'none';
+                    } else {
+                        document.getElementById('events-source-data-10d').innerHTML = `
+                            <div class="text-center py-20">
+                                <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-3xl p-6 max-w-lg mx-auto shadow-lg">
+                                    <div class="text-orange-400 mb-6">
+                                        <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-orange-700 text-xl font-bold mb-3">📊 No Events Data</div>
+                                    <div class="text-orange-600 text-base leading-relaxed">Please run a fraud report first to collect event data, then return to this tab.</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('events-source-data-10d').innerHTML = `
+                        <div class="text-center py-20">
+                            <div class="bg-red-50 border border-red-200 rounded-3xl p-8 max-w-md mx-auto">
+                                <div class="text-red-600 text-xl font-bold mb-3">⚠️ Error Loading Data</div>
+                                <div class="text-red-500 text-base">Please try again later.</div>
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+        
+        function populateEventsSourceFilters() {
+            if (!window.fetchedApps) return;
+            
+            const sourceFilter = document.getElementById('events-source-app-filter');
+            if (sourceFilter) {
+                sourceFilter.innerHTML = '<option value="" style="color: #1f2937; background-color: white; font-weight: 600; padding: 8px 12px;">🎯 Choose a campaign to analyze events</option>';
+                window.fetchedApps.forEach(app => {
+                    const option = document.createElement('option');
+                    option.value = app.app_id;
+                    option.style.color = '#1f2937';
+                    option.style.backgroundColor = 'white';
+                    option.style.fontWeight = '600';
+                    option.style.padding = '8px 12px';
+                    option.textContent = `📱 ${app.app_name} (${app.app_id})`;
+                    sourceFilter.appendChild(option);
+                });
+            }
+        }
+        
+        function processEventsDataBySource(app) {
+            const grouped = {};
+            console.log(`[DEBUG] Processing events data for app: ${app.app_name} (${app.app_id})`);
+            console.log(`[DEBUG] Total rows: ${(app.table || []).length}`);
+            
+            (app.table || []).forEach(row => {
+                let source = row.media_source;
+                if (!source) source = 'Unknown';
+                console.log(`[DEBUG] Processing media source: ${source}`);
+                
+                if (!grouped[source]) {
+                    grouped[source] = {
+                        event1: 0,
+                        event2: 0,
+                        dates: [],
+                        rows: []
+                    };
+                }
+                
+                grouped[source].event1 += parseInt(row.event1 || 0);
+                grouped[source].event2 += parseInt(row.event2 || 0);
+                grouped[source].dates.push(row.date);
+                grouped[source].rows.push(row);
+            });
+            
+            console.log(`[DEBUG] Grouped media sources: ${Object.keys(grouped).join(', ')}`);
+            return grouped;
+        }
+        
+        function renderEventsSource(data, range) {
+            const container = document.getElementById(`events-source-data-${range}`);
+            container.innerHTML = '';
+            
+            if (!data.apps || data.apps.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20">
+                        <div class="bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-3xl p-6 max-w-lg mx-auto shadow-lg">
+                            <div class="text-green-400 mb-6">
+                                <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                            </div>
+                            <div class="text-green-700 text-xl font-bold mb-3">📊 No Events Data Available</div>
+                            <div class="text-green-600 text-base leading-relaxed">Please select a campaign from the filter above and ensure fraud reports have been run to collect event data.</div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Sort apps by total events (descending)
+            const sortedApps = [...data.apps].sort((a, b) => {
+                const sumA = (a.total_event1 || 0) + (a.total_event2 || 0);
+                const sumB = (b.total_event1 || 0) + (b.total_event2 || 0);
+                return sumB - sumA;
+            });
+
+            sortedApps.forEach((app, idx) => {
+                // Group by media source
+                const grouped = processEventsDataBySource(app);
+                
+                // Sort sources by total events
+                const sortedSources = Object.keys(grouped).sort((a, b) => {
+                    const sumA = (grouped[a].event1 || 0) + (grouped[a].event2 || 0);
+                    const sumB = (grouped[b].event1 || 0) + (grouped[b].event2 || 0);
+                    return sumB - sumA;
+                });
+                
+                console.log(`[DEBUG] Sorted media sources for ${app.app_name}: ${sortedSources.join(', ')}`);
+                console.log(`[DEBUG] Event names for ${app.app_name}: event1="${app.event1_name}", event2="${app.event2_name}"`);
+                
+                const appSection = document.createElement('div');
+                appSection.className = 'mb-12 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden';
+                
+                // App header
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'bg-gradient-to-r from-green-500 to-blue-600 px-6 py-4 text-white';
+                headerDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold">${app.app_name}</h3>
+                                <p class="text-white/80 text-sm font-mono">${app.app_id}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold">${(app.total_event1 || 0) + (app.total_event2 || 0)}</div>
+                            <div class="text-white/80 text-sm">Total Events</div>
+                        </div>
+                    </div>
+                `;
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'p-6';
+                
+                // Group by media source with compact design
+                const sourcesGrid = document.createElement('div');
+                sourcesGrid.className = 'space-y-6';
+
+                sortedSources.forEach((source, sidx) => {
+                    // Source card
+                    const sourceCard = document.createElement('div');
+                    sourceCard.className = 'bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200';
+
+                    // Calculate total events for this source
+                    const totalEvents = (grouped[source].event1 || 0) + (grouped[source].event2 || 0);
+                    
+                    // Header with media source name and total events
+                    const sourceHeader = document.createElement('div');
+                    sourceHeader.className = 'bg-gradient-to-r from-gray-50 to-green-50 px-6 py-4 border-b border-gray-200 rounded-t-xl';
+                    sourceHeader.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                    <span class="text-green-600 font-bold text-sm">${sidx + 1}</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-gray-800">${source || 'Unknown Source'}</h4>
+                                    <p class="text-gray-500 text-sm">${totalEvents} total events</p>
+                                </div>
+                            </div>
+                            <div class="flex space-x-4">
+                                <div class="text-center">
+                                    <div class="text-lg font-bold text-green-600">${grouped[source].event1 || 0}</div>
+                                    <div class="text-xs text-gray-500">${app.event1_name}</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-lg font-bold text-blue-600">${grouped[source].event2 || 0}</div>
+                                    <div class="text-xs text-gray-500">${app.event2_name}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    sourceCard.appendChild(sourceHeader);
+
+                    // Chart section
+                    const chartSection = document.createElement('div');
+                    chartSection.className = 'p-6';
+                    
+                    // Chart container
+                    const chartContainer = document.createElement('div');
+                    chartContainer.className = 'relative bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border border-gray-100';
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.id = `eventsSourceChart_${idx}_${sidx}_${range}`;
+                    canvas.style.height = '300px';
+                    canvas.style.width = '100%';
+                    chartContainer.appendChild(canvas);
+                    chartSection.appendChild(chartContainer);
+
+                    // Metrics for the chart - only event1 and event2
+                    const event1Label = (app.event1_name && app.event1_name.trim()) ? app.event1_name : 'Event 1';
+                    const event2Label = (app.event2_name && app.event2_name.trim()) ? app.event2_name : 'Event 2';
+                    const metrics = [
+                        { key: 'event1', label: event1Label, color: '#10b981' },
+                        { key: 'event2', label: event2Label, color: '#6366f1' }
+                    ];
+                    
+                    // Render chart
+                    setTimeout(() => {
+                        const ctx = document.getElementById(`eventsSourceChart_${idx}_${sidx}_${range}`);
+                        if (ctx && window.Chart) {
+                            // Generate complete date range for last 10 days
+                            const today = new Date();
+                            const allDates = [];
+                            for (let i = 9; i >= 0; i--) {
+                                const date = new Date(today);
+                                date.setDate(today.getDate() - i);
+                                allDates.push(date.toISOString().split('T')[0]);
+                            }
+                            
+                            const dates = allDates;
+                            
+                            // Create datasets
+                            const datasets = metrics.map((metric, index) => ({
+                                label: metric.label,
+                                data: dates.map(date => {
+                                    const row = grouped[source].rows.find(r => r.date === date);
+                                    return row ? row[metric.key] || 0 : 0;
+                                }),
+                                borderColor: metric.color,
+                                backgroundColor: `${metric.color}20`,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5,
+                                pointHoverRadius: 8,
+                                pointBackgroundColor: metric.color,
+                                pointBorderColor: '#ffffff',
+                                pointBorderWidth: 3,
+                                borderWidth: 3
+                            }));
+
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: { labels: dates, datasets: datasets },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { 
+                                            display: true,
+                                            position: 'top',
+                                            labels: {
+                                                usePointStyle: true,
+                                                pointStyle: 'circle',
+                                                font: { size: 14, weight: 'bold' },
+                                                color: '#374151',
+                                                padding: 20
+                                            }
+                                        },
+                                        tooltip: {
+                                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                            titleColor: '#1f2937',
+                                            bodyColor: '#1f2937',
+                                            borderColor: '#e5e7eb',
+                                            borderWidth: 1,
+                                            cornerRadius: 8,
+                                            bodyFont: { size: 13 },
+                                            callbacks: {
+                                                title: function(context) {
+                                                    return `Date: ${context[0].label}`;
+                                                },
+                                                label: function(context) {
+                                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} events`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            display: true,
+                                            ticks: {
+                                                maxRotation: 45,
+                                                minRotation: 0,
+                                                font: { size: 12, weight: '500' },
+                                                color: '#374151',
+                                                padding: 10
+                                            },
+                                            grid: {
+                                                display: true,
+                                                color: '#e5e7eb',
+                                                lineWidth: 1
+                                            },
+                                            title: {
+                                                display: true,
+                                                text: 'Date',
+                                                color: '#374151',
+                                                font: { size: 14, weight: 'bold' }
+                                            }
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            display: true,
+                                            ticks: {
+                                                font: { size: 12, weight: '500' },
+                                                color: '#374151',
+                                                padding: 10,
+                                                stepSize: 1
+                                            },
+                                            grid: {
+                                                display: true,
+                                                color: '#f3f4f6',
+                                                lineWidth: 1
+                                            },
+                                            title: {
+                                                display: true,
+                                                text: 'Number of Events',
+                                                color: '#374151',
+                                                font: { size: 14, weight: 'bold' }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }, 100);
+
+                    // Add chart section to content container
+                    const contentContainer = document.createElement('div');
+                    contentContainer.appendChild(chartSection);
+                    
+                    // Add content container to source card
+                    sourceCard.appendChild(contentContainer);
+                    sourcesGrid.appendChild(sourceCard);
+                });
+
+                // Add sources grid to content div
+                contentDiv.appendChild(sourcesGrid);
+                appSection.appendChild(contentDiv);
+                container.appendChild(appSection);
+            });
+        }
+        
+        // Event handlers for Events Per Source
+        document.addEventListener('DOMContentLoaded', function() {
+            // Events source filter change handler
+            const eventsSourceFilter = document.getElementById('events-source-app-filter');
+            if (eventsSourceFilter) {
+                eventsSourceFilter.addEventListener('change', function() {
+                    window.selectedEventsSourceAppId = this.value;
+                    console.log('🔄 Selected events source app:', window.selectedEventsSourceAppId);
+                    
+                    // Render data for selected app from cache
+                    if (eventsSourceDataCache['10d']) {
+                        const filteredData = {
+                            ...eventsSourceDataCache['10d'],
+                            apps: eventsSourceDataCache['10d'].apps.filter(app => app.app_id === window.selectedEventsSourceAppId)
+                        };
+                        renderEventsSource(filteredData, '10d');
+                    }
+                });
+            }
+            
+            // Analyze Events button handler
+            const analyzeBtn = document.getElementById('run-events-source-10d-btn');
+            if (analyzeBtn) {
+                analyzeBtn.addEventListener('click', function() {
+                    const selectedAppId = document.getElementById('events-source-app-filter').value;
+                    
+                    if (!selectedAppId) {
+                        alert('Please select a campaign first.');
+                        return;
+                    }
+                    
+                    console.log('🔄 Events Per Source: Refreshing from cache only (no API calls)');
+                    
+                    // Check if we have cached data
+                    if (eventsSourceDataCache['10d']) {
+                        console.log('✅ Found cached events data, rendering for selected app:', selectedAppId);
+                        const filteredData = {
+                            ...eventsSourceDataCache['10d'],
+                            apps: eventsSourceDataCache['10d'].apps.filter(app => app.app_id === selectedAppId)
+                        };
+                        renderEventsSource(filteredData, '10d');
+                    } else {
+                        // No cache, show message to run fraud report first
+                        const container = document.getElementById('events-source-data-10d');
+                        container.innerHTML = `
+                            <div class="text-center py-20">
+                                <div class="bg-orange-50 border border-orange-200 rounded-2xl p-6 max-w-md mx-auto">
+                                    <div class="text-orange-600 text-lg font-semibold mb-2">📊 No Data Available</div>
+                                    <div class="text-orange-500 text-sm">Please run a fraud report first to collect event data, then return to this tab.</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            }
+        });
         
         // Enhanced refresh functions for comprehensive data updates
         async function forceRefreshStatsPage() {

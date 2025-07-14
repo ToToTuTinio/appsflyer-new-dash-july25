@@ -185,6 +185,33 @@ def init_db():
         UNIQUE(app_id, endpoint_type, period, start_date, end_date)
     )''')
     
+    # Create table for auto-run timing management
+    c.execute('''CREATE TABLE IF NOT EXISTS auto_run_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        last_run_time TEXT,
+        next_run_time TEXT,
+        auto_run_enabled INTEGER DEFAULT 1,
+        auto_run_interval_hours INTEGER DEFAULT 6,
+        is_running INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Create table for manual apps
+    c.execute('''CREATE TABLE IF NOT EXISTS manual_apps (
+        app_id TEXT PRIMARY KEY,
+        app_name TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
+        event1 TEXT,
+        event2 TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Initialize auto-run settings with default values if not exists
+    c.execute('''INSERT OR IGNORE INTO auto_run_settings (id) VALUES (1)''')
+    
     conn.commit()
     conn.close()
 
@@ -274,6 +301,29 @@ def get_active_apps(max_retries=7, force_fetch=False):
             for app in cached_data.get('apps', []):
                 # If app exists in database, use its status, otherwise default to active (True)
                 app['is_active'] = bool(active_status.get(app['app_id'], 1))
+                # Mark existing apps as non-manual if not already marked
+                if 'is_manual' not in app:
+                    app['is_manual'] = False
+            
+            # Add manual apps to cached data
+            c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
+                         FROM manual_apps ORDER BY app_name''')
+            manual_apps = c.fetchall()
+            
+            for manual_app in manual_apps:
+                app_id, app_name, status, event1, event2, is_active = manual_app
+                cached_data['apps'].append({
+                    'app_id': app_id,
+                    'app_name': app_name,
+                    'status': status,
+                    'event1': event1,
+                    'event2': event2,
+                    'is_active': bool(is_active),
+                    'is_manual': True  # Mark as manual apps
+                })
+            
+            # Update count to include manual apps
+            cached_data['count'] = len(cached_data['apps'])
             
             # Check if we have any non-active apps
             has_non_active = any(not app.get('is_active', True) for app in cached_data.get('apps', []))
@@ -291,6 +341,24 @@ def get_active_apps(max_retries=7, force_fetch=False):
     # Add active status to each app, defaulting to active (True) if not in database
     for app in apps:
         app['is_active'] = bool(active_status.get(app['app_id'], 1))
+        app['is_manual'] = False  # Mark as synced apps
+    
+    # Get manual apps and add them to the list
+    c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
+                 FROM manual_apps ORDER BY app_name''')
+    manual_apps = c.fetchall()
+    
+    for manual_app in manual_apps:
+        app_id, app_name, status, event1, event2, is_active = manual_app
+        apps.append({
+            'app_id': app_id,
+            'app_name': app_name,
+            'status': status,
+            'event1': event1,
+            'event2': event2,
+            'is_active': bool(is_active),
+            'is_manual': True  # Mark as manual apps
+        })
     
     fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
     result = {
@@ -1295,7 +1363,7 @@ def get_fraud():
             
             # Helper: aggregate by (date, media_source)
             agg = {}
-            def add_metric(date, media_source, key):
+            def add_metric(date, media_source, key, count=1):
                 k = (date, media_source)
                 if k not in agg:
                     agg[k] = {
@@ -1306,9 +1374,11 @@ def get_fraud():
                         "blocked_in_app_events": 0,
                         "fraud_post_inapps": 0,
                         "blocked_clicks": 0,
-                        "blocked_install_postbacks": 0
+                        "blocked_install_postbacks": 0,
+                        "event1": 0,
+                        "event2": 0
                     }
-                agg[k][key] += 1
+                agg[k][key] += count
             # Blocked Installs (RT)
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
             blocked_rt_params = {"from": start_date, "to": end_date}
@@ -1318,27 +1388,30 @@ def get_fraud():
                 timeout_count += 1
                 app_errors.append("Blocked Installs (RT) API timeout")
             if blocked_rt_resp and blocked_rt_resp.status_code == 200:
-                rows = blocked_rt_resp.text.strip().split("\n")
-                print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: {len(rows)} rows received")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    print(f"[FRAUD] Blocked Installs (RT) header: {header}")
-                    date_idx = header.index("Install Time") if "Install Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    print(f"[FRAUD] Blocked Installs (RT) indices - date_idx: {date_idx}, ms_idx: {ms_idx}")
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (RT) for app {app_id}. Header: {header}")
-                    rt_count = 0
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            install_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(install_date, media_source, "blocked_installs_rt")
-                            rt_count += 1
-                    print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: {rt_count} records processed")
-                else:
-                    print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: No data rows (header only)")
+                rt_text = blocked_rt_resp.text.strip()
+                if rt_text:
+                    import io
+                    csv_reader = csv.reader(io.StringIO(rt_text))
+                    rows = list(csv_reader)
+                    print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: {len(rows)} rows received")
+                    if len(rows) > 1:
+                        header = rows[0]
+                        print(f"[FRAUD] Blocked Installs (RT) header: {header}")
+                        date_idx = header.index("Install Time") if "Install Time" in header else None
+                        ms_idx = find_media_source_idx(header)
+                        print(f"[FRAUD] Blocked Installs (RT) indices - date_idx: {date_idx}, ms_idx: {ms_idx}")
+                        if ms_idx is None:
+                            print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (RT) for app {app_id}. Header: {header}")
+                        rt_count = 0
+                        for row in rows[1:]:
+                            if date_idx is not None and len(row) > date_idx:
+                                install_date = row[date_idx].split(" ")[0]
+                                media_source = row[ms_idx].strip() if ms_idx is not None and len(row) > ms_idx else "Unknown"
+                                add_metric(install_date, media_source, "blocked_installs_rt")
+                                rt_count += 1
+                        print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: {rt_count} records processed")
+                    else:
+                        print(f"[FRAUD] Blocked Installs (RT) for app {app_id}: No data rows (header only)")
             elif blocked_rt_resp is not None:
                 print(f"[FRAUD] Blocked Installs (RT) API error for app {app_id}: {blocked_rt_resp.status_code} {blocked_rt_resp.text[:200]}")
                 app_errors.append(f"Blocked Installs (RT) API error: {blocked_rt_resp.status_code} {blocked_rt_resp.text[:200]}")
@@ -1353,19 +1426,22 @@ def get_fraud():
                 timeout_count += 1
                 app_errors.append("Blocked Installs (PA) API timeout")
             if blocked_pa_resp and blocked_pa_resp.status_code == 200:
-                rows = blocked_pa_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Install Time") if "Install Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (PA) for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            install_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(install_date, media_source, "blocked_installs_pa")
+                pa_text = blocked_pa_resp.text.strip()
+                if pa_text:
+                    import io
+                    csv_reader = csv.reader(io.StringIO(pa_text))
+                    rows = list(csv_reader)
+                    if len(rows) > 1:
+                        header = rows[0]
+                        date_idx = header.index("Install Time") if "Install Time" in header else None
+                        ms_idx = find_media_source_idx(header)
+                        if ms_idx is None:
+                            print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Installs (PA) for app {app_id}. Header: {header}")
+                        for row in rows[1:]:
+                            if date_idx is not None and len(row) > date_idx:
+                                install_date = row[date_idx].split(" ")[0]
+                                media_source = row[ms_idx].strip() if ms_idx is not None and len(row) > ms_idx else "Unknown"
+                                add_metric(install_date, media_source, "blocked_installs_pa")
             elif blocked_pa_resp is not None:
                 app_errors.append(f"Blocked Installs (PA) API error: {blocked_pa_resp.status_code} {blocked_pa_resp.text[:200]}")
             # Blocked In-App Events
@@ -1377,19 +1453,22 @@ def get_fraud():
                 timeout_count += 1
                 app_errors.append("Blocked In-App Events API timeout")
             if blocked_events_resp and blocked_events_resp.status_code == 200:
-                rows = blocked_events_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Event Time") if "Event Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked In-App Events for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            event_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(event_date, media_source, "blocked_in_app_events")
+                events_text = blocked_events_resp.text.strip()
+                if events_text:
+                    import io
+                    csv_reader = csv.reader(io.StringIO(events_text))
+                    rows = list(csv_reader)
+                    if len(rows) > 1:
+                        header = rows[0]
+                        date_idx = header.index("Event Time") if "Event Time" in header else None
+                        ms_idx = find_media_source_idx(header)
+                        if ms_idx is None:
+                            print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked In-App Events for app {app_id}. Header: {header}")
+                        for row in rows[1:]:
+                            if date_idx is not None and len(row) > date_idx:
+                                event_date = row[date_idx].split(" ")[0]
+                                media_source = row[ms_idx].strip() if ms_idx is not None and len(row) > ms_idx else "Unknown"
+                                add_metric(event_date, media_source, "blocked_in_app_events")
             elif blocked_events_resp is not None:
                 app_errors.append(f"Blocked In-App Events API error: {blocked_events_resp.status_code} {blocked_events_resp.text[:200]}")
             # Fraud Post Inapps
@@ -1401,19 +1480,22 @@ def get_fraud():
                 timeout_count += 1
                 app_errors.append("Fraud Post-InApps API timeout")
             if fraud_post_inapps_resp and fraud_post_inapps_resp.status_code == 200:
-                rows = fraud_post_inapps_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Event Time") if "Event Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Fraud Post InApps for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            event_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(event_date, media_source, "fraud_post_inapps")
+                fraud_text = fraud_post_inapps_resp.text.strip()
+                if fraud_text:
+                    import io
+                    csv_reader = csv.reader(io.StringIO(fraud_text))
+                    rows = list(csv_reader)
+                    if len(rows) > 1:
+                        header = rows[0]
+                        date_idx = header.index("Event Time") if "Event Time" in header else None
+                        ms_idx = find_media_source_idx(header)
+                        if ms_idx is None:
+                            print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Fraud Post InApps for app {app_id}. Header: {header}")
+                        for row in rows[1:]:
+                            if date_idx is not None and len(row) > date_idx:
+                                event_date = row[date_idx].split(" ")[0]
+                                media_source = row[ms_idx].strip() if ms_idx is not None and len(row) > ms_idx else "Unknown"
+                                add_metric(event_date, media_source, "fraud_post_inapps")
             elif fraud_post_inapps_resp is not None:
                 app_errors.append(f"Fraud Post-InApps API error: {fraud_post_inapps_resp.status_code} {fraud_post_inapps_resp.text[:200]}")
             # Blocked Clicks
@@ -1425,19 +1507,22 @@ def get_fraud():
                 timeout_count += 1
                 app_errors.append("Blocked Clicks API timeout")
             if blocked_clicks_resp and blocked_clicks_resp.status_code == 200:
-                rows = blocked_clicks_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Click Time") if "Click Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Clicks for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            click_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(click_date, media_source, "blocked_clicks")
+                clicks_text = blocked_clicks_resp.text.strip()
+                if clicks_text:
+                    import io
+                    csv_reader = csv.reader(io.StringIO(clicks_text))
+                    rows = list(csv_reader)
+                    if len(rows) > 1:
+                        header = rows[0]
+                        date_idx = header.index("Click Time") if "Click Time" in header else None
+                        ms_idx = find_media_source_idx(header)
+                        if ms_idx is None:
+                            print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Clicks for app {app_id}. Header: {header}")
+                        for row in rows[1:]:
+                            if date_idx is not None and len(row) > date_idx:
+                                click_date = row[date_idx].split(" ")[0]
+                                media_source = row[ms_idx].strip() if ms_idx is not None and len(row) > ms_idx else "Unknown"
+                                add_metric(click_date, media_source, "blocked_clicks")
             elif blocked_clicks_resp is not None:
                 app_errors.append(f"Blocked Clicks API error: {blocked_clicks_resp.status_code} {blocked_clicks_resp.text[:200]}")
             # Blocked Install Postbacks
@@ -1449,21 +1534,114 @@ def get_fraud():
                 timeout_count += 1
                 app_errors.append("Blocked Install Postbacks API timeout")
             if blocked_postbacks_resp and blocked_postbacks_resp.status_code == 200:
-                rows = blocked_postbacks_resp.text.strip().split("\n")
-                if len(rows) > 1:
-                    header = rows[0].split(",")
-                    date_idx = header.index("Install Time") if "Install Time" in header else None
-                    ms_idx = find_media_source_idx(header)
-                    if ms_idx is None:
-                        print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Install Postbacks for app {app_id}. Header: {header}")
-                    for row in rows[1:]:
-                        cols = row.split(",")
-                        if date_idx is not None and len(cols) > date_idx:
-                            install_date = cols[date_idx].split(" ")[0]
-                            media_source = cols[ms_idx].strip() if ms_idx is not None and len(cols) > ms_idx else "Unknown"
-                            add_metric(install_date, media_source, "blocked_install_postbacks")
+                postbacks_text = blocked_postbacks_resp.text.strip()
+                if postbacks_text:
+                    import io
+                    csv_reader = csv.reader(io.StringIO(postbacks_text))
+                    rows = list(csv_reader)
+                    if len(rows) > 1:
+                        header = rows[0]
+                        date_idx = header.index("Install Time") if "Install Time" in header else None
+                        ms_idx = find_media_source_idx(header)
+                        if ms_idx is None:
+                            print(f"[FRAUD] ERROR: Could not find exact 'Media Source' column in Blocked Install Postbacks for app {app_id}. Header: {header}")
+                        for row in rows[1:]:
+                            if date_idx is not None and len(row) > date_idx:
+                                install_date = row[date_idx].split(" ")[0]
+                                media_source = row[ms_idx].strip() if ms_idx is not None and len(row) > ms_idx else "Unknown"
+                                add_metric(install_date, media_source, "blocked_install_postbacks")
             elif blocked_postbacks_resp is not None:
                 app_errors.append(f"Blocked Install Postbacks API error: {blocked_postbacks_resp.status_code} {blocked_postbacks_resp.text[:200]}")
+            
+            # Helper function to detect error events
+            def is_error_event(ev):
+                if not ev: return True
+                evl = ev.lower()
+                return (
+                    'maximum nu' in evl or
+                    'subscription' in evl or
+                    'error' in evl or
+                    'failed' in evl or
+                    "doesn't include" in evl or
+                    'not include' in evl or
+                    'your current subscription pack' in evl
+                )
+            
+            # Get event selections for this app to fetch event1 and event2 data
+            conn_temp = sqlite3.connect(DB_PATH)
+            c_temp = conn_temp.cursor()
+            c_temp.execute('SELECT event1, event2 FROM app_event_selections WHERE app_id = ?', (app_id,))
+            event_row = c_temp.fetchone()
+            conn_temp.close()
+            
+            selected_events = []
+            if event_row:
+                event1, event2 = event_row
+                if event1 and event1.strip() and not is_error_event(event1):
+                    selected_events.append(('event1', event1))
+                if event2 and event2.strip() and not is_error_event(event2):
+                    selected_events.append(('event2', event2))
+            
+            # Fetch event1 and event2 data per media source
+            if selected_events:
+                print(f"[FRAUD] Fetching event data for {app_id} (events: {[e[1] for e in selected_events]})...")
+                events_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/in_app_events_report/v5"
+                events_params = {"from": start_date, "to": end_date}
+                events_resp = make_api_request(events_url, events_params, app_id=app_id, app_name=app_name, period=period)
+                
+                if events_resp == 'timeout':
+                    print(f"[FRAUD] Timeout detected for in_app_events_report {app_id}, continuing...")
+                    timeout_count += 1
+                    app_errors.append("In-App Events API timeout")
+                elif events_resp and events_resp.status_code == 200:
+                    event_text = events_resp.text.strip()
+                    if event_text:
+                        import io
+                        # Use proper CSV parsing to handle quoted fields with commas
+                        csv_reader = csv.reader(io.StringIO(event_text))
+                        event_rows = list(csv_reader)
+                        
+                        if len(event_rows) > 1:
+                            event_header = event_rows[0]
+                            event_name_idx = event_header.index("Event Name") if "Event Name" in event_header else None
+                            event_time_idx = event_header.index("Event Time") if "Event Time" in event_header else None
+                            event_ms_idx = find_media_source_idx(event_header)
+                            
+                            print(f"[FRAUD] In-app events CSV header: {event_header}")
+                            print(f"[FRAUD] Event parsing indices - name: {event_name_idx}, time: {event_time_idx}, media_source: {event_ms_idx}")
+                            
+                            if event_name_idx is not None and event_time_idx is not None and event_ms_idx is not None:
+                                for row in event_rows[1:]:
+                                    if len(row) > max(event_name_idx, event_time_idx, event_ms_idx):
+                                        event_name = row[event_name_idx]
+                                        event_date = row[event_time_idx].split(" ")[0]
+                                        media_source = row[event_ms_idx].strip()
+                                        
+                                        # Debug logging for media source extraction
+                                        print(f"[FRAUD] Event: {event_name}, Date: {event_date}, Media Source: '{media_source}'")
+                                        
+                                        # Check if this event matches event1 or event2
+                                        for event_key, event_value in selected_events:
+                                            if event_name == event_value:
+                                                add_metric(event_date, media_source, event_key)
+                                                print(f"[FRAUD] Added {event_key} event for media source: '{media_source}'")
+                                                break
+                        else:
+                            print(f"[FRAUD] Could not find required columns in in_app_events_report for {app_id}")
+                            if event_name_idx is None:
+                                print(f"[FRAUD] Event Name column not found in header: {event_header}")
+                            if event_time_idx is None:
+                                print(f"[FRAUD] Event Time column not found in header: {event_header}")
+                            if event_ms_idx is None:
+                                print(f"[FRAUD] Media Source column not found in header: {event_header}")
+                elif events_resp is not None:
+                    print(f"[FRAUD] In-App Events API error for {app_id}: {events_resp.status_code}")
+                    app_errors.append(f"In-App Events API error: {events_resp.status_code}")
+                else:
+                    print(f"[FRAUD] No response from in_app_events_report API for {app_id}")
+            else:
+                print(f"[FRAUD] No valid events selected for {app_id}, skipping event data collection")
+            
             # Aggregate all (date, media_source) rows
             for (date, media_source), row in sorted(agg.items()):
                 # Include all rows, even if all metrics are zero
@@ -1478,14 +1656,16 @@ def get_fraud():
                 'blocked_in_app_events': sum(row.get('blocked_in_app_events', 0) for row in table),
                 'fraud_post_inapps': sum(row.get('fraud_post_inapps', 0) for row in table),
                 'blocked_clicks': sum(row.get('blocked_clicks', 0) for row in table),
-                'blocked_install_postbacks': sum(row.get('blocked_install_postbacks', 0) for row in table)
+                'blocked_install_postbacks': sum(row.get('blocked_install_postbacks', 0) for row in table),
+                'event1': sum(row.get('event1', 0) for row in table),
+                'event2': sum(row.get('event2', 0) for row in table)
             }
             print(f"[FRAUD] App {app_name} totals: {app_totals}")
             print(f"[FRAUD] Final table for {app_name} has {len(table)} rows")
             print(f"[FRAUD] Unique media sources: {sorted(set(row['media_source'] for row in table))}")
             
             # Determine if we should skip this app entirely
-            if timeout_count >= 6:  # All 6 API calls timed out
+            if timeout_count >= 7:  # All 7 API calls timed out (including events)
                 print(f"[FRAUD] Skipping app {app_name} ({app_id}) - all API calls timed out")
                 skipped_apps += 1
                 continue
@@ -1493,11 +1673,19 @@ def get_fraud():
             print(f"[FRAUD] Successfully processed app {app_name} ({app_id}) with {timeout_count} timeouts")
             processed_apps += 1
             
+            # Include event names for frontend display
+            event1_name = None
+            event2_name = None
+            if event_row:
+                event1_name, event2_name = event_row
+            
             fraud_list.append({
                 'app_id': app_id,
                 'app_name': app_name,
                 'table': table,
-                'errors': app_errors
+                'errors': app_errors,
+                'event1_name': event1_name,
+                'event2_name': event2_name
             })
         # Save to cache ONLY if there is at least one app
         if len(fraud_list) > 0:
@@ -1635,15 +1823,43 @@ def clear_backend_cache():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        
+        # Clear all cache tables
         c.execute('DELETE FROM stats_cache')
         c.execute('DELETE FROM fraud_cache')
         c.execute('DELETE FROM event_cache')
         c.execute('DELETE FROM apps_cache')
+        
+        # Clear all manual apps data
+        c.execute('DELETE FROM manual_apps')
+        
+        # Clear all app event selections and status data
+        c.execute('DELETE FROM app_event_selections')
+        
+        # Clear all saved CSV export data
+        c.execute('DELETE FROM raw_appsflyer_data')
+        
+        # Note: We don't clear auto_run_settings as those are user configuration preferences
+        
         conn.commit()
         conn.close()
-        return jsonify({'success': True})
+        
+        return jsonify({
+            'success': True,
+            'message': 'All backend data cleared successfully',
+            'cleared_tables': [
+                'stats_cache',
+                'fraud_cache', 
+                'event_cache',
+                'apps_cache',
+                'manual_apps',
+                'app_event_selections',
+                'raw_appsflyer_data'
+            ],
+            'preserved_tables': ['auto_run_settings']
+        })
     except Exception as e:
-        print(f"[CACHE CLEAR ERROR] {e}")
+        print(f"[BACKEND CLEAR ERROR] {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/clear-apps-cache', methods=['POST'])
@@ -1652,66 +1868,27 @@ def clear_apps_cache():
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
-        # Get current apps cache data
-        c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
-        row = c.fetchone()
+        # Clear all apps cache (synced apps)
+        c.execute('DELETE FROM apps_cache')
         
-        # Get active status from app_event_selections
-        c.execute('SELECT app_id, is_active FROM app_event_selections')
-        active_status = dict(c.fetchall())
+        # Clear all events cache
+        c.execute('DELETE FROM event_cache')
         
-        active_app_ids = []
-        if row:
-            cached_data = json.loads(row[0])
-            # Keep only apps that are marked as active in app_event_selections
-            active_apps = [
-                app for app in cached_data.get('apps', []) 
-                if active_status.get(app['app_id'], 0) == 1
-            ]
-            active_app_ids = [app['app_id'] for app in active_apps]
-            
-            if active_apps:  # Only update cache if we have active apps
-                # Update apps cache with only active apps
-                new_cache_data = {
-                    "count": len(active_apps),
-                    "apps": active_apps,
-                    "fetch_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                
-                # Update the apps cache
-                c.execute('DELETE FROM apps_cache')
-                c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)',
-                         (json.dumps(new_cache_data), new_cache_data['fetch_time']))
-            else:
-                # If no active apps, clear the entire cache
-                c.execute('DELETE FROM apps_cache')
-            
-            # Clear events cache for non-active apps only
-            # First, get all app IDs from events cache
-            c.execute('SELECT app_id FROM event_cache')
-            cached_event_apps = c.fetchall()
-            
-            # Remove events for non-active apps
-            for (app_id,) in cached_event_apps:
-                if app_id not in active_app_ids:
-                    c.execute('DELETE FROM event_cache WHERE app_id = ?', (app_id,))
-            
-            conn.commit()
-            
-            return jsonify({
-                "success": True,
-                "message": "Successfully cleared cache for non-active apps",
-                "active_apps_count": len(active_apps),
-                "events_preserved": len(active_app_ids)
-            })
-        else:
-            return jsonify({
-                "success": True,
-                "message": "No apps cache to clear",
-                "active_apps_count": 0,
-                "events_preserved": 0
-            })
-            
+        # Clear manual apps as well (user wants to clear ALL apps)
+        c.execute('DELETE FROM manual_apps')
+        
+        # Also clear any app event selections for manual apps
+        c.execute('DELETE FROM app_event_selections WHERE app_id NOT IN (SELECT app_id FROM apps_cache)')
+        
+        conn.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Successfully cleared all apps cache, events cache, and manual apps",
+            "cleared": ["apps_cache", "event_cache", "manual_apps", "related_app_event_selections"],
+            "note": "All apps cleared - both synced and manual"
+        })
+        
     except Exception as e:
         print(f"Error clearing apps cache: {str(e)}")
         return jsonify({
@@ -1759,23 +1936,60 @@ def apps_page():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        # Get the most recent apps cache
+        
+        # Get active status from database
+        c.execute('SELECT app_id, is_active FROM app_event_selections')
+        active_status = dict(c.fetchall())
+        
+        # Get the most recent apps cache (synced apps)
         c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
-        row = c.fetchone()
+        cache_row = c.fetchone()
+        
+        apps = []
+        fetch_time = None
+        used_cache = False
+        
+        if cache_row:
+            data, updated_at = cache_row
+            cached_data = json.loads(data)
+            
+            # Get synced apps from cache
+            for app in cached_data.get('apps', []):
+                app['is_active'] = bool(active_status.get(app['app_id'], 1))
+                if 'is_manual' not in app:
+                    app['is_manual'] = False
+                apps.append(app)
+            
+            fetch_time = cached_data.get('fetch_time', updated_at)
+            used_cache = cached_data.get('used_cache', True)
+        
+        # Get manual apps from database and add them
+        c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
+                     FROM manual_apps ORDER BY app_name''')
+        manual_apps = c.fetchall()
+        
+        for manual_app in manual_apps:
+            app_id, app_name, status, event1, event2, is_active = manual_app
+            apps.append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'status': status,
+                'event1': event1,
+                'event2': event2,
+                'is_active': bool(is_active),
+                'is_manual': True
+            })
+        
         conn.close()
         
-        if row:
-            data, updated_at = row
-            result = json.loads(data)
-            result['updated_at'] = updated_at
-            return jsonify(result)
-        else:
-            return jsonify({
-                'count': 0,
-                'apps': [],
-                'fetch_time': None,
-                'used_cache': False
-            })
+        return jsonify({
+            'count': len(apps),
+            'apps': apps,
+            'fetch_time': fetch_time,
+            'used_cache': used_cache,
+            'updated_at': fetch_time
+        })
+        
     except Exception as e:
         print(f"Error in apps_page endpoint: {str(e)}")
         return jsonify({
@@ -2206,6 +2420,151 @@ def update_app_status():
     finally:
         conn.close()
 
+@app.route('/api/manual-apps', methods=['POST'])
+@login_required
+def add_manual_app():
+    """Add a manual app to the database"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        app_id = data.get('app_id', '').strip()
+        app_name = data.get('app_name', '').strip()
+        status = data.get('status', 'active').strip()
+        event1 = data.get('event1', '').strip() or None
+        event2 = data.get('event2', '').strip() or None
+        
+        # Validate required fields
+        if not app_id or not app_name:
+            return jsonify({'success': False, 'error': 'App ID and App Name are required'}), 400
+        
+        # Validate status
+        if status not in ['active', 'inactive']:
+            return jsonify({'success': False, 'error': 'Status must be either "active" or "inactive"'}), 400
+            
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Check if app already exists in manual_apps or in AppsFlyer apps
+        c.execute('SELECT app_id FROM manual_apps WHERE app_id = ?', (app_id,))
+        if c.fetchone():
+            return jsonify({'success': False, 'error': 'App ID already exists as a manual app'}), 400
+        
+        # Check if app exists in AppsFlyer apps (from apps_cache)
+        c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+        cache_row = c.fetchone()
+        if cache_row:
+            cached_data = json.loads(cache_row[0])
+            existing_app_ids = [app['app_id'] for app in cached_data.get('apps', [])]
+            if app_id in existing_app_ids:
+                return jsonify({'success': False, 'error': 'App ID already exists in synced apps from AppsFlyer'}), 400
+        
+        # Insert manual app
+        is_active = 1 if status == 'active' else 0
+        c.execute('''INSERT INTO manual_apps 
+                    (app_id, app_name, status, event1, event2, is_active) 
+                    VALUES (?, ?, ?, ?, ?, ?)''',
+                 (app_id, app_name, status, event1, event2, is_active))
+        
+        # Also add to app_event_selections table for consistency
+        c.execute('''INSERT OR REPLACE INTO app_event_selections 
+                    (app_id, event1, event2, is_active) 
+                    VALUES (?, ?, ?, ?)''',
+                 (app_id, event1, event2, is_active))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Manual app added successfully',
+            'app': {
+                'app_id': app_id,
+                'app_name': app_name,
+                'status': status,
+                'event1': event1,
+                'event2': event2,
+                'is_active': is_active == 1,
+                'is_manual': True
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error adding manual app: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/apps-database-only', methods=['GET'])
+@login_required
+def apps_database_only():
+    """Get apps from database/cache only - NO AppsFlyer API calls"""
+    try:
+        import pytz
+        gmt2 = pytz.timezone('Europe/Berlin')
+        now = datetime.datetime.now(gmt2)
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Get active status from database
+        c.execute('SELECT app_id, is_active FROM app_event_selections')
+        active_status = dict(c.fetchall())
+        
+        # Get cached AppsFlyer apps (if available)
+        c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+        cache_row = c.fetchone()
+        
+        apps = []
+        fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        
+        if cache_row:
+            data, updated_at = cache_row
+            cached_data = json.loads(data)
+            
+            # Get synced apps from cache
+            for app in cached_data.get('apps', []):
+                app['is_active'] = bool(active_status.get(app['app_id'], 1))
+                app['is_manual'] = False
+                apps.append(app)
+            
+            fetch_time = cached_data.get('fetch_time', updated_at)
+        
+        # Get manual apps from database
+        c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
+                     FROM manual_apps ORDER BY app_name''')
+        manual_apps = c.fetchall()
+        
+        for manual_app in manual_apps:
+            app_id, app_name, status, event1, event2, is_active = manual_app
+            apps.append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'status': status,
+                'event1': event1,
+                'event2': event2,
+                'is_active': bool(is_active),
+                'is_manual': True
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'count': len(apps),
+            'apps': apps,
+            'fetch_time': fetch_time,
+            'used_cache': True,
+            'source': 'database_only'
+        })
+        
+    except Exception as e:
+        print(f"Error in apps_database_only endpoint: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'count': 0,
+            'apps': [],
+            'fetch_time': '0.00 seconds'
+        }), 500
+
 # Modify the get_active_apps function to include the active status
 def get_active_app_ids():
     conn = sqlite3.connect(DB_PATH)
@@ -2306,6 +2665,11 @@ def export_fraud_raw():
         for app in fraud_data.get('apps', []):
             app_name = app.get('app_name', 'Unknown App')
             app_id = app.get('app_id', 'Unknown ID')
+            event1_name = app.get('event1_name')
+            event2_name = app.get('event2_name')
+            # Use fallback names if event names are empty or None
+            event1_name = event1_name.strip() if event1_name and event1_name.strip() else 'Event 1'
+            event2_name = event2_name.strip() if event2_name and event2_name.strip() else 'Event 2'
             
             for entry in app.get('table', []):
                 row_data = {
@@ -2319,6 +2683,8 @@ def export_fraud_raw():
                     'Fraud Post In-Apps': entry.get('fraud_post_inapps', 0),
                     'Blocked Clicks': entry.get('blocked_clicks', 0),
                     'Blocked Install Postbacks': entry.get('blocked_install_postbacks', 0),
+                    event1_name: entry.get('event1', 0),
+                    event2_name: entry.get('event2', 0),
                     'Period': f'Last 10 Days',
                     'Data Type': 'Fraud Report',
                     'Updated At': updated_at
@@ -2791,7 +3157,855 @@ def export_raw_in_app_events():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# --- AUTO-RUN MANAGEMENT API ENDPOINTS ---
+
+@app.route('/api/auto-run-status', methods=['GET'])
+@login_required
+def get_auto_run_status():
+    """Get current auto-run status and timing information"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        c.execute('''SELECT last_run_time, next_run_time, auto_run_enabled, 
+                           auto_run_interval_hours, is_running, updated_at 
+                    FROM auto_run_settings WHERE id = 1''')
+        row = c.fetchone()
+        conn.close()
+        
+        if not row:
+            # Initialize default settings if none exist
+            return jsonify({
+                'last_run_time': None,
+                'next_run_time': None,
+                'auto_run_enabled': True,
+                'auto_run_interval_hours': 6,
+                'is_running': False,
+                'updated_at': None
+            })
+        
+        last_run_time, next_run_time, auto_run_enabled, auto_run_interval_hours, is_running, updated_at = row
+        
+        # Calculate next run time if last run time exists
+        if last_run_time and auto_run_enabled:
+            from datetime import datetime, timedelta
+            try:
+                last_run_dt = datetime.fromisoformat(last_run_time.replace('Z', '+00:00'))
+                next_run_dt = last_run_dt + timedelta(hours=auto_run_interval_hours)
+                next_run_time = next_run_dt.isoformat()
+            except:
+                next_run_time = None
+        
+        return jsonify({
+            'last_run_time': last_run_time,
+            'next_run_time': next_run_time,
+            'auto_run_enabled': bool(auto_run_enabled),
+            'auto_run_interval_hours': auto_run_interval_hours,
+            'is_running': bool(is_running),
+            'updated_at': updated_at
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting auto-run status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auto-run-status', methods=['POST'])
+@login_required
+def update_auto_run_status():
+    """Update auto-run status and timing"""
+    try:
+        data = request.get_json()
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Prepare update fields
+        update_fields = []
+        values = []
+        
+        if 'last_run_time' in data:
+            update_fields.append('last_run_time = ?')
+            values.append(data['last_run_time'])
+        
+        if 'auto_run_enabled' in data:
+            update_fields.append('auto_run_enabled = ?')
+            values.append(1 if data['auto_run_enabled'] else 0)
+        
+        if 'auto_run_interval_hours' in data:
+            update_fields.append('auto_run_interval_hours = ?')
+            values.append(data['auto_run_interval_hours'])
+        
+        if 'is_running' in data:
+            update_fields.append('is_running = ?')
+            values.append(1 if data['is_running'] else 0)
+        
+        if update_fields:
+            update_fields.append('updated_at = CURRENT_TIMESTAMP')
+            values.append(1)  # id = 1
+            
+            query = f"UPDATE auto_run_settings SET {', '.join(update_fields)} WHERE id = ?"
+            c.execute(query, values)
+            conn.commit()
+        
+        conn.close()
+        
+        logger.info(f"Auto-run status updated: {data}")
+        return jsonify({'success': True})
+    
+    except Exception as e:
+        logger.error(f"Error updating auto-run status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auto-run-execute', methods=['POST'])
+@login_required
+def execute_auto_run():
+    """Execute auto-run manually or via scheduler"""
+    try:
+        # Mark as running
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('UPDATE auto_run_settings SET is_running = 1, updated_at = CURRENT_TIMESTAMP WHERE id = 1')
+        conn.commit()
+        conn.close()
+        
+        logger.info("Auto-run execution started")
+        
+        # Get active apps
+        active_apps_result = get_active_apps()
+        if not active_apps_result or not active_apps_result.get('apps'):
+            logger.error("No active apps found for auto-run")
+            # Mark as not running
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('UPDATE auto_run_settings SET is_running = 0, updated_at = CURRENT_TIMESTAMP WHERE id = 1')
+            conn.commit()
+            conn.close()
+            return jsonify({'error': 'No active apps found'}), 400
+        
+        # Filter to only active apps
+        active_apps = [app for app in active_apps_result['apps'] if app.get('is_active', True)]
+        if not active_apps:
+            logger.error("No active apps found after filtering")
+            # Mark as not running
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('UPDATE auto_run_settings SET is_running = 0, updated_at = CURRENT_TIMESTAMP WHERE id = 1')
+            conn.commit()
+            conn.close()
+            return jsonify({'error': 'No active apps found after filtering'}), 400
+        
+        logger.info(f"Found {len(active_apps)} active apps for auto-run")
+        
+        # Get event selections
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT app_id, event1, event2 FROM app_event_selections')
+        selections = c.fetchall()
+        conn.close()
+        
+        selected_events = {}
+        for app_id, event1, event2 in selections:
+            selected_events[app_id] = [event1 or '', event2 or '']
+        
+        # Generate stats reports for different periods
+        periods = ['last10']
+        stats_results = []
+        
+        for period in periods:
+            logger.info(f"Generating stats for period: {period}")
+            try:
+                # Create request data
+                request_data = {
+                    'apps': active_apps,
+                    'period': period,
+                    'selected_events': selected_events
+                }
+                
+                # Call the existing all_apps_stats endpoint logic
+                stats_result = all_apps_stats_logic(request_data)
+                if stats_result:
+                    stats_results.append(stats_result)
+                    logger.info(f"Successfully generated stats for period: {period}")
+                else:
+                    logger.error(f"Failed to generate stats for period: {period}")
+                    
+            except Exception as e:
+                logger.error(f"Error generating stats for period {period}: {str(e)}")
+        
+        # Generate fraud reports
+        fraud_periods = ['10d']
+        fraud_results = []
+        
+        for period in fraud_periods:
+            logger.info(f"Generating fraud report for period: {period}")
+            try:
+                # Create request data
+                request_data = {
+                    'apps': active_apps,
+                    'period': period,
+                    'force': True
+                }
+                
+                # Call the existing get_fraud endpoint logic
+                fraud_result = get_fraud_logic(request_data)
+                if fraud_result:
+                    fraud_results.append(fraud_result)
+                    logger.info(f"Successfully generated fraud report for period: {period}")
+                else:
+                    logger.error(f"Failed to generate fraud report for period: {period}")
+                    
+            except Exception as e:
+                logger.error(f"Error generating fraud report for period {period}: {str(e)}")
+        
+        # Update last run time and mark as not running
+        from datetime import datetime
+        current_time = datetime.now().isoformat()
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''UPDATE auto_run_settings 
+                    SET last_run_time = ?, is_running = 0, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = 1''', (current_time,))
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Auto-run executed successfully. Stats: {len(stats_results)} periods, Fraud: {len(fraud_results)} periods")
+        return jsonify({
+            'success': True, 
+            'executed_at': current_time,
+            'stats_periods': len(stats_results),
+            'fraud_periods': len(fraud_results),
+            'processed_apps': len(active_apps)
+        })
+    
+    except Exception as e:
+        # Make sure to mark as not running on error
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('UPDATE auto_run_settings SET is_running = 0, updated_at = CURRENT_TIMESTAMP WHERE id = 1')
+            conn.commit()
+            conn.close()
+        except:
+            pass
+        
+        logger.error(f"Error executing auto-run: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+def all_apps_stats_logic(request_data):
+    """Extract the logic from all_apps_stats endpoint for reuse"""
+    try:
+        active_apps = request_data.get('apps', [])
+        period = request_data.get('period', 'last10')
+        selected_events = request_data.get('selected_events', {})
+        
+        start_date, end_date = get_period_dates(period)
+        logger.info(f"[AUTO-STATS] Processing {len(active_apps)} apps for period: {period} ({start_date} to {end_date})")
+        
+        # Build cache key
+        app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
+        event1 = ''
+        event2 = ''
+        if active_apps and selected_events:
+            first_app_id = active_apps[0]['app_id']
+            events = selected_events.get(first_app_id, [])
+            if len(events) > 0:
+                event1 = events[0] or ''
+            if len(events) > 1:
+                event2 = events[1] or ''
+        cache_key = f"{period}:{event1}:{event2}:{app_ids}"
+        
+        # Check cache first
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT data, updated_at FROM stats_cache WHERE range = ?', (cache_key,))
+        row = c.fetchone()
+        if row:
+            data, updated_at = row
+            result = json.loads(data)
+            if result.get('apps') and len(result['apps']) > 0:
+                logger.info(f"[AUTO-STATS] Using cached data for {period}")
+                conn.close()
+                return result
+        conn.close()
+        
+        # Generate fresh data (simplified version for auto-run)
+        # For auto-run, we'll use a simplified approach to avoid timeouts
+        stats_list = []
+        
+        for app in active_apps:
+            try:
+                app_id = app['app_id']
+                app_name = app['app_name']
+                
+                # Use daily report endpoint
+                url = f"https://hq1.appsflyer.com/api/agg-data/export/app/{app_id}/daily_report/v5"
+                params = {"from": start_date, "to": end_date}
+                
+                resp = make_api_request(url, params, max_retries=3, retry_delay=5, app_id=app_id, app_name=app_name, period=period)
+                
+                if resp and resp.status_code == 200:
+                    # Process the response (simplified)
+                    daily_stats = {}
+                    rows = resp.text.strip().split("\n")
+                    
+                    if len(rows) > 1:
+                        header = rows[0].split(",")
+                        data_rows = [row.split(",") for row in rows[1:]]
+                        
+                        # Find column indices
+                        def find_col(*names):
+                            for name in names:
+                                for i, col in enumerate(header):
+                                    if col.lower().replace('_','').replace(' ','') == name.lower().replace('_','').replace(' ',''):
+                                        return i
+                            return None
+                        
+                        impressions_idx = find_col('impressions', 'Impressions')
+                        clicks_idx = find_col('clicks', 'Clicks')
+                        installs_idx = find_col('installs', 'Installs')
+                        date_idx = find_col('date', 'Date')
+                        media_source_idx = find_col('media_source', 'media source', 'Media Source')
+                        
+                        if all(idx is not None for idx in [impressions_idx, clicks_idx, installs_idx, date_idx, media_source_idx]):
+                            for row in data_rows:
+                                if len(row) > max(impressions_idx, clicks_idx, installs_idx, date_idx, media_source_idx):
+                                    date = row[date_idx]
+                                    media_source = row[media_source_idx].strip().lower()
+                                    
+                                    if date not in daily_stats:
+                                        daily_stats[date] = {"impressions": 0, "clicks": 0, "total_installs": 0, "organic_installs": 0}
+                                    
+                                    impressions = int(row[impressions_idx]) if row[impressions_idx].isdigit() else 0
+                                    clicks = int(row[clicks_idx]) if row[clicks_idx].isdigit() else 0
+                                    installs = int(row[installs_idx]) if row[installs_idx].isdigit() else 0
+                                    
+                                    daily_stats[date]["impressions"] += impressions
+                                    daily_stats[date]["clicks"] += clicks
+                                    daily_stats[date]["total_installs"] += installs
+                                    
+                                    if media_source == 'organic':
+                                        daily_stats[date]["organic_installs"] += installs
+                        
+                        # Calculate non-organic installs
+                        for date in daily_stats:
+                            daily_stats[date]["installs"] = daily_stats[date]["total_installs"] - daily_stats[date]["organic_installs"]
+                            if daily_stats[date]["installs"] < 0:
+                                daily_stats[date]["installs"] = 0
+                        
+                        # Convert to table format
+                        table = []
+                        for date in sorted(daily_stats.keys()):
+                            row = {
+                                "date": date,
+                                "impressions": daily_stats[date]["impressions"],
+                                "clicks": daily_stats[date]["clicks"],
+                                "installs": daily_stats[date]["installs"],
+                                "blocked_installs_rt": 0,
+                                "blocked_installs_pa": 0,
+                            }
+                            
+                            # Calculate rates
+                            row["imp_to_click"] = round(row["clicks"] / row["impressions"], 2) if row["impressions"] > 0 else 0
+                            row["click_to_install"] = round(row["installs"] / row["clicks"], 2) if row["clicks"] > 0 else 0
+                            row["blocked_rt_rate"] = 0
+                            row["blocked_pa_rate"] = 0
+                            
+                            table.append(row)
+                        
+                        stats_list.append({
+                            'app_id': app_id,
+                            'app_name': app_name,
+                            'table': table,
+                            'selected_events': selected_events.get(app_id, []),
+                            'traffic': sum(r['impressions'] + r['clicks'] for r in table),
+                            'errors': []
+                        })
+                        
+                        logger.info(f"[AUTO-STATS] Processed {app_name} successfully")
+                else:
+                    logger.error(f"[AUTO-STATS] Failed to get data for {app_name}")
+                    
+            except Exception as e:
+                logger.error(f"[AUTO-STATS] Error processing {app.get('app_name', app.get('app_id'))}: {str(e)}")
+        
+        # Sort by traffic
+        stats_list.sort(key=lambda x: x['traffic'], reverse=True)
+        
+        # Save to cache
+        if stats_list:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            result = {'apps': stats_list}
+            c.execute('REPLACE INTO stats_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)', 
+                     (cache_key, json.dumps(result)))
+            conn.commit()
+            conn.close()
+            logger.info(f"[AUTO-STATS] Saved {len(stats_list)} apps to cache")
+            return result
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"[AUTO-STATS] Error in stats logic: {str(e)}")
+        return None
+
+
+def get_fraud_logic(request_data):
+    """Extract the logic from get_fraud endpoint for reuse"""
+    try:
+        active_apps = request_data.get('apps', [])
+        period = request_data.get('period', 'last10')
+        force = request_data.get('force', True)
+        
+        start_date, end_date = get_period_dates(period)
+        logger.info(f"[AUTO-FRAUD] Processing {len(active_apps)} apps for period: {period} ({start_date} to {end_date})")
+        
+        # Build cache key
+        app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
+        cache_key = f"{period}:{app_ids}"
+        
+        # Check cache first (unless forced)
+        if not force:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1', 
+                     (f"{period}%",))
+            row = c.fetchone()
+            if row:
+                data, updated_at = row
+                result = json.loads(data)
+                if result.get('apps') and len(result['apps']) > 0:
+                    logger.info(f"[AUTO-FRAUD] Using cached data for {period}")
+                    conn.close()
+                    return result
+            conn.close()
+        
+        # Generate fresh fraud data (simplified for auto-run)
+        fraud_list = []
+        
+        for app in active_apps:
+            try:
+                app_id = app['app_id']
+                app_name = app['app_name']
+                
+                # Use daily report endpoint for fraud data
+                url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/daily_report/v5"
+                params = {"from": start_date, "to": end_date}
+                
+                resp = make_api_request(url, params, max_retries=3, retry_delay=5, app_id=app_id, app_name=app_name, period=period)
+                
+                if resp and resp.status_code == 200:
+                    # Process fraud data (simplified)
+                    fraud_data = {}
+                    rows = resp.text.strip().split("\n")
+                    
+                    if len(rows) > 1:
+                        header = rows[0].split(",")
+                        
+                        # Find media source column
+                        media_source_idx = find_media_source_idx(header)
+                        date_idx = next((i for i, col in enumerate(header) if 'date' in col.lower()), None)
+                        
+                        if media_source_idx is not None and date_idx is not None:
+                            for row in rows[1:]:
+                                cols = row.split(",")
+                                if len(cols) > max(media_source_idx, date_idx):
+                                    date = cols[date_idx]
+                                    media_source = cols[media_source_idx].strip()
+                                    
+                                    if date not in fraud_data:
+                                        fraud_data[date] = {}
+                                    
+                                    fraud_data[date][media_source] = fraud_data[date].get(media_source, 0) + 1
+                        
+                        # Convert to table format
+                        table = []
+                        for date in sorted(fraud_data.keys()):
+                            for media_source, count in fraud_data[date].items():
+                                table.append({
+                                    "date": date,
+                                    "media_source": media_source,
+                                    "blocked_installs": count,
+                                    "blocked_clicks": 0,
+                                    "blocked_in_app_events": 0
+                                })
+                        
+                        fraud_list.append({
+                            'app_id': app_id,
+                            'app_name': app_name,
+                            'table': table
+                        })
+                        
+                        logger.info(f"[AUTO-FRAUD] Processed {app_name} successfully")
+                else:
+                    logger.error(f"[AUTO-FRAUD] Failed to get data for {app_name}")
+                    
+            except Exception as e:
+                logger.error(f"[AUTO-FRAUD] Error processing {app.get('app_name', app.get('app_id'))}: {str(e)}")
+        
+        # Save to cache
+        if fraud_list:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            result = {'apps': fraud_list}
+            c.execute('REPLACE INTO fraud_cache (range, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)', 
+                     (cache_key, json.dumps(result)))
+            conn.commit()
+            conn.close()
+            logger.info(f"[AUTO-FRAUD] Saved {len(fraud_list)} apps to cache")
+            return result
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"[AUTO-FRAUD] Error in fraud logic: {str(e)}")
+        return None
+
+# --- BACKGROUND WORKER FOR AUTO-RUN ---
+import threading
+import time as time_module
+
+def auto_run_background_worker():
+    """Background worker to check for and trigger auto-run execution"""
+    logger.info("🚀 Auto-run background worker started")
+    
+    while True:
+        try:
+            # Check if auto-run should be triggered
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            
+            c.execute('''SELECT last_run_time, auto_run_enabled, auto_run_interval_hours, is_running 
+                        FROM auto_run_settings WHERE id = 1''')
+            row = c.fetchone()
+            conn.close()
+            
+            if row:
+                last_run_time, auto_run_enabled, auto_run_interval_hours, is_running = row
+                
+                if auto_run_enabled and not is_running:
+                    if last_run_time:
+                        try:
+                            last_run_dt = datetime.datetime.fromisoformat(last_run_time.replace('Z', '+00:00'))
+                            if last_run_dt.tzinfo is None:
+                                last_run_dt = last_run_dt.replace(tzinfo=datetime.timezone.utc)
+                            
+                            time_since_last_run = datetime.datetime.now(datetime.timezone.utc) - last_run_dt
+                            interval_hours = auto_run_interval_hours or 6
+                            
+                            if time_since_last_run.total_seconds() >= (interval_hours * 3600):
+                                logger.info(f"⏰ Auto-run timer expired. Last run: {last_run_time}, Interval: {interval_hours}h")
+                                
+                                # Trigger auto-run execution
+                                try:
+                                    # Mark as running
+                                    conn = sqlite3.connect(DB_PATH)
+                                    c = conn.cursor()
+                                    c.execute('UPDATE auto_run_settings SET is_running = 1 WHERE id = 1')
+                                    conn.commit()
+                                    conn.close()
+                                    
+                                    # Execute auto-run
+                                    with app.app_context():
+                                        result = execute_auto_run_logic()
+                                        if result:
+                                            logger.info("✅ Background auto-run completed successfully")
+                                        else:
+                                            logger.error("❌ Background auto-run failed")
+                                    
+                                except Exception as e:
+                                    logger.error(f"❌ Error in background auto-run: {str(e)}")
+                                    # Make sure to mark as not running
+                                    try:
+                                        conn = sqlite3.connect(DB_PATH)
+                                        c = conn.cursor()
+                                        c.execute('UPDATE auto_run_settings SET is_running = 0 WHERE id = 1')
+                                        conn.commit()
+                                        conn.close()
+                                    except:
+                                        pass
+                        except Exception as e:
+                            logger.error(f"❌ Error parsing last run time: {str(e)}")
+                    else:
+                        logger.info("📝 No last run time found, skipping auto-run trigger")
+                else:
+                    if not auto_run_enabled:
+                        logger.debug("⏸️ Auto-run disabled")
+                    if is_running:
+                        logger.debug("🔄 Auto-run already running")
+            
+            # Sleep for 60 seconds before checking again
+            time_module.sleep(60)
+            
+        except Exception as e:
+            logger.error(f"❌ Error in auto-run background worker: {str(e)}")
+            time_module.sleep(60)  # Sleep and continue
+
+
+def execute_auto_run_logic():
+    """Execute the auto-run logic without Flask request context"""
+    try:
+        # Get active apps
+        active_apps_result = get_active_apps()
+        if not active_apps_result or not active_apps_result.get('apps'):
+            logger.error("No active apps found for background auto-run")
+            return False
+        
+        # Filter to only active apps
+        active_apps = [app for app in active_apps_result['apps'] if app.get('is_active', True)]
+        if not active_apps:
+            logger.error("No active apps found after filtering for background auto-run")
+            return False
+        
+        logger.info(f"Found {len(active_apps)} active apps for background auto-run")
+        
+        # Get event selections
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT app_id, event1, event2 FROM app_event_selections')
+        selections = c.fetchall()
+        conn.close()
+        
+        selected_events = {}
+        for app_id, event1, event2 in selections:
+            selected_events[app_id] = [event1 or '', event2 or '']
+        
+        # Generate stats reports
+        periods = ['last10']
+        stats_results = []
+        
+        for period in periods:
+            logger.info(f"Background: Generating stats for period: {period}")
+            try:
+                request_data = {
+                    'apps': active_apps,
+                    'period': period,
+                    'selected_events': selected_events
+                }
+                
+                stats_result = all_apps_stats_logic(request_data)
+                if stats_result:
+                    stats_results.append(stats_result)
+                    logger.info(f"Background: Successfully generated stats for period: {period}")
+                else:
+                    logger.error(f"Background: Failed to generate stats for period: {period}")
+                    
+            except Exception as e:
+                logger.error(f"Background: Error generating stats for period {period}: {str(e)}")
+        
+        # Generate fraud reports
+        fraud_periods = ['10d']
+        fraud_results = []
+        
+        for period in fraud_periods:
+            logger.info(f"Background: Generating fraud report for period: {period}")
+            try:
+                request_data = {
+                    'apps': active_apps,
+                    'period': period,
+                    'force': True
+                }
+                
+                fraud_result = get_fraud_logic(request_data)
+                if fraud_result:
+                    fraud_results.append(fraud_result)
+                    logger.info(f"Background: Successfully generated fraud report for period: {period}")
+                else:
+                    logger.error(f"Background: Failed to generate fraud report for period: {period}")
+                    
+            except Exception as e:
+                logger.error(f"Background: Error generating fraud report for period {period}: {str(e)}")
+        
+        # Update last run time and mark as not running
+        current_time = datetime.datetime.now().isoformat()
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''UPDATE auto_run_settings 
+                    SET last_run_time = ?, is_running = 0, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = 1''', (current_time,))
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Background auto-run completed successfully. Stats: {len(stats_results)} periods, Fraud: {len(fraud_results)} periods")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error in background auto-run logic: {str(e)}")
+        return False
+
+
+# Start background worker thread
+def start_background_worker():
+    """Start the background worker thread"""
+    worker_thread = threading.Thread(target=auto_run_background_worker, daemon=True)
+    worker_thread.start()
+    logger.info("🚀 Background worker thread started")
+
+# Add before the profile configuration section
+@app.route('/get_events_source', methods=['POST'])
+@login_required
+def get_events_source():
+    """Get events per source data - reuses fraud data but filters to events only"""
+    try:
+        data = request.get_json()
+        active_apps = data.get('apps', [])
+        period = data.get('period', 'last10')
+        
+        print(f"[EVENTS_SOURCE] Starting events per source processing for {len(active_apps)} apps, period: {period}")
+        
+        # Use fraud cache since it already contains event data
+        app_ids = '-'.join(sorted([app['app_id'] for app in active_apps]))
+        cache_key = f"{period}:{app_ids}"
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Try to find fraud cache data that contains the events
+        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE ? ORDER BY updated_at DESC LIMIT 1", (f"{period}%",))
+        row = c.fetchone()
+        
+        if not row:
+            print(f"[EVENTS_SOURCE] No fraud cache found for period {period}, returning empty result")
+            conn.close()
+            return jsonify({
+                'apps': [],
+                'updated_at': None,
+                'message': 'No data available. Please run a fraud report first to collect event data.'
+            })
+        
+        data_json, updated_at = row
+        fraud_data = json.loads(data_json)
+        
+        print(f"[EVENTS_SOURCE] Found fraud cache data with {len(fraud_data.get('apps', []))} apps")
+        
+        # Transform fraud data to focus on events only
+        events_list = []
+        
+        for app in fraud_data.get('apps', []):
+            app_id = app.get('app_id')
+            app_name = app.get('app_name')
+            event1_name = app.get('event1_name', 'Event 1')
+            event2_name = app.get('event2_name', 'Event 2')
+            
+            print(f"[EVENTS_SOURCE] Processing app: {app_name} (events: {event1_name}, {event2_name})")
+            
+            # Filter table to only include rows with events
+            events_table = []
+            for row in app.get('table', []):
+                event1_count = row.get('event1', 0)
+                event2_count = row.get('event2', 0)
+                
+                # Only include rows where there are actual events
+                if event1_count > 0 or event2_count > 0:
+                    events_row = {
+                        'date': row.get('date'),
+                        'media_source': row.get('media_source'),
+                        'event1': event1_count,
+                        'event2': event2_count
+                    }
+                    events_table.append(events_row)
+            
+            # Calculate totals for this app
+            total_event1 = sum(row.get('event1', 0) for row in events_table)
+            total_event2 = sum(row.get('event2', 0) for row in events_table)
+            
+            print(f"[EVENTS_SOURCE] App {app_name}: {len(events_table)} rows with events, totals: {event1_name}={total_event1}, {event2_name}={total_event2}")
+            
+            events_list.append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'table': events_table,
+                'event1_name': event1_name.strip() if event1_name and event1_name.strip() else 'Event 1',
+                'event2_name': event2_name.strip() if event2_name and event2_name.strip() else 'Event 2',
+                'total_event1': total_event1,
+                'total_event2': total_event2
+            })
+        
+        conn.close()
+        
+        result = {
+            'apps': events_list,
+            'updated_at': updated_at,
+            'period': period
+        }
+        
+        print(f"[EVENTS_SOURCE] Returning {len(events_list)} apps with events data")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[EVENTS_SOURCE] Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_events_source_subpage_10d')
+@login_required
+def get_events_source_subpage_10d():
+    """Get cached events source data for 10d period"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Get the most recent fraud cache (which contains events data)
+        c.execute("SELECT data, updated_at FROM fraud_cache WHERE range LIKE 'last10%' ORDER BY updated_at DESC LIMIT 1")
+        row = c.fetchone()
+        
+        if not row:
+            print("[EVENTS_SOURCE_SUBPAGE] No fraud cache found for 10d period")
+            conn.close()
+            return jsonify({'apps': [], 'updated_at': None})
+        
+        data_json, updated_at = row
+        fraud_data = json.loads(data_json)
+        
+        # Transform to events-only format
+        events_list = []
+        for app in fraud_data.get('apps', []):
+            # Filter to events only
+            events_table = []
+            for row in app.get('table', []):
+                event1_count = row.get('event1', 0)
+                event2_count = row.get('event2', 0)
+                
+                if event1_count > 0 or event2_count > 0:
+                    events_table.append({
+                        'date': row.get('date'),
+                        'media_source': row.get('media_source'),
+                        'event1': event1_count,
+                        'event2': event2_count
+                    })
+            
+            if events_table:  # Only include apps with events
+                events_list.append({
+                    'app_id': app.get('app_id'),
+                    'app_name': app.get('app_name'),
+                    'table': events_table,
+                    'event1_name': app.get('event1_name', 'Event 1'),
+                    'event2_name': app.get('event2_name', 'Event 2'),
+                    'total_event1': sum(row.get('event1', 0) for row in events_table),
+                    'total_event2': sum(row.get('event2', 0) for row in events_table)
+                })
+        
+        conn.close()
+        
+        result = {
+            'apps': events_list,
+            'updated_at': updated_at,
+            'period': '10d'
+        }
+        
+        print(f"[EVENTS_SOURCE_SUBPAGE] Returning {len(events_list)} apps with events data")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[EVENTS_SOURCE_SUBPAGE] Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
+    # Start the background worker
+    start_background_worker()
+    
     # Use PORT environment variable provided by Railway, default to 5000
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
