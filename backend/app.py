@@ -140,7 +140,33 @@ if not all([EMAIL, PASSWORD]):
     raise ValueError("EMAIL and PASSWORD not found in environment variables")
 
 # Database path - use persistent volume in Railway, fallback to local for development
-DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if os.getenv('RAILWAY_ENVIRONMENT') else 'event_selections.db')
+# More reliable Railway detection - Railway sets multiple environment variables
+def is_railway_environment():
+    railway_vars = [
+        'RAILWAY_ENVIRONMENT',
+        'RAILWAY_SERVICE_NAME', 
+        'RAILWAY_PROJECT_ID',
+        'RAILWAY_DEPLOYMENT_ID',
+        'RAILWAY_REPLICA_ID'
+    ]
+    return any(os.getenv(var) for var in railway_vars)
+
+DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if is_railway_environment() else 'event_selections.db')
+
+# Debug logging for Railway environment detection
+print(f"🔍 Railway Environment Detection:")
+print(f"  RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT')}")
+print(f"  RAILWAY_SERVICE_NAME: {os.getenv('RAILWAY_SERVICE_NAME')}")
+print(f"  RAILWAY_PROJECT_ID: {os.getenv('RAILWAY_PROJECT_ID')}")
+print(f"  RAILWAY_DEPLOYMENT_ID: {os.getenv('RAILWAY_DEPLOYMENT_ID')}")
+print(f"  RAILWAY_REPLICA_ID: {os.getenv('RAILWAY_REPLICA_ID')}")
+print(f"  Is Railway Environment: {is_railway_environment()}")
+print(f"  Using DB_PATH: {DB_PATH}")
+print(f"  Database file exists: {os.path.exists(DB_PATH)}")
+if is_railway_environment():
+    print(f"  /data directory exists: {os.path.exists('/data')}")
+    print(f"  /data directory contents: {os.listdir('/data') if os.path.exists('/data') else 'N/A'}")
+print(f"=========================================")
 
 def init_db():
     # Ensure the database directory exists (for persistent storage)
@@ -4276,6 +4302,54 @@ def remove_multiple_apps():
     except Exception as e:
         print(f"Error removing apps: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/debug/db-status')
+def debug_db_status():
+    """Debug endpoint to check database status and persistent storage"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Check if apps table exists and count rows
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='apps'")
+        apps_table_exists = c.fetchone() is not None
+        
+        apps_count = 0
+        if apps_table_exists:
+            c.execute("SELECT COUNT(*) FROM apps")
+            apps_count = c.fetchone()[0]
+        
+        # Check if event_selections table exists and count rows
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='event_selections'")
+        event_selections_table_exists = c.fetchone() is not None
+        
+        event_selections_count = 0
+        if event_selections_table_exists:
+            c.execute("SELECT COUNT(*) FROM event_selections")
+            event_selections_count = c.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'database_path': DB_PATH,
+            'is_railway_environment': is_railway_environment(),
+            'database_exists': os.path.exists(DB_PATH),
+            'data_directory_exists': os.path.exists('/data') if is_railway_environment() else 'N/A',
+            'data_directory_contents': os.listdir('/data') if is_railway_environment() and os.path.exists('/data') else 'N/A',
+            'apps_table_exists': apps_table_exists,
+            'apps_count': apps_count,
+            'event_selections_table_exists': event_selections_table_exists,
+            'event_selections_count': event_selections_count,
+            'railway_env_vars': {
+                'RAILWAY_ENVIRONMENT': os.getenv('RAILWAY_ENVIRONMENT'),
+                'RAILWAY_SERVICE_NAME': os.getenv('RAILWAY_SERVICE_NAME'),
+                'RAILWAY_PROJECT_ID': os.getenv('RAILWAY_PROJECT_ID'),
+                'RAILWAY_DEPLOYMENT_ID': os.getenv('RAILWAY_DEPLOYMENT_ID'),
+                'RAILWAY_REPLICA_ID': os.getenv('RAILWAY_REPLICA_ID')
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Start the background worker

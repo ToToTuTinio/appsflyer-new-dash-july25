@@ -19,7 +19,18 @@ redis_conn = Redis(host='localhost', port=6379, db=0)
 task_queue = Queue(connection=redis_conn)
 
 # Database path - use persistent volume in Railway, fallback to local for development
-DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if os.getenv('RAILWAY_ENVIRONMENT') else 'event_selections.db')
+# More reliable Railway detection - Railway sets multiple environment variables
+def is_railway_environment():
+    railway_vars = [
+        'RAILWAY_ENVIRONMENT',
+        'RAILWAY_SERVICE_NAME', 
+        'RAILWAY_PROJECT_ID',
+        'RAILWAY_DEPLOYMENT_ID',
+        'RAILWAY_REPLICA_ID'
+    ]
+    return any(os.getenv(var) for var in railway_vars)
+
+DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if is_railway_environment() else 'event_selections.db')
 
 def process_report_async(apps, period, selected_events):
     """Process report asynchronously using RQ"""
