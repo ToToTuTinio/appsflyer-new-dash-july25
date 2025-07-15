@@ -149,7 +149,19 @@ def is_railway_environment():
         'RAILWAY_DEPLOYMENT_ID',
         'RAILWAY_REPLICA_ID'
     ]
-    return any(os.getenv(var) for var in railway_vars)
+    # Check for Railway environment variables
+    if any(os.getenv(var) for var in railway_vars):
+        return True
+    
+    # Fallback: Check for Railway-specific conditions
+    # Railway typically sets PORT environment variable
+    if os.getenv('PORT') and not os.getenv('RAILWAY_ENVIRONMENT'):
+        # Additional Railway detection - Railway apps usually run on port 8080 or similar
+        port = os.getenv('PORT', '5000')
+        if port != '5000':  # Default Flask port is 5000, Railway uses different ports
+            return True
+    
+    return False
 
 DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if is_railway_environment() else 'event_selections.db')
 
