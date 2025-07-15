@@ -4322,23 +4322,32 @@ def debug_db_status():
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
-        # Check if apps table exists and count rows
-        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='apps'")
-        apps_table_exists = c.fetchone() is not None
+        # Check if apps_cache table exists and count rows
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='apps_cache'")
+        apps_cache_table_exists = c.fetchone() is not None
         
-        apps_count = 0
-        if apps_table_exists:
-            c.execute("SELECT COUNT(*) FROM apps")
-            apps_count = c.fetchone()[0]
+        apps_cache_count = 0
+        if apps_cache_table_exists:
+            c.execute("SELECT COUNT(*) FROM apps_cache")
+            apps_cache_count = c.fetchone()[0]
         
-        # Check if event_selections table exists and count rows
-        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='event_selections'")
-        event_selections_table_exists = c.fetchone() is not None
+        # Check if manual_apps table exists and count rows
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='manual_apps'")
+        manual_apps_table_exists = c.fetchone() is not None
         
-        event_selections_count = 0
-        if event_selections_table_exists:
-            c.execute("SELECT COUNT(*) FROM event_selections")
-            event_selections_count = c.fetchone()[0]
+        manual_apps_count = 0
+        if manual_apps_table_exists:
+            c.execute("SELECT COUNT(*) FROM manual_apps")
+            manual_apps_count = c.fetchone()[0]
+        
+        # Check if app_event_selections table exists and count rows
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='app_event_selections'")
+        app_event_selections_table_exists = c.fetchone() is not None
+        
+        app_event_selections_count = 0
+        if app_event_selections_table_exists:
+            c.execute("SELECT COUNT(*) FROM app_event_selections")
+            app_event_selections_count = c.fetchone()[0]
         
         conn.close()
         
@@ -4348,10 +4357,12 @@ def debug_db_status():
             'database_exists': os.path.exists(DB_PATH),
             'data_directory_exists': os.path.exists('/data') if is_railway_environment() else 'N/A',
             'data_directory_contents': os.listdir('/data') if is_railway_environment() and os.path.exists('/data') else 'N/A',
-            'apps_table_exists': apps_table_exists,
-            'apps_count': apps_count,
-            'event_selections_table_exists': event_selections_table_exists,
-            'event_selections_count': event_selections_count,
+            'apps_cache_table_exists': apps_cache_table_exists,
+            'apps_cache_count': apps_cache_count,
+            'manual_apps_table_exists': manual_apps_table_exists,
+            'manual_apps_count': manual_apps_count,
+            'app_event_selections_table_exists': app_event_selections_table_exists,
+            'app_event_selections_count': app_event_selections_count,
             'railway_env_vars': {
                 'RAILWAY_ENVIRONMENT': os.getenv('RAILWAY_ENVIRONMENT'),
                 'RAILWAY_SERVICE_NAME': os.getenv('RAILWAY_SERVICE_NAME'),
