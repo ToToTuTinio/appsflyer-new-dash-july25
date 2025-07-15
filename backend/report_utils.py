@@ -7,6 +7,7 @@ import time
 from rq import Queue
 from redis import Redis
 import logging
+import os
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +18,8 @@ redis_conn = Redis(host='localhost', port=6379, db=0)
 # Initialize RQ queue
 task_queue = Queue(connection=redis_conn)
 
-DB_PATH = 'event_selections.db'
+# Database path - use persistent volume in Railway, fallback to local for development
+DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if os.getenv('RAILWAY_ENVIRONMENT') else 'event_selections.db')
 
 def process_report_async(apps, period, selected_events):
     """Process report asynchronously using RQ"""

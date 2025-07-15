@@ -139,9 +139,17 @@ APPSFLYER_API_KEY = os.getenv('APPSFLYER_API_KEY')
 if not all([EMAIL, PASSWORD]):
     raise ValueError("EMAIL and PASSWORD not found in environment variables")
 
-DB_PATH = 'event_selections.db'
+# Database path - use persistent volume in Railway, fallback to local for development
+DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if os.getenv('RAILWAY_ENVIRONMENT') else 'event_selections.db')
 
 def init_db():
+    # Ensure the database directory exists (for persistent storage)
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+        logger.info(f"Created database directory: {db_dir}")
+    
+    logger.info(f"Initializing database at: {DB_PATH}")
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS app_event_selections (
@@ -269,10 +277,14 @@ def check_auth():
 def dashboard():
     return render_template('dashboard.html')
 
-def get_active_apps(max_retries=7, force_fetch=False):
+def get_active_apps(max_retries=7, force_fetch=False, allow_appsflyer_api=True):
     """
-    Fetch the list of active apps from cache if less than 24 hours old and has non-active apps,
-    otherwise fetch from AppsFlyer and update cache.
+    Fetch the list of active apps from cache, optionally fetch from AppsFlyer if cache is old.
+    
+    Args:
+        max_retries: Maximum retries for AppsFlyer API calls
+        force_fetch: Force fetch from AppsFlyer even if cache is fresh
+        allow_appsflyer_api: Whether to allow AppsFlyer API calls at all (False = cache only)
     """
     import pytz
     gmt2 = pytz.timezone('Europe/Berlin')
@@ -291,17 +303,52 @@ def get_active_apps(max_retries=7, force_fetch=False):
         data, updated_at = row
         updated_at_dt = datetime.datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
         updated_at_dt = gmt2.localize(updated_at_dt)
-        cache_age = (now - updated_at_dt).total_seconds()
         
-        # First check if cache is fresh enough
-        if cache_age < 86400:
+        # Always use cached data if available (no time expiration)
+        cached_data = json.loads(data)
+        
+        # Update active status from database for all apps
+        for app in cached_data.get('apps', []):
+            # If app exists in database, use its status, otherwise default to active (True)
+            app['is_active'] = bool(active_status.get(app['app_id'], 1))
+            # Mark existing apps as non-manual if not already marked
+            if 'is_manual' not in app:
+                app['is_manual'] = False
+        
+        # Add manual apps to cached data
+        c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
+                     FROM manual_apps ORDER BY app_name''')
+        manual_apps = c.fetchall()
+        
+        for manual_app in manual_apps:
+            app_id, app_name, status, event1, event2, is_active = manual_app
+            cached_data['apps'].append({
+                'app_id': app_id,
+                'app_name': app_name,
+                'status': status,
+                'event1': event1,
+                'event2': event2,
+                'is_active': bool(is_active),
+                'is_manual': True  # Mark as manual apps
+            })
+        
+        # Update count to include manual apps
+        cached_data['count'] = len(cached_data['apps'])
+        
+        # Return cached data regardless of age
+        cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+        cached_data['used_cache'] = True
+        conn.close()
+        return cached_data
+
+    # If no cache or cache is old, check if we're allowed to call AppsFlyer API
+    if not allow_appsflyer_api:
+        # Return cached data even if it's old, or empty list if no cache
+        if row:
             cached_data = json.loads(data)
-            
             # Update active status from database for all apps
             for app in cached_data.get('apps', []):
-                # If app exists in database, use its status, otherwise default to active (True)
                 app['is_active'] = bool(active_status.get(app['app_id'], 1))
-                # Mark existing apps as non-manual if not already marked
                 if 'is_manual' not in app:
                     app['is_manual'] = False
             
@@ -319,23 +366,41 @@ def get_active_apps(max_retries=7, force_fetch=False):
                     'event1': event1,
                     'event2': event2,
                     'is_active': bool(is_active),
-                    'is_manual': True  # Mark as manual apps
+                    'is_manual': True
                 })
             
-            # Update count to include manual apps
             cached_data['count'] = len(cached_data['apps'])
+            cached_data['used_cache'] = True
+            conn.close()
+            return cached_data
+        else:
+            # No cache and not allowed to call API, return just manual apps
+            manual_apps = []
+            c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
+                         FROM manual_apps ORDER BY app_name''')
+            manual_apps_data = c.fetchall()
             
-            # Check if we have any non-active apps
-            has_non_active = any(not app.get('is_active', True) for app in cached_data.get('apps', []))
+            for manual_app in manual_apps_data:
+                app_id, app_name, status, event1, event2, is_active = manual_app
+                manual_apps.append({
+                    'app_id': app_id,
+                    'app_name': app_name,
+                    'status': status,
+                    'event1': event1,
+                    'event2': event2,
+                    'is_active': bool(is_active),
+                    'is_manual': True
+                })
             
-            # Use cache only if we have some non-active apps and cache is fresh
-            if has_non_active:
-                cached_data['fetch_time'] = updated_at_dt.strftime('%Y-%m-%d %H:%M:%S')
-                cached_data['used_cache'] = True
-                conn.close()
-                return cached_data
+            conn.close()
+            return {
+                "count": len(manual_apps),
+                "apps": manual_apps,
+                "fetch_time": now.strftime('%Y-%m-%d %H:%M:%S'),
+                "used_cache": True
+            }
 
-    # If no cache, cache is old, all apps are active, or force_fetch is True, fetch new data
+    # If allowed to call API, fetch new data from AppsFlyer
     apps = get_apps_with_installs(EMAIL, PASSWORD, max_retries=max_retries)
     
     # Add active status to each app, defaulting to active (True) if not in database
@@ -379,8 +444,9 @@ def get_active_apps(max_retries=7, force_fetch=False):
 @app.route('/active-apps')
 @login_required
 def active_apps():
+    """Legacy endpoint - uses cache only to avoid unexpected AppsFlyer API calls"""
     try:
-        result = get_active_apps()
+        result = get_active_apps(allow_appsflyer_api=False)
         return jsonify(result)
     
     except Exception as e:
@@ -1062,8 +1128,9 @@ def save_event_selections():
 @app.route('/get_apps')
 @login_required
 def get_apps():
+    """Only this endpoint should trigger AppsFlyer API calls (via 'Sync Apps' button)"""
     try:
-        result = get_active_apps()
+        result = get_active_apps(allow_appsflyer_api=True)
         # Add used_cache flag to indicate if we used cached data
         result['used_cache'] = result.get('fetch_time') is not None
         return jsonify(result)
@@ -1933,61 +2000,15 @@ def clear_fraud_cache():
 @app.route('/api/apps-page')
 @login_required
 def apps_page():
+    """Tab switching endpoint - should NEVER trigger AppsFlyer API calls"""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
-        # Get active status from database
-        c.execute('SELECT app_id, is_active FROM app_event_selections')
-        active_status = dict(c.fetchall())
-        
-        # Get the most recent apps cache (synced apps)
-        c.execute('SELECT data, updated_at FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
-        cache_row = c.fetchone()
-        
-        apps = []
-        fetch_time = None
-        used_cache = False
-        
-        if cache_row:
-            data, updated_at = cache_row
-            cached_data = json.loads(data)
-            
-            # Get synced apps from cache
-            for app in cached_data.get('apps', []):
-                app['is_active'] = bool(active_status.get(app['app_id'], 1))
-                if 'is_manual' not in app:
-                    app['is_manual'] = False
-                apps.append(app)
-            
-            fetch_time = cached_data.get('fetch_time', updated_at)
-            used_cache = cached_data.get('used_cache', True)
-        
-        # Get manual apps from database and add them
-        c.execute('''SELECT app_id, app_name, status, event1, event2, is_active 
-                     FROM manual_apps ORDER BY app_name''')
-        manual_apps = c.fetchall()
-        
-        for manual_app in manual_apps:
-            app_id, app_name, status, event1, event2, is_active = manual_app
-            apps.append({
-                'app_id': app_id,
-                'app_name': app_name,
-                'status': status,
-                'event1': event1,
-                'event2': event2,
-                'is_active': bool(is_active),
-                'is_manual': True
-            })
-        
-        conn.close()
-        
+        result = get_active_apps(allow_appsflyer_api=False)
         return jsonify({
-            'count': len(apps),
-            'apps': apps,
-            'fetch_time': fetch_time,
-            'used_cache': used_cache,
-            'updated_at': fetch_time
+            'count': result['count'],
+            'apps': result['apps'],
+            'fetch_time': result['fetch_time'],
+            'used_cache': result['used_cache'],
+            'updated_at': result['fetch_time']
         })
         
     except Exception as e:
@@ -2432,12 +2453,18 @@ def add_manual_app():
         app_id = data.get('app_id', '').strip()
         app_name = data.get('app_name', '').strip()
         status = data.get('status', 'active').strip()
-        event1 = data.get('event1', '').strip() or None
-        event2 = data.get('event2', '').strip() or None
+        event1 = data.get('event1', '').strip()
+        event2 = data.get('event2', '').strip()
         
         # Validate required fields
-        if not app_id or not app_name:
-            return jsonify({'success': False, 'error': 'App ID and App Name are required'}), 400
+        if not app_id:
+            return jsonify({'success': False, 'error': 'App ID is required and cannot be empty'}), 400
+        if not app_name:
+            return jsonify({'success': False, 'error': 'App Name is required and cannot be empty'}), 400
+        if not event1:
+            return jsonify({'success': False, 'error': 'Event 1 is required and cannot be empty'}), 400
+        if not event2:
+            return jsonify({'success': False, 'error': 'Event 2 is required and cannot be empty'}), 400
         
         # Validate status
         if status not in ['active', 'inactive']:
@@ -2449,7 +2476,7 @@ def add_manual_app():
         # Check if app already exists in manual_apps or in AppsFlyer apps
         c.execute('SELECT app_id FROM manual_apps WHERE app_id = ?', (app_id,))
         if c.fetchone():
-            return jsonify({'success': False, 'error': 'App ID already exists as a manual app'}), 400
+            return jsonify({'success': False, 'error': f'App ID "{app_id}" already exists as a manual app. Each app ID must be unique.'}), 400
         
         # Check if app exists in AppsFlyer apps (from apps_cache)
         c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
@@ -2458,7 +2485,7 @@ def add_manual_app():
             cached_data = json.loads(cache_row[0])
             existing_app_ids = [app['app_id'] for app in cached_data.get('apps', [])]
             if app_id in existing_app_ids:
-                return jsonify({'success': False, 'error': 'App ID already exists in synced apps from AppsFlyer'}), 400
+                return jsonify({'success': False, 'error': f'App ID "{app_id}" already exists in synced apps from AppsFlyer. Cannot add duplicate app IDs.'}), 400
         
         # Insert manual app
         is_active = 1 if status == 'active' else 0
@@ -3270,8 +3297,8 @@ def execute_auto_run():
         
         logger.info("Auto-run execution started")
         
-        # Get active apps
-        active_apps_result = get_active_apps()
+        # Get active apps (cache only - no AppsFlyer API calls for auto-run)
+        active_apps_result = get_active_apps(allow_appsflyer_api=False)
         if not active_apps_result or not active_apps_result.get('apps'):
             logger.error("No active apps found for auto-run")
             # Mark as not running
@@ -3747,8 +3774,8 @@ def auto_run_background_worker():
 def execute_auto_run_logic():
     """Execute the auto-run logic without Flask request context"""
     try:
-        # Get active apps
-        active_apps_result = get_active_apps()
+        # Get active apps (cache only - no AppsFlyer API calls for background auto-run)
+        active_apps_result = get_active_apps(allow_appsflyer_api=False)
         if not active_apps_result or not active_apps_result.get('apps'):
             logger.error("No active apps found for background auto-run")
             return False
@@ -4001,6 +4028,126 @@ def get_events_source_subpage_10d():
     except Exception as e:
         print(f"[EVENTS_SOURCE_SUBPAGE] Error: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/remove-app', methods=['POST'])
+@login_required
+def remove_single_app():
+    """Remove a single app from cache and/or manual apps"""
+    try:
+        data = request.get_json()
+        app_id = data.get('app_id')
+        
+        if not app_id:
+            return jsonify({'success': False, 'error': 'App ID is required'}), 400
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Check if it's a manual app
+        c.execute('SELECT COUNT(*) FROM manual_apps WHERE app_id = ?', (app_id,))
+        is_manual = c.fetchone()[0] > 0
+        
+        # Remove from manual apps if it exists there
+        if is_manual:
+            c.execute('DELETE FROM manual_apps WHERE app_id = ?', (app_id,))
+            print(f"Removed manual app: {app_id}")
+        
+        # Remove from app_event_selections
+        c.execute('DELETE FROM app_event_selections WHERE app_id = ?', (app_id,))
+        
+        # If it was a synced app, we need to update the apps_cache to remove it
+        if not is_manual:
+            c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+            cache_row = c.fetchone()
+            
+            if cache_row:
+                cached_data = json.loads(cache_row[0])
+                # Remove the app from the cached apps list
+                cached_data['apps'] = [app for app in cached_data['apps'] if app['app_id'] != app_id]
+                cached_data['count'] = len(cached_data['apps'])
+                
+                # Update cache
+                c.execute('DELETE FROM apps_cache')
+                c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', 
+                         (json.dumps(cached_data), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                print(f"Removed synced app from cache: {app_id}")
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'App {app_id} removed successfully',
+            'app_type': 'manual' if is_manual else 'synced'
+        })
+        
+    except Exception as e:
+        print(f"Error removing app: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/remove-apps-bulk', methods=['POST'])
+@login_required
+def remove_multiple_apps():
+    """Remove multiple apps from cache and/or manual apps"""
+    try:
+        data = request.get_json()
+        app_ids = data.get('app_ids', [])
+        
+        if not app_ids:
+            return jsonify({'success': False, 'error': 'App IDs are required'}), 400
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        removed_manual = []
+        removed_synced = []
+        
+        # Process each app
+        for app_id in app_ids:
+            # Check if it's a manual app
+            c.execute('SELECT COUNT(*) FROM manual_apps WHERE app_id = ?', (app_id,))
+            is_manual = c.fetchone()[0] > 0
+            
+            if is_manual:
+                # Remove from manual apps
+                c.execute('DELETE FROM manual_apps WHERE app_id = ?', (app_id,))
+                removed_manual.append(app_id)
+            else:
+                removed_synced.append(app_id)
+            
+            # Remove from app_event_selections
+            c.execute('DELETE FROM app_event_selections WHERE app_id = ?', (app_id,))
+        
+        # Update apps_cache to remove synced apps
+        if removed_synced:
+            c.execute('SELECT data FROM apps_cache ORDER BY updated_at DESC LIMIT 1')
+            cache_row = c.fetchone()
+            
+            if cache_row:
+                cached_data = json.loads(cache_row[0])
+                # Remove the synced apps from the cached apps list
+                cached_data['apps'] = [app for app in cached_data['apps'] if app['app_id'] not in removed_synced]
+                cached_data['count'] = len(cached_data['apps'])
+                
+                # Update cache
+                c.execute('DELETE FROM apps_cache')
+                c.execute('INSERT INTO apps_cache (data, updated_at) VALUES (?, ?)', 
+                         (json.dumps(cached_data), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Removed {len(app_ids)} apps successfully',
+            'removed_manual': removed_manual,
+            'removed_synced': removed_synced,
+            'total_removed': len(app_ids)
+        })
+        
+    except Exception as e:
+        print(f"Error removing apps: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Start the background worker

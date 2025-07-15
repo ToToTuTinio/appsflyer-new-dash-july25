@@ -1256,12 +1256,44 @@
                 </div>
             </div>
 
+            <!-- Bulk Actions Bar -->
+            <div id="bulk-actions-bar" class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-lg mb-4 hidden">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span id="selected-count" class="text-indigo-800 font-medium">0 apps selected</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button id="bulk-remove-btn" class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Remove Selected
+                        </button>
+                        <button id="deselect-all-btn" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            Clear Selection
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Enhanced Apps Table -->
             <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gradient-to-r from-indigo-50 to-purple-50">
                             <tr>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="checkbox" id="select-all-checkbox" class="h-4 w-4 text-indigo-600 rounded focus:ring-indigo-500">
+                                        <span>Select</span>
+                                    </div>
+                                </th>
                                 <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                     <div class="flex items-center space-x-2">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1307,7 +1339,7 @@
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
                                         </svg>
-                                        <span>Actions</span>
+                                        <span>Save/Remove</span>
                                     </div>
                                 </th>
                             </tr>
@@ -1384,9 +1416,14 @@
                 <form id="add-manual-app-form" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">App ID *</label>
+                        <div class="mb-2">
+                            <p class="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                                <span class="font-semibold">⚠️ Critical:</span> This App ID is used for AppsFlyer API calls.
+                            </p>
+                        </div>
                         <input type="text" id="manual-app-id" name="app_id" required 
                                class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                               placeholder="Enter app ID">
+                               placeholder="Enter exact AppsFlyer app ID">
                     </div>
                     
                     <div>
@@ -1406,15 +1443,15 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Event 1 (Optional)</label>
-                        <input type="text" id="manual-app-event1" name="event1" 
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event 1 *</label>
+                        <input type="text" id="manual-app-event1" name="event1" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                placeholder="Enter event 1">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Event 2 (Optional)</label>
-                        <input type="text" id="manual-app-event2" name="event2" 
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event 2 *</label>
+                        <input type="text" id="manual-app-event2" name="event2" required
                                class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                placeholder="Enter event 2">
                     </div>
@@ -2971,13 +3008,19 @@
                 app_id: formData.get('app_id').trim(),
                 app_name: formData.get('app_name').trim(),
                 status: formData.get('status'),
-                event1: formData.get('event1').trim() || null,
-                event2: formData.get('event2').trim() || null
+                event1: formData.get('event1').trim(),
+                event2: formData.get('event2').trim()
             };
             
             // Validate required fields
             if (!appData.app_id || !appData.app_name) {
                 showErrorToast('App ID and App Name are required');
+                return;
+            }
+            
+            // Validate required events
+            if (!appData.event1 || !appData.event2) {
+                showErrorToast('Event 1 and Event 2 are required');
                 return;
             }
             
@@ -3003,12 +3046,14 @@
                     // Just refresh the apps list from cache/database without API calls
                     refreshAppsListFromDatabase();
                 } else {
-                    showErrorToast(data.error || 'Failed to add manual app');
+                    // Show detailed error message from backend
+                    const errorMessage = data.error || 'Failed to add manual app';
+                    showErrorToast(`Failed to add manual app: ${errorMessage}`);
                 }
             })
             .catch(error => {
                 console.error('Error adding manual app:', error);
-                showErrorToast('Error adding manual app. Please try again.');
+                showErrorToast('Network error: Could not connect to server. Please check your connection and try again.');
             })
             .finally(() => {
                 saveBtn.disabled = false;
@@ -4951,6 +4996,10 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <input type="checkbox" class="app-checkbox mr-3 h-4 w-4 text-indigo-600 rounded focus:ring-indigo-500" data-app-id="${app.app_id}">
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
                                     <span class="font-mono text-sm font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded">${app.app_id}</span>
                                 </div>
                             </td>
@@ -4990,12 +5039,19 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <button class="event-save-btn action-button btn-primary" data-app-id="${app.app_id}">
-                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-                                    </svg>
-                                    Save
-                                </button>
+                                <div class="flex items-center justify-center space-x-2">
+                                    <button class="event-save-btn action-button btn-primary" data-app-id="${app.app_id}">
+                                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                                        </svg>
+                                        Save
+                                    </button>
+                                    <button class="remove-app-btn text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-full transition-colors" data-app-id="${app.app_id}" data-app-name="${app.app_name}" data-is-manual="${app.is_manual}" title="Remove App">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </td>
                         `;
                         appsList.appendChild(tr);
@@ -5076,6 +5132,9 @@
                     
                     // Setup search and filter functionality
                     setupSearchAndFilters();
+                    
+                    // Initialize app removal functionality after rendering
+                    setupAppRemovalEventListeners();
                 })
                 .catch(error => {
                     console.error('Error fetching event selections:', error);
@@ -7618,6 +7677,255 @@
             }
             if (tabName === 'profile') loadProfile();
         };
+
+        // App removal functionality
+        function setupAppRemovalEventListeners() {
+            // Select all checkbox functionality
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', function() {
+                    const appCheckboxes = document.querySelectorAll('.app-checkbox');
+                    appCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                    updateBulkActionsBar();
+                });
+            }
+
+            // Individual app checkboxes
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('app-checkbox')) {
+                    updateBulkActionsBar();
+                    updateSelectAllCheckbox();
+                }
+            });
+
+            // Individual app remove buttons
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.remove-app-btn')) {
+                    const button = e.target.closest('.remove-app-btn');
+                    const appId = button.dataset.appId;
+                    const appName = button.dataset.appName;
+                    const isManual = button.dataset.isManual === 'true';
+                    
+                    removeApp(appId, appName, isManual);
+                }
+            });
+
+            // Bulk remove button
+            document.getElementById('bulk-remove-btn').addEventListener('click', function() {
+                const selectedApps = getSelectedApps();
+                if (selectedApps.length === 0) {
+                    alert('Please select apps to remove');
+                    return;
+                }
+                
+                bulkRemoveApps(selectedApps);
+            });
+
+            // Deselect all button
+            document.getElementById('deselect-all-btn').addEventListener('click', function() {
+                const appCheckboxes = document.querySelectorAll('.app-checkbox');
+                appCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                document.getElementById('select-all-checkbox').checked = false;
+                updateBulkActionsBar();
+            });
+        }
+
+        function updateBulkActionsBar() {
+            const selectedApps = getSelectedApps();
+            const bulkActionsBar = document.getElementById('bulk-actions-bar');
+            const selectedCount = document.getElementById('selected-count');
+            
+            if (selectedApps.length > 0) {
+                bulkActionsBar.classList.remove('hidden');
+                selectedCount.textContent = `${selectedApps.length} app${selectedApps.length > 1 ? 's' : ''} selected`;
+            } else {
+                bulkActionsBar.classList.add('hidden');
+            }
+        }
+
+        function updateSelectAllCheckbox() {
+            const appCheckboxes = document.querySelectorAll('.app-checkbox');
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            
+            if (appCheckboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                return;
+            }
+            
+            const checkedCount = document.querySelectorAll('.app-checkbox:checked').length;
+            selectAllCheckbox.checked = checkedCount === appCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < appCheckboxes.length;
+        }
+
+        function getSelectedApps() {
+            const selectedCheckboxes = document.querySelectorAll('.app-checkbox:checked');
+            return Array.from(selectedCheckboxes).map(checkbox => {
+                const row = checkbox.closest('tr');
+                const removeBtn = row.querySelector('.remove-app-btn');
+                return {
+                    appId: checkbox.dataset.appId,
+                    appName: removeBtn.dataset.appName,
+                    isManual: removeBtn.dataset.isManual === 'true'
+                };
+            });
+        }
+
+        function removeApp(appId, appName, isManual) {
+            const appType = isManual ? 'manual' : 'synced';
+            
+            if (!confirm(`Are you sure you want to remove the ${appType} app "${appName}" (${appId})?`)) {
+                return;
+            }
+
+            fetch('/remove-app', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    app_id: appId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the row from the table
+                    const row = document.querySelector(`tr[data-app-id="${appId}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                    
+                    // Update app counts
+                    const remainingApps = document.querySelectorAll('.apps-row').length;
+                    document.getElementById('app-count').textContent = remainingApps;
+                    
+                    // Update bulk actions bar
+                    updateBulkActionsBar();
+                    updateSelectAllCheckbox();
+                    
+                    // Show success message
+                    showSuccessToast(`${appType} app "${appName}" removed successfully`);
+                    
+                    // Refresh the apps list to get updated data
+                    setTimeout(() => {
+                        refreshAppsListFromDatabase();
+                    }, 1000);
+                } else {
+                    showErrorToast('Error removing app: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error removing app:', error);
+                showErrorToast('Error removing app: ' + error.message);
+            });
+        }
+
+        function bulkRemoveApps(selectedApps) {
+            const appIds = selectedApps.map(app => app.appId);
+            const manualCount = selectedApps.filter(app => app.isManual).length;
+            const syncedCount = selectedApps.length - manualCount;
+            
+            let confirmMessage = `Are you sure you want to remove ${selectedApps.length} app${selectedApps.length > 1 ? 's' : ''}?`;
+            if (manualCount > 0 && syncedCount > 0) {
+                confirmMessage += `\n\n${manualCount} manual app${manualCount > 1 ? 's' : ''} and ${syncedCount} synced app${syncedCount > 1 ? 's' : ''}`;
+            } else if (manualCount > 0) {
+                confirmMessage += `\n\n${manualCount} manual app${manualCount > 1 ? 's' : ''}`;
+            } else {
+                confirmMessage += `\n\n${syncedCount} synced app${syncedCount > 1 ? 's' : ''}`;
+            }
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            fetch('/remove-apps-bulk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    app_ids: appIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the rows from the table
+                    appIds.forEach(appId => {
+                        const row = document.querySelector(`tr[data-app-id="${appId}"]`);
+                        if (row) {
+                            row.remove();
+                        }
+                    });
+                    
+                    // Update app counts
+                    const remainingApps = document.querySelectorAll('.apps-row').length;
+                    document.getElementById('app-count').textContent = remainingApps;
+                    
+                    // Update bulk actions bar
+                    updateBulkActionsBar();
+                    updateSelectAllCheckbox();
+                    
+                    // Show success message
+                    showSuccessToast(`Successfully removed ${data.total_removed} app${data.total_removed > 1 ? 's' : ''}`);
+                    
+                    // Refresh the apps list to get updated data
+                    setTimeout(() => {
+                        refreshAppsListFromDatabase();
+                    }, 1000);
+                } else {
+                    showErrorToast('Error removing apps: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error removing apps:', error);
+                showErrorToast('Error removing apps: ' + error.message);
+            });
+        }
+
+        // Toast notification functions
+        function showSuccessToast(message) {
+            showToast(message, 'success');
+        }
+
+        function showErrorToast(message) {
+            showToast(message, 'error');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-y-0`;
+            
+            if (type === 'success') {
+                toast.className += ' bg-green-500 text-white';
+            } else if (type === 'error') {
+                toast.className += ' bg-red-500 text-white';
+            } else {
+                toast.className += ' bg-blue-500 text-white';
+            }
+            
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                toast.style.transform = 'translateY(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize app removal functionality when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setupAppRemovalEventListeners();
+        });
 
         // Helper to get the currently active stats range
         function getActiveStatsRange() {
