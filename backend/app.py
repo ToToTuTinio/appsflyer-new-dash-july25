@@ -686,6 +686,8 @@ def make_api_request(url, params, max_retries=7, retry_delay=30, app_id=None, ap
             endpoint_type = "daily_report"
         elif "blocked_installs_report" in url:
             endpoint_type = "blocked_installs_report"
+        elif "installs_report" in url:
+            endpoint_type = "installs_report"
         elif "detection" in url:
             endpoint_type = "detection"
         elif "blocked_in_app_events_report" in url:
@@ -885,6 +887,16 @@ def all_apps_stats():
             else:
                 print(f"[STATS] daily_report API error for {app_id}: {resp.status_code if resp else 'No response'}")
                 continue
+            # Installs Report (for raw data export)
+            print(f"[STATS] Calling installs_report API for {app_id}...")
+            installs_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/installs_report/v5"
+            installs_params = {"from": start_date, "to": end_date}
+            installs_resp = make_api_request(installs_url, installs_params, app_id=app_id, app_name=app_name, period=period)
+            if installs_resp == 'timeout':
+                print(f"[STATS] Timeout detected for installs_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Installs Report API timeout")
+            
             # Blocked Installs (RT)
             print(f"[STATS] Calling blocked_installs_report API for {app_id}...")
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
@@ -1446,6 +1458,17 @@ def get_fraud():
                         "event2": 0
                     }
                 agg[k][key] += count
+            
+            # Installs Report (for raw data export)
+            print(f"[FRAUD] Calling installs_report API for {app_id}...")
+            installs_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/installs_report/v5"
+            installs_params = {"from": start_date, "to": end_date}
+            installs_resp = make_api_request(installs_url, installs_params, app_id=app_id, app_name=app_name, period=period)
+            if installs_resp == 'timeout':
+                print(f"[FRAUD] Timeout detected for installs_report {app_id}, continuing with other APIs...")
+                timeout_count += 1
+                app_errors.append("Installs Report API timeout")
+            
             # Blocked Installs (RT)
             blocked_rt_url = f"https://hq1.appsflyer.com/api/raw-data/export/app/{app_id}/blocked_installs_report/v5"
             blocked_rt_params = {"from": start_date, "to": end_date}
@@ -2601,6 +2624,29 @@ def get_active_app_ids():
     conn.close()
     return active_apps
 
+def parse_raw_csv_data(raw_csv_data):
+    """Parse raw CSV data using proper CSV parser to handle malformed data"""
+    try:
+        if not raw_csv_data or not raw_csv_data.strip():
+            return []
+        
+        import io
+        import csv
+        
+        # Use proper CSV parsing to handle malformed data
+        csv_reader = csv.reader(io.StringIO(raw_csv_data.strip()))
+        rows = list(csv_reader)
+        
+        # Filter out empty rows
+        rows = [row for row in rows if row and any(cell.strip() for cell in row)]
+        
+        return rows
+    except Exception as e:
+        print(f"[CSV_PARSE] Error parsing CSV data: {str(e)}")
+        # Fallback to line splitting if CSV parsing fails
+        lines = raw_csv_data.strip().split('\n')
+        return [line.split(',') for line in lines if line.strip()]
+
 # Raw Data Export Endpoints
 @app.route('/export/stats/raw', methods=['GET'])
 @login_required
@@ -2765,19 +2811,21 @@ def export_raw_daily_report():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
-                # Add header with app info
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
+                # Add header with generic info for multi-app export
                 combined_csv += f"# Daily Report Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"  # Add App_Name column
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            # Add data rows with app name
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         # Return as downloadable CSV
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -2824,17 +2872,20 @@ def export_raw_blocked_installs_report():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# Blocked Installs Report Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_Blocked_Installs_{period}_{timestamp}.csv"
@@ -2880,17 +2931,20 @@ def export_raw_detection():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# Detection (PA) Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_Detection_PA_{period}_{timestamp}.csv"
@@ -2936,17 +2990,20 @@ def export_raw_blocked_in_app_events():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# Blocked In-App Events Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_Blocked_InApp_Events_{period}_{timestamp}.csv"
@@ -2992,17 +3049,20 @@ def export_raw_fraud_post_inapps():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# Fraud Post-InApps Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_Fraud_Post_InApps_{period}_{timestamp}.csv"
@@ -3048,17 +3108,20 @@ def export_raw_blocked_clicks():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# Blocked Clicks Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_Blocked_Clicks_{period}_{timestamp}.csv"
@@ -3104,17 +3167,20 @@ def export_raw_blocked_install_postbacks():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# Blocked Install Postbacks Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_Blocked_Install_Postbacks_{period}_{timestamp}.csv"
@@ -3160,20 +3226,82 @@ def export_raw_in_app_events():
         header_added = False
         
         for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
-            lines = raw_csv_data.strip().split('\n')
-            if not header_added and lines:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
                 combined_csv += f"# In-App Events Data - Period: {period} ({start_date} to {end_date})\n"
-                combined_csv += f"# App: {app_name}\n"
                 combined_csv += f"# Generated: {created_at}\n"
-                combined_csv += lines[0] + ",App_Name\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
                 header_added = True
             
-            for line in lines[1:]:
-                if line.strip():
-                    combined_csv += line + f",{app_name}\n"
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
         
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"AppsFlyer_Raw_InApp_Events_{period}_{timestamp}.csv"
+        
+        return Response(
+            combined_csv,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export/raw/installs_report', methods=['GET'])
+@login_required
+def export_raw_installs_report():
+    """Export raw installs report data"""
+    try:
+        period = request.args.get('period', 'last10')
+        app_id = request.args.get('app_id')
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        if app_id:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE app_id = ? AND endpoint_type = 'installs_report' AND period = ?
+                        ORDER BY created_at DESC LIMIT 1''', (app_id, period))
+        else:
+            c.execute('''SELECT app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at 
+                        FROM raw_appsflyer_data 
+                        WHERE endpoint_type = 'installs_report' AND period = ?
+                        ORDER BY app_name, created_at DESC''', (period,))
+        
+        rows = c.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'error': 'No installs report data found'}), 404
+        
+        combined_csv = ""
+        header_added = False
+        
+        for app_name, endpoint_type, period, raw_csv_data, start_date, end_date, created_at in rows:
+            parsed_rows = parse_raw_csv_data(raw_csv_data)
+            if not header_added and parsed_rows:
+                combined_csv += f"# Installs Report Data - Period: {period} ({start_date} to {end_date})\n"
+                combined_csv += f"# Generated: {created_at}\n"
+                # Convert header row to CSV format and add App_Name column
+                header_csv = ','.join(parsed_rows[0]) + ",App_Name\n"
+                combined_csv += header_csv
+                header_added = True
+            
+            # Add data rows with proper CSV formatting
+            for row in parsed_rows[1:]:
+                if row:  # Skip empty rows
+                    row_csv = ','.join(f'"{cell}"' if ',' in cell else cell for cell in row)
+                    combined_csv += row_csv + f",{app_name}\n"
+        
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"AppsFlyer_Raw_Installs_Report_{period}_{timestamp}.csv"
         
         return Response(
             combined_csv,

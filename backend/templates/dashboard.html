@@ -2557,6 +2557,25 @@
                                                     </button>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Installs Report -->
+                                            <div class="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                                                <div class="text-center">
+                                                    <div class="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-700 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                                        </svg>
+                                                    </div>
+                                                    <h4 class="text-lg font-bold text-gray-800 mb-2">Installs Report</h4>
+                                                    <p class="text-gray-600 text-xs mb-3">Install data report</p>
+                                                    <button onclick="exportRawInstallsReport()" class="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto transform hover:scale-105 text-sm">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                        </svg>
+                                                        <span>Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -5680,7 +5699,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                     apps: appsToAnalyze,
-                    period: 'last10'
+                    period: 'last10',
+                    force: true
                     })
                 })
                 .then(r => {
@@ -8256,7 +8276,7 @@
             fetch('/get_fraud', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10' })
+                body: JSON.stringify({ apps: window.fetchedApps || [], period: 'last10', force: true })
             })
             .then(r => r.json())
             .then(data => {
@@ -8626,7 +8646,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                                     apps: activeApps,
-                                    period: fraudPeriod
+                                    period: fraudPeriod,
+                                    force: true
                         })
                     });
                             
@@ -10515,6 +10536,20 @@
             } catch (error) {
                 console.error('Error exporting in-app events:', error);
                 showToast('error', 'Error exporting in-app events. Please try again.');
+            }
+        }
+
+        function exportRawInstallsReport() {
+            try {
+                showToast('info', 'Preparing original installs report data for export...');
+                
+                const url = '/export/raw/installs_report?period=last10';
+                window.open(url, '_blank');
+                
+                showToast('success', 'Installs report export started. Check your downloads folder.');
+            } catch (error) {
+                console.error('Error exporting installs report:', error);
+                showToast('error', 'Error exporting installs report. Please try again.');
             }
         }
     </script>
