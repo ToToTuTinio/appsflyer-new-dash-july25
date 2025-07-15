@@ -1,88 +1,26 @@
-# Railway Persistent Storage Setup Guide 🚀
+# Railway Persistent Storage Setup
 
-This guide will help you set up persistent storage for your AppsFlyer Dashboard on Railway, ensuring your Apps Cache and Manual Apps data survives deployments.
+## Overview
+This document explains how to configure Railway persistent storage for the AppsFlyer Dashboard to prevent data loss during deployments.
 
-## 🔧 What This Solves
+## Problem
+By default, Railway containers are ephemeral - they get destroyed and recreated on each deployment, causing all database data to be lost.
 
-Previously, each Railway deployment would wipe your SQLite database, losing:
-- ✅ **Apps Cache** (synced AppsFlyer apps)
-- ✅ **Manual Apps** (manually added apps)
-- ✅ **App Event Selections** (event configurations)
+## Solution
+Configure Railway persistent volumes to store the SQLite database on persistent storage that survives deployments.
 
-After following this guide, your apps data will persist across all deployments! 🎉
+## Configuration Steps
 
-## 📋 Prerequisites
-
-- Railway account with your project deployed
-- Access to your project's Railway dashboard
-- Local copy of your current database (if you have existing data)
-
-## 🛠️ Setup Steps
-
-### Step 1: Run the Migration Script (If You Have Existing Data)
-
-If you already have apps data you want to keep, run the migration script **before** deploying:
-
-```bash
-# Create a backup and migrate your existing data
-python migrate_database.py --backup
-
-# Or migrate to a custom location
-python migrate_database.py --backup --source event_selections.db --destination data/event_selections.db
-```
-
-The script will:
-- 📋 Create a backup of your existing database
-- 📦 Migrate all apps-related data to the new persistent location
-- 🔧 Create the proper database schema
-
-### Step 2: Deploy to Railway
-
-The code changes are already configured for persistent storage:
-
-1. **Database Path**: Automatically uses `/data/event_selections.db` in Railway
-2. **Volume Mount**: Railway will mount persistent storage at `/data`
-3. **Fallback**: Uses local path in development
-
-Simply deploy your updated code to Railway - no additional configuration needed!
-
-### Step 3: Verify Persistent Storage
-
-After deployment:
-
-1. **Check Database Location**: The app will log the database path during startup
-2. **Add Test Data**: Add a manual app through the UI
-3. **Redeploy**: Deploy again and verify your data is still there
-4. **Success!** 🎉 Your data now persists across deployments
-
-## 📁 File Structure
-
-```
-your-project/
-├── event_selections.db          # Local development database
-├── data/
-│   └── event_selections.db      # Persistent database (Railway)
-├── migrate_database.py          # Migration script
-└── railway.json                 # Railway configuration with volume
-```
-
-## 🔍 How It Works
-
-### Database Path Logic
-
-```python
-# Automatically chooses the right path
-DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if os.getenv('RAILWAY_ENVIRONMENT') else 'event_selections.db')
-```
-
-- **Railway**: Uses `/data/event_selections.db` (persistent volume)
-- **Local**: Uses `event_selections.db` (local development)
-- **Custom**: Set `DB_PATH` environment variable to override
-
-### Railway Volume Configuration
+### 1. Railway Volume Configuration
+The `railway.json` file contains the persistent volume configuration:
 
 ```json
 {
+  "$schema": "https://railway.app/railway.schema.json",
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
   "volumes": [
     {
       "name": "appsflyer-data",
@@ -92,84 +30,105 @@ DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if os.getenv('RAILWAY
 }
 ```
 
-This mounts a persistent volume at `/data` that survives deployments.
+### 2. Database Path Configuration
+The application automatically detects Railway environment and uses the persistent volume:
 
-## 🚨 Important Notes
+```python
+# More reliable Railway detection - Railway sets multiple environment variables
+def is_railway_environment():
+    railway_vars = [
+        'RAILWAY_ENVIRONMENT',
+        'RAILWAY_SERVICE_NAME', 
+        'RAILWAY_PROJECT_ID',
+        'RAILWAY_DEPLOYMENT_ID',
+        'RAILWAY_REPLICA_ID'
+    ]
+    return any(os.getenv(var) for var in railway_vars)
 
-### Data Preserved
-- ✅ **Apps Cache** (synced AppsFlyer apps)
-- ✅ **Manual Apps** (manually added apps)
-- ✅ **App Event Selections** (event configurations)
-
-### Data NOT Preserved (Intentionally)
-- ❌ **Stats Cache** (regenerated from AppsFlyer)
-- ❌ **Fraud Cache** (regenerated from AppsFlyer)
-- ❌ **Event Cache** (regenerated from AppsFlyer)
-- ❌ **Raw AppsFlyer Data** (regenerated from AppsFlyer)
-
-This is by design - only your apps configuration persists, while report data gets refreshed.
-
-## 🐛 Troubleshooting
-
-### Issue: Database Permission Errors
-```bash
-# Check if /data directory exists and is writable
-ls -la /data/
+DB_PATH = os.getenv('DB_PATH', '/data/event_selections.db' if is_railway_environment() else 'event_selections.db')
 ```
 
-### Issue: Migration Script Errors
-```bash
-# Run with verbose output
-python migrate_database.py --backup --source event_selections.db --destination data/event_selections.db
+### 3. Debug Endpoint
+A debug endpoint is available to check the database status and persistent storage:
+
+**URL**: `/api/debug/db-status`
+
+**Response includes**:
+- Database path and existence
+- Railway environment detection
+- Data directory status
+- Table existence and row counts
+- Railway environment variables
+
+### 4. Migration Script
+Use the `migrate_database.py` script to transfer existing data:
+
+```python
+python migrate_database.py
 ```
 
-### Issue: Apps Data Missing After Deployment
-1. Check Railway logs for database path
-2. Verify volume is mounted correctly
-3. Re-run migration script if needed
+## Deployment Process
 
-## 🎯 Migration Script Options
+### First Deployment
+1. **Expected**: 0 apps after first deployment (this is normal)
+2. **Reason**: New persistent volume is empty
+3. **Solution**: Sync apps from AppsFlyer after first deployment
 
-```bash
-# Basic migration with backup
-python migrate_database.py --backup
+### Subsequent Deployments
+1. **Expected**: Apps data persists between deployments
+2. **Verification**: Check `/api/debug/db-status` endpoint
+3. **Troubleshooting**: Use debug logs in Railway deployment logs
 
-# Custom source/destination paths
-python migrate_database.py --backup --source old_db.db --destination new_location/db.db
+## Verification
 
-# Migration without backup (not recommended)
-python migrate_database.py --source event_selections.db --destination data/event_selections.db
+### After Deployment
+1. **Check debug endpoint**: `https://your-app.railway.app/api/debug/db-status`
+2. **Verify Railway detection**: Look for `is_railway_environment: true`
+3. **Check database path**: Should be `/data/event_selections.db`
+4. **Verify data directory**: Should exist with proper contents
+
+### Debug Logs
+Check Railway deployment logs for:
+```
+🔍 Railway Environment Detection:
+  RAILWAY_ENVIRONMENT: production
+  RAILWAY_SERVICE_NAME: your-service
+  RAILWAY_PROJECT_ID: your-project-id
+  Is Railway Environment: true
+  Using DB_PATH: /data/event_selections.db
+  Database file exists: true
+  /data directory exists: true
 ```
 
-## 📊 What Gets Migrated
+## Troubleshooting
 
-The migration script preserves:
+### Apps Data Still Disappearing
+1. **Check debug endpoint**: Verify Railway detection is working
+2. **Check Railway logs**: Look for database path information
+3. **Verify volume mount**: Ensure `/data` directory exists
+4. **Check environment variables**: Verify Railway variables are set
 
-| Table | Description | Records |
-|-------|-------------|---------|
-| `apps_cache` | Synced AppsFlyer apps | All cached apps |
-| `manual_apps` | Manually added apps | All manual apps |
-| `app_event_selections` | Event configurations | All event settings |
+### Database Not Found
+1. **Check Railway environment detection**: May need to manually set `DB_PATH=/data/event_selections.db`
+2. **Verify volume configuration**: Ensure `railway.json` is properly configured
+3. **Check Railway dashboard**: Verify volume is mounted
 
-## 🔄 Deployment Workflow
+### Migration Issues
+1. **Run migration script**: Transfer existing data to persistent storage
+2. **Check source database**: Verify local database exists
+3. **Manual migration**: Use Railway CLI to copy database file
 
-1. **Before First Deployment**: Run migration script
-2. **Deploy to Railway**: Your apps data is now persistent
-3. **Future Deployments**: Just deploy - data persists automatically!
+## Railway Environment Variables
+Railway automatically sets these variables:
+- `RAILWAY_ENVIRONMENT`
+- `RAILWAY_SERVICE_NAME`
+- `RAILWAY_PROJECT_ID`
+- `RAILWAY_DEPLOYMENT_ID`
+- `RAILWAY_REPLICA_ID`
 
-## ✅ Success Verification
-
-After setup, you should see:
-
-1. **Railway Logs**: Database path shows `/data/event_selections.db`
-2. **Apps Page**: All your apps are still there after deployment
-3. **Manual Apps**: Any manual apps you added persist
-4. **Sync History**: Apps cache from AppsFlyer is preserved
-
----
-
-## 🎉 Congratulations!
-
-Your AppsFlyer Dashboard now has persistent storage! Your apps data will survive all future Railway deployments, making your dashboard much more reliable and user-friendly.
-
-For any issues, check the Railway logs or contact support with the specific error messages. 
+## Notes
+- **Volume persistence**: Data in `/data` survives deployments
+- **Container ephemeral**: Data in container filesystem is lost
+- **First deployment**: Will show 0 apps (expected)
+- **Subsequent deployments**: Apps data should persist
+- **Debug endpoint**: Use to verify configuration 
